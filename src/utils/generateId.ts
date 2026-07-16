@@ -1,0 +1,14 @@
+import { v4 as uuidv4 } from 'uuid';
+
+export const generateId = (): string => {
+  return uuidv4();
+};
+
+export const generateRoomCode = (): string => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return code;
+};
