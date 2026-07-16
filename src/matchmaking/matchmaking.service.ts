@@ -53,14 +53,15 @@ export class MatchmakingService {
     const region = input.region || 'AUTO';
 
     const entry: QueueEntry = {
-      userId,
-      username,
-      rating,
-      mode: input.mode,
-      region,
-      joinedAt: Date.now(),
-      socketId,
-    };
+    userId,
+    username,
+    rating,
+    mode: input.mode,
+    region,
+    joinedAt: Date.now(),
+    socketId,
+    requiredPlayers: input.requiredPlayers || 2,
+};
 
     // Add to queue
     const queueKey = `queue:${input.mode}`;
@@ -212,47 +213,56 @@ export class MatchmakingService {
     players: QueueEntry[],
     mode: GameMode
   ): QueueEntry[] | null {
-    if (players.length < MIN_PLAYERS) return null;
+    if (players.length < 2) return null;
 
     // Remove duplicates by userId
     const uniquePlayers = players.filter((player, index, self) =>
       index === self.findIndex(p => p.userId === player.userId)
     );
 
-    logger.info('Unique players in queue', {
-      total: players.length,
-      unique: uniquePlayers.length,
-      userIds: uniquePlayers.map(p => p.userId.substring(0, 8)),
+    if (uniquePlayers.length < 2) return null;
+
+    // Group by requiredPlayers count
+    const groups: { [key: number]: QueueEntry[] } = {};
+    uniquePlayers.forEach(p => {
+      const required = p.requiredPlayers || 2;
+      if (!groups[required]) groups[required] = [];
+      groups[required].push(p);
     });
 
-    if (uniquePlayers.length < MIN_PLAYERS) return null;
+    // Try to match groups that have enough players
+    for (const [requiredStr, groupPlayers] of Object.entries(groups)) {
+      const required = parseInt(requiredStr);
 
+      if (groupPlayers.length >= required) {
+        const now = Date.now();
+        const first = groupPlayers[0];
+        const waitTime = (now - first.joinedAt) / 1000;
+        const expansions = Math.floor(waitTime / (EXPANSION_INTERVAL / 1000));
+        const ratingRange = RATING_RANGE_INITIAL + expansions * RATING_RANGE_EXPANSION;
+
+        const compatible = groupPlayers.filter(p => {
+          if (p.userId === first.userId) return true;
+          return Math.abs(p.rating - first.rating) <= ratingRange;
+        });
+
+        if (compatible.length >= required) {
+          return compatible.slice(0, required);
+        }
+      }
+    }
+
+    // Fallback: after 30 seconds waiting, match any 2+ players regardless of requiredPlayers
     const now = Date.now();
-    const first = uniquePlayers[0];
-    const waitTime = (now - first.joinedAt) / 1000;
+    const oldest = uniquePlayers[0];
+    if (oldest && (now - oldest.joinedAt) > 30000) {
+      if (uniquePlayers.length >= 2) {
+        return uniquePlayers.slice(0, Math.min(uniquePlayers.length, 4));
+      }
+    }
 
-    // Calculate rating range based on wait time
-    const expansions = Math.floor(waitTime / (EXPANSION_INTERVAL / 1000));
-    const ratingRange = RATING_RANGE_INITIAL + expansions * RATING_RANGE_EXPANSION;
-
-    // Find compatible players
-    const compatible = uniquePlayers.filter((p) => {
-      if (p.userId === first.userId) return true;
-      return Math.abs(p.rating - first.rating) <= ratingRange;
-    });
-
-    logger.info('Compatible players', {
-      compatible: compatible.length,
-      ratingRange,
-      waitTime,
-    });
-
-    if (compatible.length < MIN_PLAYERS) return null;
-
-    // Take up to MAX_PLAYERS
-    return compatible.slice(0, MAX_PLAYERS);
+    return null;
   }
-
   // ─────────────────────────────────────────
   // GET QUEUE STATUS
   // ─────────────────────────────────────────

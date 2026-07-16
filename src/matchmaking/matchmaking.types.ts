@@ -22,6 +22,13 @@ export interface QueueEntry {
   region: string;
   joinedAt: number;
   socketId: string;
+  requiredPlayers: number;
+}
+
+export interface QueueJoinInput {
+  mode: GameMode;
+  region?: string;
+  requiredPlayers?: number;
 }
 
 export interface MatchFound {
