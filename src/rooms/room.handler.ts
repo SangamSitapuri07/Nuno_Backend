@@ -13,11 +13,11 @@ export const initializeRoomHandlers = (
   socket.on(SOCKET_EVENTS.ROOM_CREATE, async (data: CreateRoomInput) => {
     try {
       const room = await roomService.createRoom(
-        socket.userId,
-        socket.username,
-        socket.id,
-        data || {}
-      );
+    socket.userId,
+    socket.username,
+    socket.id,
+    data || { gameMode: 'PRIVATE', maxPlayers: 4, voiceEnabled: true }
+);
 
       socket.join(room.roomId);
       socket.roomId = room.roomId;
