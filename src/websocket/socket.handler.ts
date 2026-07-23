@@ -107,6 +107,64 @@ if (!(socket as any)._handlersRegistered) {
         });
       }
     });
+    // INVITE FRIEND TO GAME
+socket.on('invite.send', async (data: { targetUserId: string, roomCode: string }) => {
+    try {
+        if (!socket.userId || !data?.targetUserId || !data?.roomCode) return;
+
+        // Find target socket
+        for (const [socketId, sock] of io.sockets.sockets) {
+            const s = sock as any;
+            if (s.userId === data.targetUserId) {
+                io.to(socketId).emit('invite.received', {
+                    fromUserId: socket.userId,
+                    fromUsername: socket.username,
+                    roomCode: data.roomCode,
+                    timestamp: Date.now(),
+                });
+                logger.info('Invite sent', {
+                    from: socket.userId,
+                    to: data.targetUserId,
+                    roomCode: data.roomCode
+                });
+                break;
+            }
+        }
+
+        socket.emit('invite.sent', { success: true });
+    } catch (error) {
+        logger.error('Invite error', { error });
+    }
+});
+
+// ACCEPT INVITE
+socket.on('invite.accept', async (data: { roomCode: string }) => {
+    try {
+        if (!socket.userId || !data?.roomCode) return;
+
+        // Join the room
+        const roomService = (await import('../rooms/room.service')).default;
+        const room = await roomService.joinRoom(
+            socket.userId,
+            socket.username,
+            socket.id,
+            { roomCode: data.roomCode }
+        );
+
+        socket.join(room.roomId);
+        (socket as any).roomId = room.roomId;
+
+        socket.emit('room.joined', { room });
+        io.to(room.roomId).emit('room.updated', { room });
+
+        logger.info('Invite accepted', { userId: socket.userId, roomCode: data.roomCode });
+    } catch (error: any) {
+        socket.emit('error', {
+            code: error.code || 'SERVER_ERROR',
+            message: error.message || 'Failed to join room.',
+        });
+    }
+});
 
     socket.on('disconnect', async (reason) => {
       logger.info('Socket disconnected', {
