@@ -2,8 +2,21 @@ import { createClient } from 'redis';
 import logger from '../utils/logger';
 import config from './config';
 
+const redisUrl = config.redis.url;
+
 const redisClient = createClient({
-  url: config.redis.url,
+  url: redisUrl,
+  socket: {
+    tls: redisUrl.startsWith('rediss://'),
+    rejectUnauthorized: false,
+    reconnectStrategy: (retries) => {
+      if (retries > 10) {
+        logger.error('Redis max retries reached');
+        return new Error('Max retries reached');
+      }
+      return Math.min(retries * 200, 3000);
+    }
+  }
 });
 
 redisClient.on('connect', () => {
@@ -11,7 +24,9 @@ redisClient.on('connect', () => {
 });
 
 redisClient.on('error', (error) => {
-  logger.error('Redis connection error', { error });
+  if (error.message && !error.message.includes('ECONNRESET')) {
+    logger.error('Redis connection error', { message: error.message });
+  }
 });
 
 redisClient.on('end', () => {
