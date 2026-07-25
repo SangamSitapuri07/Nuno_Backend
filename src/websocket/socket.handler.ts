@@ -28,6 +28,8 @@ export const initializeSocketHandlers = (io: Server): void => {
       const success = await authenticateSocket(socket, data.token);
 
       if (success) {
+        socket.join(`user:${socket.userId}`);
+
         socket.emit(SOCKET_EVENTS.AUTHENTICATED, {
           success: true,
           playerId: socket.userId,
@@ -64,6 +66,13 @@ export const initializeSocketHandlers = (io: Server): void => {
             try {
               if (!socket.userId || !inviteData?.targetUserId || !inviteData?.roomCode) return;
 
+              io.to(`user:${inviteData.targetUserId}`).emit('invite.received', {
+                fromUserId: socket.userId,
+                fromUsername: socket.username,
+                roomCode: inviteData.roomCode,
+                timestamp: Date.now(),
+              });
+
               for (const [socketId, sock] of io.sockets.sockets) {
                 const s = sock as any;
                 if (s.userId === inviteData.targetUserId) {
@@ -72,11 +81,6 @@ export const initializeSocketHandlers = (io: Server): void => {
                     fromUsername: socket.username,
                     roomCode: inviteData.roomCode,
                     timestamp: Date.now(),
-                  });
-                  logger.info('Invite sent', {
-                    from: socket.userId,
-                    to: inviteData.targetUserId,
-                    roomCode: inviteData.roomCode
                   });
                   break;
                 }
@@ -145,6 +149,13 @@ export const initializeSocketHandlers = (io: Server): void => {
 
               const messageText = dmData.message.trim();
               if (messageText.length === 0 || messageText.length > 500) return;
+
+              io.to(`user:${dmData.targetUserId}`).emit('dm.received', {
+                fromUserId: socket.userId,
+                fromUsername: socket.username,
+                message: messageText,
+                timestamp: Date.now(),
+              });
 
               for (const [sid, sock] of io.sockets.sockets) {
                 const s = sock as any;
