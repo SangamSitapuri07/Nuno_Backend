@@ -48,6 +48,8 @@ const io = new Server(httpServer, {
   connectTimeout: 45000,
 });
 
+app.set('io', io);
+
 // ─────────────────────────────────────────
 // MIDDLEWARE
 // ─────────────────────────────────────────
@@ -64,6 +66,7 @@ app.use(sanitizeInput);
 app.use(validateContentType);
 app.use(securityLogger);
 app.use(preventParamPollution);
+
 // ─────────────────────────────────────────
 // ROUTES
 // ─────────────────────────────────────────

@@ -35,6 +35,21 @@ export class FriendsController {
     }
 
     await friendsService.sendFriendRequest(userId, playerId);
+
+    const io = req.app.get('io');
+    if (io) {
+      for (const [sid, sock] of io.sockets.sockets) {
+        const s = sock as any;
+        if (s.userId === playerId) {
+          io.to(sid).emit('friend.requestReceived', {
+            senderId: userId,
+            timestamp: Date.now(),
+          });
+          break;
+        }
+      }
+    }
+
     sendSuccess(res, { message: 'Friend request sent.' }, HTTP_STATUS.CREATED);
   });
 
@@ -56,7 +71,25 @@ export class FriendsController {
       return;
     }
 
-    await friendsService.acceptFriendRequest(userId, requestId);
+    const request = await friendsService.acceptFriendRequest(userId, requestId);
+
+    const io = req.app.get('io');
+    if (io && request) {
+      for (const [sid, sock] of io.sockets.sockets) {
+        const s = sock as any;
+        if (s.userId === request.senderId || s.userId === request.receiverId) {
+          io.to(sid).emit('friend.requestAccepted', {
+            senderId: request.senderId,
+            receiverId: request.receiverId,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      await friendsService.broadcastUserStatus(io, request.senderId);
+      await friendsService.broadcastUserStatus(io, request.receiverId);
+    }
+
     sendSuccess(res, { message: 'Friend request accepted.' });
   });
 

@@ -42,12 +42,27 @@ export class FriendsService {
         const friend = f.userOne === userId ? f.userTwoRef : f.userOneRef;
         const status = await this.getPlayerStatus(friend.id);
 
+        let roomCode: string | null = null;
+        if (status === PlayerOnlineStatus.IN_LOBBY) {
+          const inRoomId = await redisClient.get(`player:room:${friend.id}`);
+          if (inRoomId) {
+            const roomData = await redisClient.get(`room:${inRoomId}`);
+            if (roomData) {
+              try {
+                const parsed = JSON.parse(roomData);
+                roomCode = parsed.roomCode || null;
+              } catch (e) {}
+            }
+          }
+        }
+
         return {
           friendshipId: f.id,
           userId: friend.id,
           username: friend.username,
           avatarUrl: friend.avatarUrl,
           status,
+          roomCode,
           lastOnline: friend.lastLogin,
         };
       })
@@ -123,7 +138,7 @@ export class FriendsService {
   async acceptFriendRequest(
     userId: string,
     requestId: string
-  ): Promise<void> {
+  ) {
     const request = await prisma.friendRequest.findUnique({
       where: { id: requestId },
     });
@@ -151,6 +166,7 @@ export class FriendsService {
     });
 
     logger.info('Friend request accepted', { requestId, userId });
+    return request;
   }
 
   // ─────────────────────────────────────────
@@ -282,6 +298,20 @@ export class FriendsService {
       if (!userId || !io) return;
       const status = customStatus || (await this.getPlayerStatus(userId));
 
+      let roomCode: string | null = null;
+      if (status === PlayerOnlineStatus.IN_LOBBY) {
+        const inRoomId = await redisClient.get(`player:room:${userId}`);
+        if (inRoomId) {
+          const roomData = await redisClient.get(`room:${inRoomId}`);
+          if (roomData) {
+            try {
+              const parsed = JSON.parse(roomData);
+              roomCode = parsed.roomCode || null;
+            } catch (e) {}
+          }
+        }
+      }
+
       const friends = await prisma.friend.findMany({
         where: {
           OR: [
@@ -303,11 +333,12 @@ export class FriendsService {
           io.to(s.id).emit('friend.statusUpdated', {
             userId,
             status,
+            roomCode,
           });
         }
       }
 
-      logger.info('Broadcasted user status to friends', { userId, status });
+      logger.info('Broadcasted user status to friends', { userId, status, roomCode });
     } catch (error) {
       logger.error('Error broadcasting user status', { error, userId });
     }
