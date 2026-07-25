@@ -274,6 +274,46 @@ export class FriendsService {
   }
 
   // ─────────────────────────────────────────
+  // BROADCAST USER STATUS TO FRIENDS
+  // ─────────────────────────────────────────
+
+  async broadcastUserStatus(io: any, userId: string, customStatus?: string): Promise<void> {
+    try {
+      if (!userId || !io) return;
+      const status = customStatus || (await this.getPlayerStatus(userId));
+
+      const friends = await prisma.friend.findMany({
+        where: {
+          OR: [
+            { userOne: userId },
+            { userTwo: userId },
+          ],
+        },
+      });
+
+      if (!friends.length) return;
+
+      const friendIds = new Set(
+        friends.map((f) => (f.userOne === userId ? f.userTwo : f.userOne))
+      );
+
+      for (const [, socket] of io.sockets.sockets) {
+        const s = socket as any;
+        if (s.userId && friendIds.has(s.userId)) {
+          io.to(s.id).emit('friend.statusUpdated', {
+            userId,
+            status,
+          });
+        }
+      }
+
+      logger.info('Broadcasted user status to friends', { userId, status });
+    } catch (error) {
+      logger.error('Error broadcasting user status', { error, userId });
+    }
+  }
+
+  // ─────────────────────────────────────────
   // GET NOTIFICATIONS
   // ─────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../websocket/socket.types';
 import matchmakingService from './matchmaking.service';
+import friendsService from '../friends/friends.service';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { GameMode, QueueJoinInput } from './matchmaking.types';
 import logger from '../utils/logger';
@@ -207,6 +208,7 @@ const processAndNotify = async (
                 break;
               }
             }
+            await friendsService.broadcastUserStatus(io, playerId);
           }
         } catch (err) {
           logger.error('Error starting matched game', { error: err });

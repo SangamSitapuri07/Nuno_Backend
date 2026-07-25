@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../websocket/socket.types';
 import roomService from './room.service';
+import friendsService from '../friends/friends.service';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { CreateRoomInput, JoinRoomInput, RoomStatus } from './room.types';
 import logger from '../utils/logger';
@@ -29,6 +30,8 @@ export const initializeRoomHandlers = (
       });
 
       socket.emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+
+      await friendsService.broadcastUserStatus(io, socket.userId);
 
     } catch (error: any) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -61,6 +64,8 @@ export const initializeRoomHandlers = (
       socket.emit(SOCKET_EVENTS.ROOM_JOINED, { room });
       io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
 
+      await friendsService.broadcastUserStatus(io, socket.userId);
+
     } catch (error: any) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         code: error.code || 'SERVER_ERROR',
@@ -89,6 +94,7 @@ export const initializeRoomHandlers = (
       }
 
       socket.emit('room.left', { success: true });
+      await friendsService.broadcastUserStatus(io, socket.userId);
 
     } catch (error: any) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -141,6 +147,8 @@ export const initializeRoomHandlers = (
         targetSocket.emit('room.kicked', { reason: 'Kicked by host.' });
         targetSocket.leave(room.roomId);
       }
+
+      await friendsService.broadcastUserStatus(io, data.targetUserId);
 
     } catch (error: any) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -223,6 +231,7 @@ const startCountdown = (io: Server, roomId: string): void => {
             break;
           }
         }
+        await friendsService.broadcastUserStatus(io, playerId);
       }
       return;
     }

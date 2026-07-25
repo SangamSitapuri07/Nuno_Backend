@@ -5,6 +5,7 @@ import { initializeMatchmakingHandlers } from '../matchmaking/matchmaking.handle
 import { initializeRoomHandlers } from '../rooms/room.handler';
 import { initializeGameHandlers } from '../gameplay/game.handler';
 import { initializeVoiceHandlers } from '../voice/voice.handler';
+import friendsService from '../friends/friends.service';
 import { SOCKET_EVENTS } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -106,6 +107,8 @@ export const initializeSocketHandlers = (io: Server): void => {
               socket.emit('room.joined', { room });
               io.to(room.roomId).emit('room.updated', { room });
 
+              await friendsService.broadcastUserStatus(io, socket.userId);
+
               logger.info('Invite accepted', { userId: socket.userId, roomCode: acceptData.roomCode });
             } catch (error: any) {
               socket.emit('error', {
@@ -206,38 +209,8 @@ export const initializeSocketHandlers = (io: Server): void => {
 
         restoreMatchState();
 
-        // ═══ BROADCAST ONLINE STATUS TO FRIENDS ═══
-        const broadcastOnlineStatus = async () => {
-          try {
-            const prisma = (await import('../config/database')).default;
-            const friends = await prisma.friend.findMany({
-              where: {
-                OR: [
-                  { userOne: socket.userId },
-                  { userTwo: socket.userId }
-                ]
-              }
-            });
-
-            for (const friend of friends) {
-              const friendId = friend.userOne === socket.userId ? friend.userTwo : friend.userOne;
-              for (const [sid, sock] of io.sockets.sockets) {
-                const s = sock as any;
-                if (s.userId === friendId) {
-                  io.to(sid).emit('friend.statusUpdated', {
-                    userId: socket.userId,
-                    status: 'ONLINE'
-                  });
-                  break;
-                }
-              }
-            }
-          } catch (err) {
-            // Silently ignore
-          }
-        };
-
-        broadcastOnlineStatus();
+        // ═══ BROADCAST USER STATUS TO FRIENDS ═══
+        friendsService.broadcastUserStatus(io, socket.userId);
 
         logger.info('Socket authentication successful', {
           userId: socket.userId,
@@ -256,33 +229,7 @@ export const initializeSocketHandlers = (io: Server): void => {
 
       // Broadcast offline status to friends
       if (socket.userId) {
-        try {
-          const prisma = (await import('../config/database')).default;
-          const friends = await prisma.friend.findMany({
-            where: {
-              OR: [
-                { userOne: socket.userId },
-                { userTwo: socket.userId }
-              ]
-            }
-          });
-
-          for (const friend of friends) {
-            const friendId = friend.userOne === socket.userId ? friend.userTwo : friend.userOne;
-            for (const [sid, sock] of io.sockets.sockets) {
-              const s = sock as any;
-              if (s.userId === friendId) {
-                io.to(sid).emit('friend.statusUpdated', {
-                  userId: socket.userId,
-                  status: 'OFFLINE'
-                });
-                break;
-              }
-            }
-          }
-        } catch (err) {
-          // Silently ignore
-        }
+        await friendsService.broadcastUserStatus(io, socket.userId, 'OFFLINE');
       }
 
       await removeSocketSession(socket);

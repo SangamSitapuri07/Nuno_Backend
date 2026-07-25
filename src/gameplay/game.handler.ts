@@ -4,6 +4,7 @@ import gameEngine from './game.engine';
 import gameStateManager from './game.state';
 import rematchService from './rematch.service';
 import roomService from '../rooms/room.service';
+import friendsService from '../friends/friends.service';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { PlayCardInput, MatchStatus } from './game.types';
 import { generateId } from '../utils/generateId';
@@ -151,6 +152,10 @@ export const initializeGameHandlers = (
           totalTurns: state.totalTurns,
           matchId: state.matchId,
         });
+
+        for (const playerId of state.players) {
+          await friendsService.broadcastUserStatus(io, playerId);
+        }
       }
 
       socket.emit(SOCKET_EVENTS.CARD_ACCEPTED, {
@@ -273,6 +278,7 @@ export const initializeGameHandlers = (
         for (const playerId of state.players) {
           await redis.del(`match:player:${playerId}`);
           await redis.del(`player:room:${playerId}`);
+          await friendsService.broadcastUserStatus(io, playerId);
         }
       }
 
