@@ -94,16 +94,35 @@ export const getSocketSession = async (
 };
 
 export const removeSocketSession = async (
-  socket: AuthenticatedSocket
-): Promise<void> => {
-  if (!socket.userId) return;
+  socket: AuthenticatedSocket,
+  io?: any
+): Promise<boolean> => {
+  if (!socket.userId) return false;
 
-  await redisClient.del(`socket:${socket.userId}`);
   await redisClient.del(`session:${socket.id}`);
-  await redisClient.sRem('online_players', socket.userId);
 
-  logger.info('Socket session removed', {
-    userId: socket.userId,
-    socketId: socket.id,
-  });
+  let remainingSockets = 0;
+  if (io && io.sockets && io.sockets.sockets) {
+    for (const [, s] of io.sockets.sockets) {
+      if ((s as any).userId === socket.userId && s.id !== socket.id) {
+        remainingSockets++;
+      }
+    }
+  }
+
+  if (remainingSockets === 0) {
+    await redisClient.del(`socket:${socket.userId}`);
+    await redisClient.sRem('online_players', socket.userId);
+    logger.info('Socket session removed (user offline)', {
+      userId: socket.userId,
+      socketId: socket.id,
+    });
+    return true;
+  } else {
+    logger.info('Socket closed, user still online on another socket', {
+      userId: socket.userId,
+      remainingSockets,
+    });
+    return false;
+  }
 };

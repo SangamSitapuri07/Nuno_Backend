@@ -238,12 +238,14 @@ export const initializeSocketHandlers = (io: Server): void => {
         reason,
       });
 
-      // Broadcast offline status to friends
       if (socket.userId) {
-        await friendsService.broadcastUserStatus(io, socket.userId, 'OFFLINE');
+        const isOffline = await removeSocketSession(socket, io);
+        if (isOffline) {
+          await friendsService.broadcastUserStatus(io, socket.userId, 'OFFLINE');
+        }
+      } else {
+        await removeSocketSession(socket, io);
       }
-
-      await removeSocketSession(socket);
     });
 
     // ═══ ERROR ═══
