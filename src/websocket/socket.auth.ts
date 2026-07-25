@@ -73,10 +73,11 @@ export const authenticateSocket = async (
 
     return true;
 
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Socket authentication error', { error });
+    const code = error?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'AUTH_FAILED';
     socket.emit(SOCKET_EVENTS.ERROR, {
-      code: 'AUTH_FAILED',
+      code,
       message: 'Invalid or expired token.',
     });
     socket.disconnect();
