@@ -33,6 +33,10 @@ export const initializeVoiceHandlers = (
         socket.id
       );
 
+      socket.join(roomId);
+      socket.join(`voice:${roomId}`);
+      (socket as any).roomId = roomId;
+
       // Send list of existing participants to the joining player
       const otherParticipants = voiceRoom.participants
         .filter(p => p.userId !== socket.userId)
@@ -49,7 +53,7 @@ export const initializeVoiceHandlers = (
       });
 
       // Notify existing participants that a new user joined
-      socket.to(roomId).emit('voice.userJoined', {
+      io.to(`voice:${roomId}`).emit('voice.userJoined', {
         userId: socket.userId,
         username: socket.username,
         socketId: socket.id
@@ -96,26 +100,27 @@ export const initializeVoiceHandlers = (
     try {
       if (!socket.userId || !data?.targetUserId || !data?.sdp) return;
 
-      // Find target socket
-      let targetSocketId: string | null = null;
+      io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.VOICE_OFFER, {
+        fromUserId: socket.userId,
+        fromUsername: socket.username,
+        sdp: data.sdp,
+      });
+
       for (const [id, s] of io.sockets.sockets) {
         if ((s as any).userId === data.targetUserId) {
-          targetSocketId = id;
+          io.to(id).emit(SOCKET_EVENTS.VOICE_OFFER, {
+            fromUserId: socket.userId,
+            fromUsername: socket.username,
+            sdp: data.sdp,
+          });
           break;
         }
       }
 
-      if (targetSocketId) {
-        io.to(targetSocketId).emit(SOCKET_EVENTS.VOICE_OFFER, {
-          fromUserId: socket.userId,
-          fromUsername: socket.username,
-          sdp: data.sdp,
-        });
-        logger.info('Voice offer relayed', {
-          from: socket.userId,
-          to: data.targetUserId
-        });
-      }
+      logger.info('Voice offer relayed', {
+        from: socket.userId,
+        to: data.targetUserId
+      });
 
     } catch (error) {
       logger.error('Voice offer error', { error });
@@ -133,24 +138,25 @@ export const initializeVoiceHandlers = (
     try {
       if (!socket.userId || !data?.targetUserId || !data?.sdp) return;
 
-      let targetSocketId: string | null = null;
+      io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.VOICE_ANSWER, {
+        fromUserId: socket.userId,
+        sdp: data.sdp,
+      });
+
       for (const [id, s] of io.sockets.sockets) {
         if ((s as any).userId === data.targetUserId) {
-          targetSocketId = id;
+          io.to(id).emit(SOCKET_EVENTS.VOICE_ANSWER, {
+            fromUserId: socket.userId,
+            sdp: data.sdp,
+          });
           break;
         }
       }
 
-      if (targetSocketId) {
-        io.to(targetSocketId).emit(SOCKET_EVENTS.VOICE_ANSWER, {
-          fromUserId: socket.userId,
-          sdp: data.sdp,
-        });
-        logger.info('Voice answer relayed', {
-          from: socket.userId,
-          to: data.targetUserId
-        });
-      }
+      logger.info('Voice answer relayed', {
+        from: socket.userId,
+        to: data.targetUserId
+      });
 
     } catch (error) {
       logger.error('Voice answer error', { error });
@@ -170,21 +176,23 @@ export const initializeVoiceHandlers = (
     try {
       if (!socket.userId || !data?.targetUserId) return;
 
-      let targetSocketId: string | null = null;
+      io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.VOICE_ICE_CANDIDATE, {
+        fromUserId: socket.userId,
+        candidate: data.candidate,
+        sdpMid: data.sdpMid,
+        sdpMLineIndex: data.sdpMLineIndex,
+      });
+
       for (const [id, s] of io.sockets.sockets) {
         if ((s as any).userId === data.targetUserId) {
-          targetSocketId = id;
+          io.to(id).emit(SOCKET_EVENTS.VOICE_ICE_CANDIDATE, {
+            fromUserId: socket.userId,
+            candidate: data.candidate,
+            sdpMid: data.sdpMid,
+            sdpMLineIndex: data.sdpMLineIndex,
+          });
           break;
         }
-      }
-
-      if (targetSocketId) {
-        io.to(targetSocketId).emit(SOCKET_EVENTS.VOICE_ICE_CANDIDATE, {
-          fromUserId: socket.userId,
-          candidate: data.candidate,
-          sdpMid: data.sdpMid,
-          sdpMLineIndex: data.sdpMLineIndex,
-        });
       }
 
     } catch (error) {
