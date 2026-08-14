@@ -130,28 +130,66 @@ class _PlayButtonState extends State<_PlayButton>
           return AnimatedScale(
             scale: _pressed ? 0.97 : 1,
             duration: const Duration(milliseconds: 110),
-            child: Container(
-              width: width,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.xxl,
-                vertical: AppDimens.lg,
-              ),
-              decoration: BoxDecoration(
-                gradient: AppColors.playGradient,
-                borderRadius: AppDimens.brXl,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.5),
-                    blurRadius: glow,
-                    spreadRadius: 1,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Card peeking out from behind the right edge, as in the
+                // reference's home screen.
+                Positioned(
+                  right: -14,
+                  child: Transform.rotate(
+                    angle: 0.22,
+                    child: Container(
+                      width: 42,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF3B2E8F), Color(0xFF221A5C)],
+                        ),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              child: child,
+                ),
+
+                Container(
+                  width: width,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.xxl,
+                    vertical: AppDimens.lg,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.playGradient,
+                    borderRadius: AppDimens.brXl,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.30),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.55),
+                        blurRadius: glow,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: child,
+                ),
+              ],
             ),
           );
         },

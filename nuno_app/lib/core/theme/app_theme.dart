@@ -125,7 +125,7 @@ class AppTheme {
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? AppColors.primary
+              ? AppColors.green
               : AppColors.surfaceHigh,
         ),
         trackOutlineColor:

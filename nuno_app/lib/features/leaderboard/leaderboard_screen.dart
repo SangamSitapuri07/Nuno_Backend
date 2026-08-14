@@ -94,7 +94,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
               child: TabBar(
                 controller: _tabs,
                 indicator: const BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                  gradient: AppColors.blueGradient,
                   borderRadius: AppDimens.brSm,
                 ),
                 dividerColor: Colors.transparent,

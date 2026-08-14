@@ -211,7 +211,7 @@ class _Item extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? AppColors.primary.withValues(alpha: 0.20)
+                        ? AppColors.blue.withValues(alpha: 0.22)
                         : Colors.transparent,
                     borderRadius: AppDimens.brPill,
                   ),
@@ -219,7 +219,7 @@ class _Item extends StatelessWidget {
                     isActive ? spec.active : spec.inactive,
                     size: 19,
                     color:
-                        isActive ? AppColors.primary : AppColors.textMuted,
+                        isActive ? AppColors.blue : AppColors.textMuted,
                   ),
                 ),
                 if (badge > 0)
@@ -258,7 +258,7 @@ class _Item extends StatelessWidget {
               spec.label,
               style: AppTextStyles.caption.copyWith(
                 fontSize: 9,
-                color: isActive ? AppColors.primary : AppColors.textMuted,
+                color: isActive ? AppColors.blue : AppColors.textMuted,
                 fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
               ),
             ),
