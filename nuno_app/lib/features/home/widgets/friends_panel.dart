@@ -34,9 +34,16 @@ class _FriendsPanelState extends ConsumerState<FriendsPanel> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xE60C0E28),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xE62A1A5E), Color(0xF21A0F3D)],
+        ),
         borderRadius: AppDimens.brXl,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(
+          color: AppColors.violet.withValues(alpha: 0.45),
+          width: 1.4,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.5),
@@ -259,9 +266,9 @@ class _FriendRow extends ConsumerWidget {
         vertical: AppDimens.sm,
       ),
       decoration: BoxDecoration(
-        color: const Color(0x8016193C),
+        color: const Color(0x662A1A5E),
         borderRadius: AppDimens.brMd,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.violet.withValues(alpha: 0.22)),
       ),
       child: Row(
         children: [

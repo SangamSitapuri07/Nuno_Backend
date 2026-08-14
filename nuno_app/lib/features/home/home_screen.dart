@@ -313,9 +313,9 @@ class _CurrencyCapsule extends StatelessWidget {
       height: 34,
       padding: const EdgeInsets.only(left: 4, right: 4),
       decoration: BoxDecoration(
-        color: const Color(0xE6121430),
+        color: const Color(0xE61E1147),
         borderRadius: AppDimens.brPill,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(color: AppColors.violet.withValues(alpha: 0.40)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -371,9 +371,9 @@ class _GlassCircleButton extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: const Color(0xE6121430),
+          color: const Color(0xE61E1147),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          border: Border.all(color: AppColors.violet.withValues(alpha: 0.40)),
         ),
         child: Icon(icon, size: 18, color: Colors.white70),
       ),

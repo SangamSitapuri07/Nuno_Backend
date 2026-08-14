@@ -34,7 +34,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   bool _navVisible = true;
   Timer? _hideTimer;
 
-  static const _idleBeforeHide = Duration(seconds: 4);
+  static const _idleBeforeHide = Duration(milliseconds: 1500);
 
   void _scheduleHide() {
     _hideTimer?.cancel();
@@ -151,11 +151,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ignoring: !_navVisible,
         child: AnimatedSlide(
           offset: _navVisible ? Offset.zero : const Offset(0, 1),
-          duration: const Duration(milliseconds: 260),
+          duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
           child: AnimatedOpacity(
             opacity: _navVisible ? 1 : 0,
-            duration: const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 100),
             child: _BottomBar(
               index: _index,
               tabs: _tabs,
@@ -164,6 +164,38 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Circular back arrow shown on the non-home tabs.
+class _BackButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _BackButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.surfaceStroke),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.arrow_back_rounded,
+            size: 20, color: AppColors.textPrimary),
       ),
     );
   }
@@ -205,9 +237,16 @@ class _BottomBar extends StatelessWidget {
             margin: const EdgeInsets.only(left: AppDimens.md, bottom: 6),
             padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
             decoration: BoxDecoration(
-              color: const Color(0xE60A0C22),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xE62A1A5E), Color(0xF2140A30)],
+              ),
               borderRadius: BorderRadius.circular(AppDimens.radiusXl),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+              border: Border.all(
+                color: AppColors.violet.withValues(alpha: 0.40),
+                width: 1.4,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.45),

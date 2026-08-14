@@ -39,9 +39,16 @@ class PlayerBadge extends StatelessWidget {
           vertical: 6,
         ),
         decoration: BoxDecoration(
-          color: const Color(0xE60E1030),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xE62A1A5E), Color(0xF21A0F3D)],
+          ),
           borderRadius: AppDimens.brLg,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+          border: Border.all(
+            color: AppColors.violet.withValues(alpha: 0.45),
+            width: 1.4,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.45),

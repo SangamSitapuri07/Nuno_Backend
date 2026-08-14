@@ -8,12 +8,12 @@ class AppColors {
   AppColors._();
 
   // ── Surfaces ────────────────────────────────────────────────
-  static const Color background = Color(0xFF0A0B1E);
-  static const Color backgroundAlt = Color(0xFF0E1030);
-  static const Color surface = Color(0xFF161A3A);
-  static const Color surfaceHigh = Color(0xFF1E2350);
-  static const Color surfaceStroke = Color(0xFF2A2F5E);
-  static const Color panelHeader = Color(0xFF141833);
+  static const Color background = Color(0xFF0D0722);
+  static const Color backgroundAlt = Color(0xFF150C33);
+  static const Color surface = Color(0xFF1E1147);
+  static const Color surfaceHigh = Color(0xFF2A1A5E);
+  static const Color surfaceStroke = Color(0xFF422A7A);
+  static const Color panelHeader = Color(0xFF190E3B);
 
   // ── Brand ───────────────────────────────────────────────────
   /// UNO red — logo, PLAY button, destructive actions.
@@ -21,21 +21,21 @@ class AppColors {
   static const Color primaryDark = Color(0xFF8B0F16);
 
   /// Gold — primary confirm CTAs (CREATE ROOM, START GAME, CLAIM).
-  static const Color gold = Color(0xFFFFC107);
-  static const Color goldDark = Color(0xFFFF9800);
+  static const Color gold = Color(0xFFFFC93C);
+  static const Color goldDark = Color(0xFFF7931E);
 
-  static const Color blue = Color(0xFF2196F3);
-  static const Color green = Color(0xFF4CAF50);
-  static const Color violet = Color(0xFF6C4BF6);
-  static const Color cyan = Color(0xFF22D3EE);
+  static const Color blue = Color(0xFF3B82F6);
+  static const Color green = Color(0xFF22C55E);
+  static const Color violet = Color(0xFF8B5CF6);
+  static const Color cyan = Color(0xFF2DD4BF);
 
   /// Legacy alias kept so older widgets keep compiling.
   static const Color accent = green;
 
   // ── Text ────────────────────────────────────────────────────
-  static const Color textPrimary = Color(0xFFF2F4FF);
-  static const Color textSecondary = Color(0xFF9BA3D0);
-  static const Color textMuted = Color(0xFF636B9E);
+  static const Color textPrimary = Color(0xFFFDF7FF);
+  static const Color textSecondary = Color(0xFFB4A5E0);
+  static const Color textMuted = Color(0xFF7D6BAE);
 
   // ── Status ──────────────────────────────────────────────────
   static const Color success = Color(0xFF4CAF50);
@@ -48,10 +48,10 @@ class AppColors {
   static const Color gem = Color(0xFF22D3EE);
 
   // ── Playing cards ───────────────────────────────────────────
-  static const Color cardRed = Color(0xFFE53935);
-  static const Color cardBlue = Color(0xFF1E88E5);
-  static const Color cardGreen = Color(0xFF43A047);
-  static const Color cardYellow = Color(0xFFFDD835);
+  static const Color cardRed = Color(0xFFED1C24);
+  static const Color cardBlue = Color(0xFF0072BC);
+  static const Color cardGreen = Color(0xFF00A651);
+  static const Color cardYellow = Color(0xFFFFDE00);
   static const Color cardWild = Color(0xFF1A1A2E);
 
   // ── Table glow (screens 7 & 8) ──────────────────────────────
@@ -109,13 +109,14 @@ class AppColors {
   static const LinearGradient goldGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFFD54F), Color(0xFFFFA000)],
+    colors: [Color(0xFFFFE082), Color(0xFFFFC93C), Color(0xFFF7931E)],
+    stops: [0.0, 0.5, 1.0],
   );
 
   static const LinearGradient blueGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF42A5F5), Color(0xFF1565C0)],
+    colors: [Color(0xFF60A5FA), Color(0xFF2563EB)],
   );
 
   static const LinearGradient greenGradient = LinearGradient(
@@ -127,7 +128,7 @@ class AppColors {
   static const LinearGradient violetGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF8B6CF7), Color(0xFF5433D4)],
+    colors: [Color(0xFFA78BFA), Color(0xFF6D28D9)],
   );
 
   static const LinearGradient dangerGradient = LinearGradient(
@@ -140,9 +141,10 @@ class AppColors {
   static const LinearGradient accentGradient = greenGradient;
 
   static const LinearGradient backgroundGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0xFF12142F), Color(0xFF07081A)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF241155), Color(0xFF120730), Color(0xFF08040F)],
+    stops: [0.0, 0.55, 1.0],
   );
 
   /// Radial ambience behind the game table; tinted by whose turn it is.
