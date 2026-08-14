@@ -85,83 +85,78 @@ class HomeScreen extends ConsumerWidget {
                   AppDimens.md,
                   0,
                 ),
-                child: Column(
+                // Two full-height columns. The header lives inside the LEFT
+                // column only, so the friends panel on the right can start at
+                // the very top of the screen.
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── Header ─────────────────────────
-                    SizedBox(
-                      height: headerHeight,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                    // ── Left column: header over the stage ──
+                    Expanded(
+                      child: Column(
                         children: [
-                          Flexible(
-                            child: PlayerBadge(
-                              username: profile?.username ?? 'Player',
-                              avatarUrl: profile?.avatarUrl,
-                              level: profile?.level ?? 1,
-                              levelProgress: profile?.levelProgress ?? 0,
-                              tier: profile?.leaderboard?.tier ??
-                                  RankTier.bronze,
-                              onTap: () => onNavigate?.call(3),
+                          SizedBox(
+                            height: headerHeight,
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: PlayerBadge(
+                                    username: profile?.username ?? 'Player',
+                                    avatarUrl: profile?.avatarUrl,
+                                    level: profile?.level ?? 1,
+                                    levelProgress: profile?.levelProgress ?? 0,
+                                    tier: profile?.leaderboard?.tier ??
+                                        RankTier.bronze,
+                                    onTap: () => onNavigate?.call(3),
+                                  ),
+                                ),
+                                const SizedBox(width: AppDimens.sm),
+                                _CurrencyCapsule(
+                                  icon: Icons.monetization_on_rounded,
+                                  iconColor: AppColors.gold,
+                                  value: profile?.coins ?? 0,
+                                  onAdd: () => onNavigate?.call(2),
+                                ),
+                                const SizedBox(width: 6),
+                                const _CurrencyCapsule(
+                                  icon: Icons.diamond_rounded,
+                                  iconColor: AppColors.cyan,
+                                  // No gem currency on the backend yet.
+                                  value: 0,
+                                ),
+                                const SizedBox(width: 6),
+                                _GlassCircleButton(
+                                  icon: Icons.settings_rounded,
+                                  onTap: () =>
+                                      context.push(AppRoutes.settings),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: AppDimens.sm),
-                          _CurrencyCapsule(
-                            icon: Icons.monetization_on_rounded,
-                            iconColor: AppColors.gold,
-                            value: profile?.coins ?? 0,
-                            onAdd: () => onNavigate?.call(2),
-                          ),
-                          const SizedBox(width: 6),
-                          const _CurrencyCapsule(
-                            icon: Icons.diamond_rounded,
-                            iconColor: AppColors.cyan,
-                            // The backend has no gem currency yet.
-                            value: 0,
-                          ),
-                          const SizedBox(width: 6),
-                          _GlassCircleButton(
-                            icon: Icons.settings_rounded,
-                            onTap: () => context.push(AppRoutes.settings),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    // ── Body ───────────────────────────
-                    Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Stage: podium + chest
+                          // Stage: podium + chest, nudged down.
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.only(
+                                top: AppDimens.lg,
                                 right: AppDimens.sm,
-                                bottom: AppDimens.xs,
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  // Podium takes the space the chest leaves,
-                                  // nudged down so it clears the header.
                                   Expanded(
                                     flex: 7,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppDimens.xxl,
-                                      ),
-                                      child: _FloatingAsset(
-                                        asset: Art.cardPodium,
-                                        onTap: () =>
-                                            context.push(AppRoutes.playMenu),
-                                      ),
+                                    child: _FloatingAsset(
+                                      asset: Art.cardPodium,
+                                      onTap: () =>
+                                          context.push(AppRoutes.playMenu),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 3,
                                     child: Padding(
                                       padding: const EdgeInsets.only(
-                                        bottom: AppDimens.lg,
+                                        bottom: AppDimens.xxl,
                                       ),
                                       child: _FloatingAsset(
                                         asset: Art.treasureChest,
@@ -176,37 +171,38 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Right column: friends fills from the top down to
-                          // PLAY, which sits bottom-right.
-                          SizedBox(
-                            width: panelWidth,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: AppDimens.sm,
-                                    ),
-                                    child: const FriendsPanel(),
-                                  ),
-                                ),
-                                SizedBox(
-                                  height: playHeight,
-                                  child: _PlayButton(
-                                    onTap: () =>
-                                        context.push(AppRoutes.playMenu),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          // Space for the floating nav bar, which is
+                          // docked to the bottom-left.
+                          const SizedBox(height: navReserve),
                         ],
                       ),
                     ),
 
-                    // ── Reserved for the floating nav bar ──
-                    const SizedBox(height: navReserve),
+                    // ── Right column: friends from the very top,
+                    //    PLAY pinned at the bottom ──
+                    SizedBox(
+                      width: panelWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppDimens.sm,
+                              ),
+                              child: const FriendsPanel(),
+                            ),
+                          ),
+                          SizedBox(
+                            height: playHeight,
+                            child: _PlayButton(
+                              onTap: () => context.push(AppRoutes.playMenu),
+                            ),
+                          ),
+                          const SizedBox(height: AppDimens.sm),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
