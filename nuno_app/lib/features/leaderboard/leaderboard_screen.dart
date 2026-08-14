@@ -10,6 +10,7 @@ import '../../core/widgets/titled_panel.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/player_avatar.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/social_models.dart';
@@ -159,6 +160,8 @@ class _MyRankCard extends ConsumerWidget {
       borderColor: tierColor.withValues(alpha: 0.45),
       child: Row(
         children: [
+          ArtImage(Art.tierShield(rank.tier.wire), height: 50),
+          const SizedBox(width: AppDimens.md),
           Column(
             children: [
               Text('#${rank.globalRank ?? '-'}',

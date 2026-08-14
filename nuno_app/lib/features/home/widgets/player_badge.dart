@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/game_assets.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../data/models/enums.dart';
 
@@ -52,16 +53,19 @@ class PlayerBadge extends StatelessWidget {
         child: Row(
           children: [
             // Avatar with a violet ring.
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.violet, width: 2.5),
-              ),
-              child: PlayerAvatar(
-                username: username,
-                avatarUrl: avatarUrl,
-                size: 42,
+            SizedBox(
+              width: 54,
+              height: 54,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  PlayerAvatar(
+                    username: username,
+                    avatarUrl: avatarUrl,
+                    size: 38,
+                  ),
+                  ArtImage(Art.frameForLevel(level), width: 54),
+                ],
               ),
             ),
 
@@ -110,28 +114,26 @@ class PlayerBadge extends StatelessWidget {
 
             const SizedBox(width: AppDimens.sm),
 
-            // Tier pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: tierColor.withValues(alpha: 0.14),
-                borderRadius: AppDimens.brSm,
-                border: Border.all(color: tierColor, width: 1.4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.shield_rounded, size: 12, color: tierColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    tier.label.toUpperCase(),
-                    style: AppTextStyles.caption.copyWith(
-                      color: tierColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
+            // Tier shield
+            ArtImage(
+              Art.tierShield(tier.wire),
+              height: 44,
+              fallback: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: tierColor.withValues(alpha: 0.14),
+                  borderRadius: AppDimens.brSm,
+                  border: Border.all(color: tierColor, width: 1.4),
+                ),
+                child: Text(
+                  tier.label.toUpperCase(),
+                  style: AppTextStyles.caption.copyWith(
+                    color: tierColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
                   ),
-                ],
+                ),
               ),
             ),
           ],

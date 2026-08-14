@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'game_assets.dart';
 
 /// The reference sheet's signature container: a dark rounded panel with a
 /// centered uppercase title strip on top, optionally with a back arrow.
@@ -129,10 +130,9 @@ class PanelScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
+      body: ArtBackground(
+        asset: Art.bgPanel,
+        vignette: false,
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(

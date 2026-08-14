@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/game_assets.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/game_card.dart';
 
@@ -320,7 +321,7 @@ class _CornerGlyph extends StatelessWidget {
   }
 }
 
-/// Face-down card: black body, red oval, "NUNO" wordmark.
+/// Face-down card. Uses the rendered 3D art, falling back to a painted back.
 class CardBackView extends StatelessWidget {
   final double width;
   final VoidCallback? onTap;
@@ -341,7 +342,6 @@ class CardBackView extends StatelessWidget {
       width: width,
       height: _height,
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(width * 0.13),
         boxShadow: [
           BoxShadow(
@@ -357,57 +357,12 @@ class CardBackView extends StatelessWidget {
             ),
         ],
       ),
-      padding: EdgeInsets.all(width * 0.055),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(width * 0.095),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const ColoredBox(color: Color(0xFF0D0D0D)),
-            Center(
-              child: Transform.rotate(
-                angle: -math.pi / 5,
-                child: Container(
-                  width: width * 0.92,
-                  height: _height * 0.46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD31820),
-                    borderRadius: BorderRadius.circular(width),
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: Transform.rotate(
-                angle: -math.pi / 5,
-                child: FittedBox(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: width * 0.06),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Text(
-                          'NUNO',
-                          style: _wordmark(width * 0.24).copyWith(
-                            foreground: Paint()
-                              ..style = PaintingStyle.stroke
-                              ..strokeWidth = width * 0.030
-                              ..strokeJoin = StrokeJoin.round
-                              ..color = Colors.white,
-                          ),
-                        ),
-                        Text(
-                          'NUNO',
-                          style: _wordmark(width * 0.24)
-                              .copyWith(color: const Color(0xFFFFC400)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        borderRadius: BorderRadius.circular(width * 0.13),
+        child: Image.asset(
+          Art.cardBack3d,
+          fit: BoxFit.fill,
+          errorBuilder: (_, __, ___) => _PaintedBack(width: width),
         ),
       ),
     );
@@ -420,12 +375,61 @@ class CardBackView extends StatelessWidget {
             child: face,
           );
   }
+}
 
-  TextStyle _wordmark(double size) => TextStyle(
-        fontSize: size,
-        fontWeight: FontWeight.w900,
-        height: 1,
-        letterSpacing: -0.5,
-        fontFamily: 'Baloo 2',
-      );
+/// Hand-painted card back, used when the asset cannot be loaded.
+class _PaintedBack extends StatelessWidget {
+  final double width;
+
+  const _PaintedBack({required this.width});
+
+  @override
+  Widget build(BuildContext context) {
+    final height = width / 0.68;
+
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.all(width * 0.055),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(width * 0.095),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF0D0D0D)),
+            Center(
+              child: Transform.rotate(
+                angle: -math.pi / 5,
+                child: Container(
+                  width: width * 0.92,
+                  height: height * 0.46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD31820),
+                    borderRadius: BorderRadius.circular(width),
+                  ),
+                ),
+              ),
+            ),
+            Center(
+              child: Transform.rotate(
+                angle: -math.pi / 5,
+                child: FittedBox(
+                  child: Text(
+                    'NUNO',
+                    style: TextStyle(
+                      fontSize: width * 0.24,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                      letterSpacing: -0.5,
+                      fontFamily: 'Baloo 2',
+                      color: const Color(0xFFFFC400),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

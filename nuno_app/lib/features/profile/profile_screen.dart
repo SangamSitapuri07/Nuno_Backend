@@ -12,6 +12,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/currency_pill.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/player_avatar.dart';
 import '../../core/widgets/side_nav.dart';
 import '../../core/widgets/titled_panel.dart';
@@ -174,7 +175,12 @@ class _IdentitySection extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.shield_rounded, size: 22, color: tierColor),
+                ArtImage(
+                  Art.tierShield(
+                    rank?.tier.wire ?? p.leaderboard?.tier.wire ?? 'BRONZE',
+                  ),
+                  height: 44,
+                ),
                 const SizedBox(width: AppDimens.sm),
                 Expanded(
                   child: Column(

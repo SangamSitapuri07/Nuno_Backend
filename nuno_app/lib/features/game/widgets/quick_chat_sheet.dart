@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/game_assets.dart';
 import '../../../services/socket_events.dart';
 
 /// Screen 14 — Quick Chat / Emotes. Preset phrases on top, emoji row beneath.
@@ -89,18 +90,26 @@ class QuickChatSheet extends StatelessWidget {
                             onEmote(e.key);
                             Navigator.of(context).pop();
                           },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceHigh,
-                              borderRadius: AppDimens.brSm,
-                              border:
-                                  Border.all(color: AppColors.surfaceStroke),
+                          child: SizedBox(
+                            width: 46,
+                            height: 46,
+                            child: ArtImage(
+                              Art.emote(e.key) ?? '',
+                              width: 46,
+                              // Emotes without bespoke art fall back to the
+                              // unicode glyph in a tile.
+                              fallback: Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceHigh,
+                                  borderRadius: AppDimens.brSm,
+                                  border: Border.all(
+                                      color: AppColors.surfaceStroke),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(e.value,
+                                    style: const TextStyle(fontSize: 20)),
+                              ),
                             ),
-                            alignment: Alignment.center,
-                            child: Text(e.value,
-                                style: const TextStyle(fontSize: 20)),
                           ),
                         ),
                     ],

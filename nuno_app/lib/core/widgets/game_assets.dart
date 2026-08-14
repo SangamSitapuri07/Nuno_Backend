@@ -27,11 +27,66 @@ class Art {
   static const victoryBanner = 'assets/images/victory_banner.png';
   static const panelFrame = 'assets/images/panel_frame.png';
 
+  static const bgPanel = 'assets/images/bg_panel.jpg';
+
+  // Rank tier shields, indexed by RankTier.
+  static const tierBronze = 'assets/images/tier_bronze.png';
+  static const tierSilver = 'assets/images/tier_silver.png';
+  static const tierGold = 'assets/images/tier_gold.png';
+  static const tierPlatinum = 'assets/images/tier_platinum.png';
+  static const tierDiamond = 'assets/images/tier_diamond.png';
+  static const tierMaster = 'assets/images/tier_master.png';
+  static const tierGrandmaster = 'assets/images/tier_grandmaster.png';
+
+  // Circular avatar frames.
+  static const frameBronze = 'assets/images/frame_bronze.png';
+  static const frameSilver = 'assets/images/frame_silver.png';
+  static const frameGold = 'assets/images/frame_gold.png';
+  static const frameEpic = 'assets/images/frame_epic.png';
+
+  // Emote reaction bubbles.
+  static const emoteLaugh = 'assets/images/emote_laugh.png';
+  static const emoteAngry = 'assets/images/emote_angry.png';
+  static const emoteCool = 'assets/images/emote_cool.png';
+  static const emoteCry = 'assets/images/emote_cry.png';
+  static const emoteShock = 'assets/images/emote_shock.png';
+  static const emoteClap = 'assets/images/emote_clap.png';
+
   static const btnPlay = 'assets/images/btn_play_gold.png';
   static const btnStart = 'assets/images/btn_start.png';
   static const btnJoin = 'assets/images/btn_join.png';
   static const btnReady = 'assets/images/btn_ready.png';
   static const btnInvite = 'assets/images/btn_invite.png';
+
+  /// Shield art for a rank tier wire value (BRONZE, SILVER, ...).
+  static String tierShield(String wire) => switch (wire.toUpperCase()) {
+        'SILVER' => tierSilver,
+        'GOLD' => tierGold,
+        'PLATINUM' => tierPlatinum,
+        'DIAMOND' => tierDiamond,
+        'MASTER' => tierMaster,
+        'GRANDMASTER' => tierGrandmaster,
+        _ => tierBronze,
+      };
+
+  /// Avatar frame that escalates with player level.
+  static String frameForLevel(int level) {
+    if (level >= 30) return frameEpic;
+    if (level >= 20) return frameGold;
+    if (level >= 10) return frameSilver;
+    return frameBronze;
+  }
+
+  /// Bubble art for an emote key, or null if that key has no art.
+  static String? emote(String key) => switch (key) {
+        'laugh' => emoteLaugh,
+        'angry' => emoteAngry,
+        'cool' => emoteCool,
+        'cry' => emoteCry,
+        'shock' => emoteShock,
+        'clap' => emoteClap,
+        _ => null,
+      };
 }
 
 /// Full-bleed background image with a graceful gradient fallback.
