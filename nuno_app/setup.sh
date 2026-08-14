@@ -41,6 +41,8 @@ flutter pub get
 echo
 
 # ── 4. Allow cleartext HTTP to a local backend (Android) ─────
+# Not needed for the hosted https:// backend, but harmless and saves pain
+# if you later point at a local server over plain http://.
 MANIFEST="android/app/src/main/AndroidManifest.xml"
 if [ -f "$MANIFEST" ] && ! grep -q "usesCleartextTraffic" "$MANIFEST"; then
   echo "--- Enabling cleartext HTTP for local dev (Android) ---"
@@ -69,18 +71,19 @@ cat <<'EOF'
 
 === Setup complete ===
 
-Run the app (the backend must be running):
+The app defaults to the hosted backend, so just run:
 
-  # Android emulator — 10.0.2.2 is the host's localhost
-  flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
+  flutter run
 
-  # iOS simulator / desktop
-  flutter run --dart-define=API_BASE_URL=http://localhost:3000
+In VS Code, press F5 and choose "Nuno (hosted backend — default)".
 
-  # Physical device — use your machine's LAN IP
-  flutter run --dart-define=API_BASE_URL=http://192.168.1.10:3000
+To use a local backend instead:
 
-In VS Code just press F5 and pick a launch configuration.
+  flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000     # Android emulator
+  flutter run --dart-define=API_BASE_URL=http://localhost:3000    # iOS sim / desktop
 
-NOTE: the app is LANDSCAPE-only — use a landscape emulator/device.
+NOTES
+  * The app is LANDSCAPE-only — use a landscape emulator/device.
+  * The hosted backend is on a free tier that sleeps when idle. The first
+    launch may sit on "Waking the server..." for up to a minute.
 EOF

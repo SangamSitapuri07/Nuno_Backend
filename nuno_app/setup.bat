@@ -40,15 +40,19 @@ call flutter analyze
 echo.
 echo === Setup complete ===
 echo.
-echo IMPORTANT: for Android, add this attribute to the ^<application^> tag in
-echo   android\app\src\main\AndroidManifest.xml
-echo so the app can reach a local HTTP backend:
+echo The app defaults to the hosted backend, so just run:
+echo   flutter run
 echo.
+echo In VS Code, press F5 and choose "Nuno (hosted backend - default)".
+echo.
+echo To use a LOCAL backend over plain http, first add this attribute to the
+echo ^<application^> tag in android\app\src\main\AndroidManifest.xml:
 echo   android:usesCleartextTraffic="true"
-echo.
-echo Then run:
+echo then run:
 echo   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 echo.
-echo NOTE: the app is LANDSCAPE-only - use a landscape emulator/device.
+echo NOTES
+echo   * The app is LANDSCAPE-only - use a landscape emulator/device.
+echo   * The hosted backend sleeps when idle; first launch may take a minute.
 
 endlocal

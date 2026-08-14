@@ -1,6 +1,8 @@
 # Getting started in VS Code
 
-Five minutes from zip to running app.
+The app is preconfigured to use your hosted backend at
+`https://nuno-backend-by35.onrender.com`, so there is **nothing to run locally
+except the app itself**.
 
 ---
 
@@ -10,9 +12,7 @@ Five minutes from zip to running app.
 |---|---|---|
 | Flutter SDK | **3.27 or newer** | https://docs.flutter.dev/get-started/install |
 | VS Code | any recent | https://code.visualstudio.com |
-| VS Code extensions | Flutter + Dart | search `Dart-Code.flutter` in the Extensions panel |
-
-Verify Flutter is on your PATH and healthy:
+| VS Code extensions | Flutter + Dart | search `Dart-Code.flutter` in Extensions |
 
 ```bash
 flutter --version     # must print 3.27.x or higher
@@ -20,159 +20,140 @@ flutter doctor        # fix anything with an [X]
 ```
 
 > The project uses `Color.withValues`, `CardThemeData` and `DialogThemeData`,
-> which are **Flutter 3.27+ only**. On an older SDK you will get analyzer
-> errors — run `flutter upgrade` first.
+> which are **Flutter 3.27+ only**. On an older SDK run `flutter upgrade`.
 
 ---
 
 ## 2. Open the project
 
-Unzip `nuno_app.zip`, then open **the `nuno_app` folder itself** in VS Code
-(`File → Open Folder…`). Opening a parent folder will stop the Dart extension
-from finding `pubspec.yaml`.
+Unzip, then open **the `nuno_app` folder itself** in VS Code
+(`File → Open Folder…`). Opening a parent folder stops the Dart extension from
+finding `pubspec.yaml`.
 
 ---
 
 ## 3. Run setup once
 
-This generates the native `android/` and `ios/` folders (the zip ships only the
-Dart source), installs packages, and patches the platform configs so the app can
-reach a backend over plain HTTP during development.
+The zip ships only Dart source, so this generates the native `android/` and
+`ios/` folders and installs packages.
 
 **macOS / Linux**
-
 ```bash
 cd nuno_app
 ./setup.sh
 ```
 
 **Windows**
-
 ```bat
 cd nuno_app
 setup.bat
 ```
 
 <details>
-<summary>Prefer to do it manually?</summary>
+<summary>Manual equivalent</summary>
 
 ```bash
 flutter create --project-name nuno_app --org com.nuno .
 flutter pub get
 ```
-
-Then add to the `<application>` tag in
-`android/app/src/main/AndroidManifest.xml`:
-
-```xml
-android:usesCleartextTraffic="true"
-```
-
-and to `ios/Runner/Info.plist`:
-
-```xml
-<key>NSAppTransportSecurity</key>
-<dict>
-  <key>NSAllowsArbitraryLoads</key>
-  <true/>
-</dict>
-```
 </details>
 
 ---
 
-## 4. Start the backend
+## 4. Run it
 
-The app is a pure client — it needs `Nuno_Backend` running with **PostgreSQL**
-and **Redis** available.
+**VS Code:** press **F5** → choose **`Nuno (hosted backend — default)`**.
 
+**Terminal:**
 ```bash
-cd ..                 # into the backend repo root
-npm install
-npx prisma migrate dev
-npm run dev           # listens on :3000
+flutter run
 ```
 
-Confirm it is alive:
+That's it — no `--dart-define` needed. The hosted URL is the default.
 
-```bash
-curl http://localhost:3000/api/v1/health
-```
+> **Landscape only.** Rotate your emulator (`Ctrl`/`Cmd` + `←`/`→`).
 
-You should get `{"success":true,"data":{"status":"healthy",...}}`.
+### First launch is slow — that's expected
+
+Render's free tier spins the server down after ~15 minutes idle. The first
+request wakes it, which takes **up to a minute**. The splash screen shows
+*"Waking the server…"* so you know it isn't frozen. Subsequent launches are fast.
 
 ---
 
-## 5. Point the app at your backend
+## 5. Create an account
 
-The base URL is a compile-time constant. Pick the value that matches where you
-are running the app:
+Register in the app. The backend requires 8+ characters with an uppercase
+letter, a lowercase letter, a number **and** a symbol — e.g. `Nuno@2026`.
 
-| Target | `API_BASE_URL` |
+A real match needs two players: run two emulators, or use a second device and
+join by room code.
+
+---
+
+## Switching to a local backend
+
+Only if you want to develop against `npm run dev`:
+
+| Target | Command |
 |---|---|
-| Android emulator | `http://10.0.2.2:3000` ← the emulator's alias for your host |
-| iOS simulator / desktop | `http://localhost:3000` |
-| Physical phone | `http://<your-computer-LAN-IP>:3000` |
+| Android emulator | `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000` |
+| iOS sim / desktop | `flutter run --dart-define=API_BASE_URL=http://localhost:3000` |
+| Physical device | `flutter run --dart-define=API_BASE_URL=http://<LAN-IP>:3000` |
 
-Find your LAN IP with `ipconfig` (Windows) or `ifconfig | grep inet` (macOS/Linux).
+The matching launch configs are already in `.vscode/launch.json`, and `setup.sh`
+has already enabled cleartext HTTP for local dev.
 
 ---
 
-## 6. Run it
+## Server-side checklist
 
-**In VS Code:** press **F5** and pick a configuration from the dropdown —
-`Nuno (Android emulator)`, `Nuno (iOS simulator / desktop)` or
-`Nuno (physical device — EDIT IP)`. Edit the IP in `.vscode/launch.json` for the
-last one.
+Two things your Render deployment needs. Both cause failures that look like app
+bugs, so worth confirming:
 
-**From the terminal:**
+**1. Redis must be reachable.**
+The socket handshake stores sessions in Redis (`src/websocket/socket.auth.ts`),
+and matchmaking, rooms and live game state all live there. Without it, login
+may succeed over REST but the socket never authenticates — so matchmaking and
+gameplay silently do nothing. Set `REDIS_URL` on your Render service.
 
+**2. Postgres must be migrated.**
+Run `npx prisma migrate deploy` against your production `DATABASE_URL`.
+
+**3. `ALLOWED_ORIGINS` — only matters for Flutter Web.**
+It defaults to `http://localhost:3000` (`src/config/config.ts`). Native Android
+and iOS builds do **not** send an `Origin` header, so CORS does not apply and
+the app works as-is. If you later build for web, add that origin to the
+`ALLOWED_ORIGINS` env var (comma-separated).
+
+Verify the deployment is alive:
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
+curl https://nuno-backend-by35.onrender.com/api/v1/health
 ```
-
-> **The app is landscape-only.** Rotate your emulator (`Ctrl`/`Cmd` + `←`/`→`)
-> or it will look wrong.
-
----
-
-## 7. Create an account
-
-Register in the app. The backend enforces a strong password:
-8+ characters with an uppercase letter, a lowercase letter, a number **and** a
-symbol — e.g. `Nuno@2026`.
-
-To play a real match you need two players: run a second emulator, or open a
-second device and join via room code.
+Expect `{"success":true,"data":{"status":"healthy",...}}`. The first call may
+take a minute if the instance is asleep.
 
 ---
 
 ## Troubleshooting
 
-**"Connection refused" / "No connection"**
-The most common cause is a wrong `API_BASE_URL`. `localhost` inside an Android
-emulator means *the emulator itself*, not your computer — use `10.0.2.2`. On a
-physical device both machines must be on the same Wi-Fi and you must use the
-LAN IP.
+**Splash sits on "Waking the server…"**
+Normal on the first launch — allow 60s. If it becomes *"Cannot reach the
+server"*, check the health URL above in a browser.
 
-**CORS errors**
-Add your origin to `config.cors.allowedOrigins` in the backend
-(`src/config/config.ts`).
+**Login works, but matchmaking/rooms do nothing**
+Almost always Redis. Check the Render logs for Redis connection errors.
 
-**Cleartext HTTP blocked on Android**
-`setup.sh` handles this. If you set up manually, add
-`android:usesCleartextTraffic="true"` to the `<application>` tag.
+**"Cannot reach the server"**
+Confirm the Render service is deployed and not suspended, and that the health
+endpoint responds in a browser.
 
-**Analyzer errors about `withValues` or `CardThemeData`**
-Your Flutter is older than 3.27. Run `flutter upgrade`.
+**Analyzer errors about `withValues` / `CardThemeData`**
+Flutter older than 3.27 — run `flutter upgrade`.
 
-**Socket never authenticates**
-Check the backend log — Redis must be reachable, since the socket handshake
-stores its session there.
-
-**Stale build after changing `--dart-define`**
-Dart-defines are compiled in. Fully stop and relaunch; hot reload will not pick
-up a new URL.
+**Changed `--dart-define` but nothing happened**
+Dart-defines are compiled in. Fully stop and relaunch; hot reload won't pick up
+a new URL.
 
 ---
 
@@ -184,7 +165,7 @@ lib/
 ├── data/        models + repositories (one per REST domain)
 ├── services/    Socket.IO connection and event names
 └── features/    one folder per screen group
-design/          the UI reference sheet + DESIGN_SPEC.md
+design/          DESIGN_SPEC.md — sampled palette and screen inventory
 ```
 
-Full architecture notes are in `README.md`.
+Architecture notes are in `README.md`.

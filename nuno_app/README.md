@@ -32,29 +32,40 @@ flutter run
 
 ### Pointing at your backend
 
-The base URL is a compile-time constant, defaulting to `http://10.0.2.2:3000`
-(the Android emulator's alias for the host machine's `localhost`).
+The base URL is a compile-time constant defaulting to the hosted deployment:
+
+```
+https://nuno-backend-by35.onrender.com
+```
+
+So the app runs with no flags:
 
 ```bash
-# Android emulator (default)
 flutter run
+```
 
-# iOS simulator
-flutter run --dart-define=API_BASE_URL=http://localhost:3000
+Override for a local backend:
 
-# Physical device on the same Wi-Fi
-flutter run --dart-define=API_BASE_URL=http://192.168.1.42:3000
-
-# Staging / production
+```bash
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000     # Android emulator
+flutter run --dart-define=API_BASE_URL=http://localhost:3000    # iOS sim / desktop
 flutter build apk --dart-define=API_BASE_URL=https://api.yourdomain.com
 ```
 
-> **CORS:** add your client origin to `config.cors.allowedOrigins` on the backend.
->
-> **Cleartext HTTP:** for local development over plain `http://`, Android needs
-> `android:usesCleartextTraffic="true"` on `<application>` in
-> `android/app/src/main/AndroidManifest.xml`, and iOS needs an
-> `NSAppTransportSecurity` → `NSAllowsArbitraryLoads` entry in `Info.plist`.
+#### Hosted-backend notes
+
+* **Cold starts.** Render's free tier sleeps after ~15 minutes idle and takes up
+  to a minute to wake. `AppConfig` widens HTTP and socket timeouts to 90s when
+  the host is `onrender.com`, and the splash screen shows a
+  "Waking the server..." hint (`core/network/server_wakeup.dart`).
+* **Socket transport.** The client starts on HTTP polling and lets Socket.IO
+  upgrade to websocket, because hosted proxies often reject a direct websocket
+  handshake.
+* **CORS.** Native Android/iOS send no `Origin` header, so the backend's
+  `ALLOWED_ORIGINS` does not affect them. It only matters for a Flutter Web
+  build.
+* **Cleartext HTTP** is only needed when targeting a local `http://` backend;
+  `setup.sh` configures Android and iOS for it automatically.
 
 ---
 

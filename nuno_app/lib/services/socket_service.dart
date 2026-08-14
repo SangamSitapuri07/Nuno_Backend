@@ -86,12 +86,17 @@ class SocketService {
     _socket = io.io(
       AppConfig.socketUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          // Start on polling and let Socket.IO upgrade to websocket. Hosted
+          // proxies (Render, Heroku, Cloudflare) frequently reject a direct
+          // websocket handshake, which would strand a websocket-only client.
+          .setTransports(['polling', 'websocket'])
           .enableForceNew()
           .enableReconnection()
           .setReconnectionAttempts(999)
           .setReconnectionDelay(1000)
-          .setReconnectionDelayMax(5000)
+          // A sleeping free-tier instance needs a long cold-start budget.
+          .setReconnectionDelayMax(AppConfig.isRenderFreeTier ? 15000 : 5000)
+          .setTimeout(AppConfig.connectTimeout.inMilliseconds)
           .disableAutoConnect()
           .build(),
     );

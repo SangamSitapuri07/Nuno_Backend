@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../core/network/server_wakeup.dart';
 import '../../core/providers.dart';
 import '../../data/models/user_models.dart';
 
@@ -49,6 +50,10 @@ class AuthController extends StateNotifier<AuthState> {
 
   /// Restores a persisted session on cold start.
   Future<void> _bootstrap() async {
+    // Wake the hosted backend first; on Render's free tier this can take
+    // ~50s and would otherwise look like the app hanging.
+    await _ref.read(serverWakeupProvider.notifier).ping();
+
     final auth = _ref.read(authRepositoryProvider);
     if (!await auth.hasSession()) {
       state = state.copyWith(status: AuthStatus.unauthenticated);

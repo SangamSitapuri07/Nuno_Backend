@@ -2,7 +2,20 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Nuno (Android emulator)",
+      "name": "Nuno (hosted backend — default)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Nuno (hosted, profile mode)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Local backend — Android emulator",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
@@ -11,7 +24,7 @@
       ]
     },
     {
-      "name": "Nuno (iOS simulator / desktop)",
+      "name": "Local backend — iOS simulator / desktop",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
@@ -20,22 +33,12 @@
       ]
     },
     {
-      "name": "Nuno (physical device — EDIT IP)",
+      "name": "Local backend — physical device (EDIT IP)",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
       "args": [
         "--dart-define=API_BASE_URL=http://192.168.1.10:3000"
-      ]
-    },
-    {
-      "name": "Nuno (profile mode)",
-      "request": "launch",
-      "type": "dart",
-      "flutterMode": "profile",
-      "program": "lib/main.dart",
-      "args": [
-        "--dart-define=API_BASE_URL=http://10.0.2.2:3000"
       ]
     }
   ]
