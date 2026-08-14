@@ -50,9 +50,9 @@ class AppDimens {
   static const double cardAspectRatio = 0.68;
 
   // Landscape: the hand sits in a short strip, so cards are compact.
-  static const double handCardWidth = 54;
+  static const double handCardWidth = 76;
   static const double handCardHeight = handCardWidth / cardAspectRatio;
-  static const double tableCardWidth = 60;
+  static const double tableCardWidth = 82;
   static const double tableCardHeight = tableCardWidth / cardAspectRatio;
   static const double opponentCardWidth = 22;
   static const double miniCardWidth = 22;

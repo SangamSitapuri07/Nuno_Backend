@@ -8,7 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_states.dart';
-import '../../core/widgets/player_avatar.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/game_card.dart';
 import '../../data/models/game_state.dart';
 import '../auth/auth_controller.dart';
@@ -16,20 +16,21 @@ import 'game_providers.dart';
 import 'widgets/card_action_popup.dart';
 import 'widgets/exit_confirm_dialog.dart';
 import 'widgets/game_chat_sheet.dart';
+import 'widgets/game_hud.dart';
 import 'widgets/game_over_screen.dart';
 import 'widgets/opponent_seat.dart';
-import 'widgets/quick_chat_sheet.dart';
 import 'widgets/player_hand.dart';
+import 'widgets/quick_chat_sheet.dart';
 import 'widgets/table_center.dart';
 import 'widgets/table_overlays.dart';
 import 'widgets/table_toasts.dart';
 
-/// Screens 7 & 8 — the landscape game table.
+/// The landscape game table, matching the gameplay mockup.
 ///
-/// Layout mirrors the reference: timer top-left, a chat bubble top-right,
-/// opponents seated left / top / right, the draw+discard piles centred, and the
-/// local player's fanned hand along the bottom. The whole table glows RED on an
-/// opponent's turn and GREEN on yours.
+/// Deep red radial background; NUNO badge + room info top-left; action buttons
+/// and LEAVE ROOM top-right; players seated top / left / right with the local
+/// player lower-left; glowing pile vortex in the middle; fanned hand along the
+/// bottom; timer dial and UNO! button on the right.
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
 
@@ -39,6 +40,8 @@ class GameScreen extends ConsumerStatefulWidget {
 
 class _GameScreenState extends ConsumerState<GameScreen> {
   bool _resultShown = false;
+  bool _micOn = true;
+  bool _soundOn = true;
 
   @override
   void initState() {
@@ -50,9 +53,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   Future<void> _playCard(GameCard card) async {
     final controller = ref.read(gameControllerProvider.notifier);
-
     if (card.isWild) {
-      // Screen 9 — Card Action popup.
       final color = await CardActionPopup.show(context, card: card);
       if (color == null || !mounted) return;
       controller.playCard(card, selectedColor: color);
@@ -62,12 +63,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   Future<void> _confirmExit() async {
-    // Screen 30 — Exit Confirm.
     final leave = await ExitConfirmDialog.show(context);
     if (leave == true && mounted) {
-      final controller = ref.read(gameControllerProvider.notifier);
-      controller.surrender();
-      controller.reset();
+      final c = ref.read(gameControllerProvider.notifier);
+      c.surrender();
+      c.reset();
       context.go(AppRoutes.home);
     }
   }
@@ -76,12 +76,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (_resultShown) return;
     _resultShown = true;
 
-    // Screen 12 — Game Over.
-    final game = ref.read(gameControllerProvider).game;
     GameOverScreen.show(
       context,
       result: result,
-      game: game,
+      game: ref.read(gameControllerProvider).game,
       myId: myId,
       onPlayAgain: () {
         _resultShown = false;
@@ -110,8 +108,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         AppSnack.error(context, next.error!);
         controller.clearError();
       }
-      // Screen 11 — Draw Penalty.
-      // Screen 10 — UNO! burst when I successfully declare.
       final me = myId;
       if (me != null &&
           next.unoCalledBy.contains(me) &&
@@ -126,29 +122,40 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     final game = state.game;
 
-    // Table ambience follows whose turn it is.
-    final glow = isMyTurn ? AppColors.tableGlowGreen : AppColors.tableGlowRed;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _confirmExit();
       },
       child: Scaffold(
-        backgroundColor: AppColors.tableBase,
-        body: AnimatedContainer(
-          duration: const Duration(milliseconds: 600),
-          decoration: BoxDecoration(
-            gradient: AppColors.tableGradient(glow),
+        backgroundColor: const Color(0xFF2A0507),
+        body: DecoratedBox(
+          // Deep red table, brighter toward the middle.
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 0.95,
+              colors: [
+                Color(0xFF9E1A10),
+                Color(0xFF6E0F0C),
+                Color(0xFF3A0708),
+                Color(0xFF1E0304),
+              ],
+              stops: [0.0, 0.42, 0.75, 1.0],
+            ),
           ),
           child: SafeArea(
             child: game == null
                 ? const LoadingView(label: 'Joining the table...')
-                : _TableLayout(
+                : _Table(
                     state: state,
                     game: game,
                     myId: myId,
                     isMyTurn: isMyTurn,
+                    micOn: _micOn,
+                    soundOn: _soundOn,
+                    onToggleMic: () => setState(() => _micOn = !_micOn),
+                    onToggleSound: () => setState(() => _soundOn = !_soundOn),
                     onPlayCard: _playCard,
                     onExit: _confirmExit,
                   ),
@@ -159,154 +166,261 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 }
 
-class _TableLayout extends ConsumerWidget {
+class _Table extends ConsumerWidget {
   final GameUiState state;
   final GameState game;
   final String? myId;
   final bool isMyTurn;
+  final bool micOn;
+  final bool soundOn;
+  final VoidCallback onToggleMic;
+  final VoidCallback onToggleSound;
   final Future<void> Function(GameCard) onPlayCard;
   final VoidCallback onExit;
 
-  const _TableLayout({
+  const _Table({
     required this.state,
     required this.game,
     required this.myId,
     required this.isMyTurn,
+    required this.micOn,
+    required this.soundOn,
+    required this.onToggleMic,
+    required this.onToggleSound,
     required this.onPlayCard,
     required this.onExit,
   });
+
+  static const _ringColors = [
+    AppColors.blue,
+    AppColors.green,
+    AppColors.gold,
+    AppColors.rarityEpic,
+    AppColors.cyan,
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(gameControllerProvider.notifier);
     final opponents = game.opponentsFrom(myId ?? '');
-    final seats = _distributeSeats(opponents);
-    final turnProgress =
-        (state.turnSecondsLeft / AppConfig.turnTimerSeconds).clamp(0.0, 1.0);
+    final seats = _seat(opponents);
+    final me = myId == null ? null : game.playerInfo(myId!);
+    final canCallUno =
+        game.shouldCallUno && !state.unoCalledBy.contains(myId ?? '');
+
+    Color ringFor(String userId) =>
+        _ringColors[userId.hashCode.abs() % _ringColors.length];
 
     return Stack(
       children: [
-        // ── Main table column ────────────────────────
-        Column(
-          children: [
-            // Top row: timer · top opponents · chat
-            SizedBox(
-              height: 74,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _TurnTimer(
-                    seconds: state.turnSecondsLeft,
-                    isMyTurn: isMyTurn,
-                    onTap: onExit,
-                  ),
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final o in seats.top)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppDimens.md,
-                            ),
-                            child: OpponentSeat(
-                              player: o,
-                              placement: SeatPlacement.top,
-                              isCurrentTurn: o.userId == game.currentTurn,
-                              hasCalledUno:
-                                  state.unoCalledBy.contains(o.userId),
-                              turnProgress: turnProgress,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  _ChatButton(
-                    onTap: () => GameChatSheet.show(context),
-                    unread: state.messages.length,
-                  ),
-                ],
+        // ── Centre piles ─────────────────────────────
+        Align(
+          alignment: const Alignment(0, -0.10),
+          child: TableCenter(
+            topCard: game.topCard,
+            currentColor: game.currentColor,
+            drawPileCount: game.drawPileCount,
+            direction: game.direction,
+            canDraw: isMyTurn && state.pendingCardId == null,
+            onDraw: controller.drawCard,
+          ),
+        ),
+
+        // ── Top seat ─────────────────────────────────
+        if (seats.top != null)
+          Align(
+            alignment: const Alignment(0, -1),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: OpponentSeat(
+                player: seats.top!,
+                placement: SeatPlacement.top,
+                isCurrentTurn: seats.top!.userId == game.currentTurn,
+                hasCalledUno: state.unoCalledBy.contains(seats.top!.userId),
+                ringColor: ringFor(seats.top!.userId),
+                score: 0,
               ),
             ),
+          ),
 
-            // Middle: side seats + centre piles
-            Expanded(
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 96,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (final o in seats.left)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppDimens.sm,
-                            ),
-                            child: OpponentSeat(
-                              player: o,
-                              placement: SeatPlacement.left,
-                              isCurrentTurn: o.userId == game.currentTurn,
-                              hasCalledUno:
-                                  state.unoCalledBy.contains(o.userId),
-                              turnProgress: turnProgress,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: TableCenter(
-                        topCard: game.topCard,
-                        currentColor: game.currentColor,
-                        drawPileCount: game.drawPileCount,
-                        direction: game.direction,
-                        canDraw: isMyTurn && state.pendingCardId == null,
-                        onDraw: controller.drawCard,
-                        showYourTurn: isMyTurn,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 96,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (final o in seats.right)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppDimens.sm,
-                            ),
-                            child: OpponentSeat(
-                              player: o,
-                              placement: SeatPlacement.right,
-                              isCurrentTurn: o.userId == game.currentTurn,
-                              hasCalledUno:
-                                  state.unoCalledBy.contains(o.userId),
-                              turnProgress: turnProgress,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+        // ── Left seat ────────────────────────────────
+        if (seats.left != null)
+          Align(
+            alignment: const Alignment(-1, -0.25),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: OpponentSeat(
+                player: seats.left!,
+                placement: SeatPlacement.left,
+                isCurrentTurn: seats.left!.userId == game.currentTurn,
+                hasCalledUno: state.unoCalledBy.contains(seats.left!.userId),
+                ringColor: ringFor(seats.left!.userId),
               ),
             ),
+          ),
 
-            // Bottom: you + hand + UNO
-            _BottomBar(
-              state: state,
-              game: game,
-              myId: myId,
-              isMyTurn: isMyTurn,
-              onPlayCard: onPlayCard,
-              onCallUno: controller.callUno,
+        // ── Right seat ───────────────────────────────
+        if (seats.right != null)
+          Align(
+            alignment: const Alignment(1, -0.25),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: OpponentSeat(
+                player: seats.right!,
+                placement: SeatPlacement.right,
+                isCurrentTurn: seats.right!.userId == game.currentTurn,
+                hasCalledUno: state.unoCalledBy.contains(seats.right!.userId),
+                ringColor: ringFor(seats.right!.userId),
+              ),
+            ),
+          ),
+
+        // ── Extra seats, if more than three opponents ─
+        if (seats.extra.isNotEmpty)
+          Align(
+            alignment: const Alignment(0, -0.72),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final o in seats.extra)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: OpponentSeat(
+                      player: o,
+                      placement: SeatPlacement.top,
+                      isCurrentTurn: o.userId == game.currentTurn,
+                      hasCalledUno: state.unoCalledBy.contains(o.userId),
+                      ringColor: ringFor(o.userId),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+        // ── You, lower-left ──────────────────────────
+        Align(
+          alignment: const Alignment(-1, 0.42),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OpponentSeat(
+                  player: GamePlayerInfo(
+                    userId: myId ?? '',
+                    username: 'You',
+                    level: me?.level ?? 1,
+                    cardCount: 0,
+                  ),
+                  placement: SeatPlacement.bottom,
+                  isCurrentTurn: isMyTurn,
+                  hasCalledUno: state.unoCalledBy.contains(myId ?? ''),
+                  ringColor: AppColors.primary,
+                ),
+                if (isMyTurn)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 26),
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Top-left info ────────────────────────────
+        Positioned(
+          top: 4,
+          left: 8,
+          child: GameTopLeft(
+            roomCode: game.roomId.isEmpty
+                ? '------'
+                : game.roomId.substring(0, game.roomId.length.clamp(0, 8)),
+            mode: 'Classic',
+            pingMs: 52,
+          ),
+        ),
+
+        // ── Top-right controls ───────────────────────
+        Positioned(
+          top: 4,
+          right: 8,
+          child: GameTopRight(
+            micEnabled: micOn,
+            soundEnabled: soundOn,
+            onChat: () => GameChatSheet.show(context),
+            onMic: onToggleMic,
+            onSound: onToggleSound,
+            onMenu: onExit,
+            onLeave: onExit,
+          ),
+        ),
+
+        // ── Current card readout ─────────────────────
+        Align(
+          alignment: const Alignment(0.62, 0.30),
+          child: CurrentCardChip(
+            value: game.currentValue.glyph,
+            color: AppColors.forCardColor(game.currentColor.wire),
+            colorName: game.currentColor.isWild
+                ? 'Wild'
+                : game.currentColor.label,
+          ),
+        ),
+
+        // ── Timer dial ───────────────────────────────
+        Align(
+          alignment: const Alignment(0.95, 0.44),
+          child: TurnTimerDial(
+            seconds: state.turnSecondsLeft,
+            totalSeconds: AppConfig.turnTimerSeconds,
+          ),
+        ),
+
+        // ── UNO! button ──────────────────────────────
+        Align(
+          alignment: const Alignment(0.95, 0.86),
+          child: _UnoButton(
+            enabled: canCallUno,
+            onPressed: controller.callUno,
+          ),
+        ),
+
+        // ── Emote button ─────────────────────────────
+        Align(
+          alignment: const Alignment(-0.97, 0.95),
+          child: GestureDetector(
+            onTap: () => QuickChatSheet.show(
+              context,
               onEmote: controller.sendEmote,
               onQuickChat: controller.sendQuickChat,
             ),
-          ],
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.emoji_emotions_rounded,
+                  size: 24, color: Color(0xFF2A0507)),
+            ),
+          ),
+        ),
+
+        // ── My hand ──────────────────────────────────
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: PlayerHand(
+              cards: game.myHand,
+              isPlayable: game.isCardPlayable,
+              isMyTurn: isMyTurn && state.pendingCardId == null,
+              pendingCardId: state.pendingCardId,
+              onPlay: onPlayCard,
+            ),
+          ),
         ),
 
         TableToasts(toasts: state.toasts),
@@ -322,256 +436,33 @@ class _TableLayout extends ConsumerWidget {
     );
   }
 
-  /// Spreads opponents around the table: with few players they sit on the
-  /// sides, and overflow fills the top edge.
-  _Seats _distributeSeats(List<GamePlayerInfo> opponents) {
-    final left = <GamePlayerInfo>[];
-    final top = <GamePlayerInfo>[];
-    final right = <GamePlayerInfo>[];
-
-    switch (opponents.length) {
-      case 0:
-        break;
-      case 1:
-        top.add(opponents[0]);
-      case 2:
-        left.add(opponents[0]);
-        right.add(opponents[1]);
-      case 3:
-        left.add(opponents[0]);
-        top.add(opponents[1]);
-        right.add(opponents[2]);
-      case 4:
-        left.add(opponents[0]);
-        top.addAll([opponents[1], opponents[2]]);
-        right.add(opponents[3]);
-      default:
-        // 5+: two per side, remainder across the top.
-        left.addAll(opponents.take(2));
-        right.addAll(opponents.skip(opponents.length - 2));
-        top.addAll(opponents.skip(2).take(opponents.length - 4));
-    }
-
-    return _Seats(left: left, top: top, right: right);
+  /// Seats opponents: first to the top, then left, then right.
+  _Seats _seat(List<GamePlayerInfo> o) {
+    return switch (o.length) {
+      0 => const _Seats(),
+      1 => _Seats(top: o[0]),
+      2 => _Seats(left: o[0], right: o[1]),
+      3 => _Seats(left: o[0], top: o[1], right: o[2]),
+      _ => _Seats(
+          left: o[0],
+          top: o[1],
+          right: o[2],
+          extra: o.sublist(3),
+        ),
+    };
   }
 }
 
 class _Seats {
-  final List<GamePlayerInfo> left;
-  final List<GamePlayerInfo> top;
-  final List<GamePlayerInfo> right;
+  final GamePlayerInfo? left;
+  final GamePlayerInfo? top;
+  final GamePlayerInfo? right;
+  final List<GamePlayerInfo> extra;
 
-  const _Seats({required this.left, required this.top, required this.right});
+  const _Seats({this.left, this.top, this.right, this.extra = const []});
 }
 
-// ── Turn timer (top-left) ─────────────────────────────────────
-
-class _TurnTimer extends StatelessWidget {
-  final int seconds;
-  final bool isMyTurn;
-  final VoidCallback onTap;
-
-  const _TurnTimer({
-    required this.seconds,
-    required this.isMyTurn,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final urgent = seconds <= 5;
-    final label =
-        '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
-
-    return Padding(
-      padding: const EdgeInsets.all(AppDimens.sm),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.md,
-            vertical: 6,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.45),
-            borderRadius: AppDimens.brPill,
-            border: Border.all(
-              color: urgent
-                  ? AppColors.danger
-                  : Colors.white.withValues(alpha: 0.15),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.timer_outlined,
-                size: 14,
-                color: urgent ? AppColors.danger : AppColors.gold,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: AppTextStyles.body.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: urgent ? AppColors.danger : AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChatButton extends StatelessWidget {
-  final VoidCallback onTap;
-  final int unread;
-
-  const _ChatButton({required this.onTap, this.unread = 0});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppDimens.sm),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.45),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-          ),
-          child: const Icon(Icons.chat_bubble_outline_rounded,
-              size: 16, color: AppColors.textPrimary),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Bottom bar: you + hand + UNO ──────────────────────────────
-
-class _BottomBar extends StatelessWidget {
-  final GameUiState state;
-  final GameState game;
-  final String? myId;
-  final bool isMyTurn;
-  final Future<void> Function(GameCard) onPlayCard;
-  final VoidCallback onCallUno;
-  final void Function(String) onEmote;
-  final void Function(String) onQuickChat;
-
-  const _BottomBar({
-    required this.state,
-    required this.game,
-    required this.myId,
-    required this.isMyTurn,
-    required this.onPlayCard,
-    required this.onCallUno,
-    required this.onEmote,
-    required this.onQuickChat,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final me = myId == null ? null : game.playerInfo(myId!);
-    final canCallUno =
-        game.shouldCallUno && !state.unoCalledBy.contains(myId ?? '');
-
-    return SizedBox(
-      height: AppDimens.handCardHeight + 26,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // You
-          Padding(
-            padding: const EdgeInsets.only(
-              left: AppDimens.sm,
-              bottom: AppDimens.sm,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PlayerAvatar(
-                  username: me?.username ?? 'You',
-                  size: 38,
-                  isActive: isMyTurn,
-                  ringColor: isMyTurn ? AppColors.green : null,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'You',
-                  style: AppTextStyles.caption.copyWith(fontSize: 9),
-                ),
-                Text(
-                  '${game.myHand.length}',
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Hand
-          Expanded(
-            child: PlayerHand(
-              cards: game.myHand,
-              isPlayable: game.isCardPlayable,
-              isMyTurn: isMyTurn && state.pendingCardId == null,
-              pendingCardId: state.pendingCardId,
-              onPlay: onPlayCard,
-            ),
-          ),
-
-          // Emote + UNO
-          Padding(
-            padding: const EdgeInsets.only(
-              right: AppDimens.sm,
-              bottom: AppDimens.sm,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: () => QuickChatSheet.show(
-                    context,
-                    onEmote: onEmote,
-                    onQuickChat: onQuickChat,
-                  ),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.15),
-                      ),
-                    ),
-                    child: const Icon(Icons.emoji_emotions_outlined,
-                        size: 16, color: AppColors.textPrimary),
-                  ),
-                ),
-                const SizedBox(height: AppDimens.sm),
-                _UnoButton(enabled: canCallUno, onPressed: onCallUno),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The red pill UNO button from the reference's hand strip.
+/// Large rounded UNO! button, bottom-right.
 class _UnoButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback onPressed;
@@ -583,36 +474,35 @@ class _UnoButton extends StatelessWidget {
     return GestureDetector(
       onTap: enabled ? onPressed : null,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.md,
-          vertical: 7,
+          horizontal: AppDimens.xxl,
+          vertical: AppDimens.md,
         ),
         decoration: BoxDecoration(
-          gradient: enabled ? AppColors.playGradient : null,
-          color: enabled ? null : Colors.black.withValues(alpha: 0.4),
+          gradient: enabled
+              ? const LinearGradient(
+                  colors: [Color(0xFFFF7A3D), Color(0xFFEF3A2E)],
+                )
+              : null,
+          color: enabled ? null : Colors.black.withValues(alpha: 0.45),
           borderRadius: AppDimens.brPill,
-          border: Border.all(
-            color: enabled
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.12),
-            width: enabled ? 1.8 : 1,
-          ),
           boxShadow: enabled
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.6),
-                    blurRadius: 16,
+                    color: const Color(0xFFFF5A2E).withValues(alpha: 0.6),
+                    blurRadius: 22,
                     spreadRadius: 1,
                   ),
                 ]
               : null,
         ),
         child: Text(
-          'UNO',
-          style: AppTextStyles.button.copyWith(
-            fontSize: 13,
-            color: enabled ? Colors.white : AppColors.textMuted,
+          'UNO!',
+          style: AppTextStyles.h2.copyWith(
+            color: enabled ? Colors.white : Colors.white38,
+            fontSize: 24,
+            letterSpacing: 0.5,
           ),
         ),
       ),

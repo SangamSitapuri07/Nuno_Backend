@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -7,16 +9,19 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../data/models/game_state.dart';
 import 'playing_card.dart';
 
-enum SeatPlacement { left, top, right }
+enum SeatPlacement { left, top, right, bottom }
 
-/// An opponent around the landscape table: avatar with turn ring, name, and a
-/// fan of face-down cards oriented toward the table centre.
+/// A player around the table, matching the gameplay mockup: circular avatar
+/// with a coloured ring and a level badge, a dark name plate carrying a trophy
+/// score, an angled fan of card backs, and a small card-count badge.
 class OpponentSeat extends StatelessWidget {
   final GamePlayerInfo player;
   final SeatPlacement placement;
   final bool isCurrentTurn;
   final bool hasCalledUno;
   final double turnProgress;
+  final Color ringColor;
+  final int score;
 
   const OpponentSeat({
     super.key,
@@ -25,52 +30,59 @@ class OpponentSeat extends StatelessWidget {
     this.isCurrentTurn = false,
     this.hasCalledUno = false,
     this.turnProgress = 1,
+    this.ringColor = AppColors.blue,
+    this.score = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final avatar = _Avatar(
+    final identity = _Identity(
       player: player,
       isCurrentTurn: isCurrentTurn,
       hasCalledUno: hasCalledUno,
-      turnProgress: turnProgress,
+      ringColor: ringColor,
+      score: score,
     );
 
-    final fan = _MiniFan(
-      count: player.cardCount,
-      vertical: placement != SeatPlacement.top,
-    );
+    final fan = _CardFan(count: player.cardCount, placement: placement);
 
-    return switch (placement) {
-      // Top seats stack avatar over a horizontal fan.
-      SeatPlacement.top => Column(
+    switch (placement) {
+      case SeatPlacement.top:
+        return Column(
           mainAxisSize: MainAxisSize.min,
-          children: [avatar, const SizedBox(height: 3), fan],
-        ),
-      // Side seats put the fan toward the centre of the table.
-      SeatPlacement.left => Row(
+          children: [identity, const SizedBox(height: 2), fan],
+        );
+      case SeatPlacement.left:
+        return Row(
           mainAxisSize: MainAxisSize.min,
-          children: [avatar, const SizedBox(width: 3), fan],
-        ),
-      SeatPlacement.right => Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [identity, const SizedBox(width: 2), fan],
+        );
+      case SeatPlacement.right:
+        return Row(
           mainAxisSize: MainAxisSize.min,
-          children: [fan, const SizedBox(width: 3), avatar],
-        ),
-    };
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [fan, const SizedBox(width: 2), identity],
+        );
+      case SeatPlacement.bottom:
+        return identity;
+    }
   }
 }
 
-class _Avatar extends StatelessWidget {
+class _Identity extends StatelessWidget {
   final GamePlayerInfo player;
   final bool isCurrentTurn;
   final bool hasCalledUno;
-  final double turnProgress;
+  final Color ringColor;
+  final int score;
 
-  const _Avatar({
+  const _Identity({
     required this.player,
     required this.isCurrentTurn,
     required this.hasCalledUno,
-    required this.turnProgress,
+    required this.ringColor,
+    required this.score,
   });
 
   @override
@@ -79,34 +91,58 @@ class _Avatar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Stack(
-          alignment: Alignment.center,
           clipBehavior: Clip.none,
+          alignment: Alignment.center,
           children: [
-            if (isCurrentTurn)
-              SizedBox(
-                width: 42,
-                height: 42,
-                child: CircularProgressIndicator(
-                  value: turnProgress,
-                  strokeWidth: 2.5,
-                  backgroundColor: Colors.black.withValues(alpha: 0.35),
-                  valueColor: AlwaysStoppedAnimation(
-                    turnProgress < 0.3 ? AppColors.danger : AppColors.gold,
+            // Avatar with a thick coloured ring.
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: ringColor, width: 3),
+                boxShadow: isCurrentTurn
+                    ? [
+                        BoxShadow(
+                          color: ringColor.withValues(alpha: 0.65),
+                          blurRadius: 16,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: PlayerAvatar(username: player.username, size: 46),
+            ),
+
+            // Level badge, top-right on the ring.
+            Positioned(
+              top: -4,
+              right: -6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                constraints: const BoxConstraints(minWidth: 22),
+                decoration: BoxDecoration(
+                  color: ringColor,
+                  borderRadius: AppDimens.brPill,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  '${player.level}',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.caption.copyWith(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-            PlayerAvatar(
-              username: player.username,
-              size: 34,
-              isActive: isCurrentTurn,
-              ringColor: isCurrentTurn ? AppColors.gold : null,
             ),
+
             if (hasCalledUno)
               Positioned(
-                top: -7,
+                bottom: -6,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: AppDimens.brPill,
@@ -124,76 +160,117 @@ class _Avatar extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 2),
-        SizedBox(
-          width: 58,
-          child: Text(
-            player.username,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption.copyWith(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: isCurrentTurn
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
-            ),
+
+        const SizedBox(height: 4),
+
+        // Name plate with trophy score.
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.72),
+            borderRadius: AppDimens.brSm,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                player.username,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body.copyWith(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (score > 0)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.emoji_events_rounded,
+                        size: 11, color: AppColors.gold),
+                    const SizedBox(width: 3),
+                    Text(
+                      _formatScore(score),
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
         ),
       ],
     );
   }
+
+  static String _formatScore(int v) {
+    if (v < 1000) return '$v';
+    final s = v.toString();
+    return '${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+  }
 }
 
-/// Small fan of face-down cards with the count badge.
-class _MiniFan extends StatelessWidget {
+/// Angled fan of card backs with a count badge, oriented toward the table.
+class _CardFan extends StatelessWidget {
   final int count;
-  final bool vertical;
+  final SeatPlacement placement;
 
-  const _MiniFan({required this.count, this.vertical = false});
+  const _CardFan({required this.count, required this.placement});
 
   @override
   Widget build(BuildContext context) {
-    const w = AppDimens.opponentCardWidth;
-    const h = w / 0.68;
-    final visible = count.clamp(0, 5);
-    const step = 6.0;
+    final visible = count.clamp(0, 7);
+    if (visible == 0) return const SizedBox.shrink();
 
-    if (visible == 0) {
-      return const SizedBox(width: w, height: h);
-    }
+    const cardW = 26.0;
+    final cardH = cardW / 0.68;
+    const step = 11.0;
+    const spread = 0.10;
+
+    final isSide =
+        placement == SeatPlacement.left || placement == SeatPlacement.right;
+
+    final width = cardW + step * (visible - 1) + 10;
+    final height = cardH + 16;
 
     return SizedBox(
-      width: vertical ? w + 6 : w + step * (visible - 1),
-      height: vertical ? h + step * (visible - 1) : h + 6,
+      width: isSide ? width * 0.92 : width,
+      height: height + 14,
       child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
         children: [
           for (var i = 0; i < visible; i++)
             Positioned(
-              left: vertical ? 0 : i * step,
-              top: vertical ? i * step : 0,
-              child: const CardBackView(width: w),
+              left: i * step,
+              top: 6 - math.cos((i - (visible - 1) / 2) * 0.5) * 3,
+              child: Transform.rotate(
+                angle: (i - (visible - 1) / 2) * spread,
+                child: const CardBackView(width: cardW),
+              ),
             ),
-          // Count badge.
+
+          // Count badge below the fan.
           Positioned(
-            right: 0,
-            bottom: 0,
+            bottom: -2,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
               decoration: BoxDecoration(
-                color: count == 1 ? AppColors.primary : Colors.black87,
-                borderRadius: AppDimens.brPill,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
+                color: count == 1
+                    ? AppColors.primary
+                    : Colors.black.withValues(alpha: 0.82),
+                borderRadius: AppDimens.brSm,
               ),
               child: Text(
                 '$count',
                 style: AppTextStyles.caption.copyWith(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
                   color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),

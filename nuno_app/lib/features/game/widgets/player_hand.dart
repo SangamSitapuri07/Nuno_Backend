@@ -81,7 +81,7 @@ class _PlayerHandState extends State<PlayerHand> {
     final available = screenWidth - AppDimens.xxl;
     final count = widget.cards.length;
     final rawStep = count > 1 ? (available - cardWidth) / (count - 1) : 0.0;
-    final double step = rawStep.clamp(26.0, cardWidth * 0.82).toDouble();
+    final double step = rawStep.clamp(34.0, cardWidth * 0.88).toDouble();
     final double totalWidth = cardWidth + step * (count - 1);
     final needsScroll = totalWidth > available;
 
@@ -122,8 +122,8 @@ class _PlayerHandState extends State<PlayerHand> {
     // Arc: middle cards sit slightly higher, edges tilt outward.
     final centre = (count - 1) / 2;
     final offsetFromCentre = count == 1 ? 0.0 : (i - centre) / centre;
-    final angle = offsetFromCentre * 0.10;
-    final arcLift = -math.cos(offsetFromCentre * math.pi / 2) * 8;
+    final angle = offsetFromCentre * 0.055;
+    final arcLift = -math.cos(offsetFromCentre * math.pi / 2) * 5;
 
     final left = (math.max(totalWidth, available) - totalWidth) / 2 + i * step;
 

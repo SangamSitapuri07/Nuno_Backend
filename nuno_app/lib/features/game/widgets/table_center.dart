@@ -2,15 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/game_card.dart';
 import 'playing_card.dart';
 
-/// Centre of the table: rotating direction ring, draw pile, discard pile and
-/// the "YOUR TURN" banner from screen 8.
+/// Centre of the table: a glowing orange vortex with the draw pile on the left
+/// and the discard pile on the right, plus curved direction arrows.
 class TableCenter extends StatelessWidget {
   final GameCard? topCard;
   final CardColor currentColor;
@@ -18,7 +16,6 @@ class TableCenter extends StatelessWidget {
   final GameDirection direction;
   final bool canDraw;
   final VoidCallback onDraw;
-  final bool showYourTurn;
 
   const TableCenter({
     super.key,
@@ -28,201 +25,211 @@ class TableCenter extends StatelessWidget {
     required this.direction,
     required this.canDraw,
     required this.onDraw,
-    this.showYourTurn = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showYourTurn) ...[
-          const _YourTurnBanner(),
-          const SizedBox(height: AppDimens.sm),
-        ],
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            _DirectionRing(direction: direction, color: currentColor),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Draw pile
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Positioned(
-                          left: 3,
-                          top: 3,
-                          child: Opacity(
-                            opacity: 0.6,
-                            child: CardBackView(
-                              width: AppDimens.tableCardWidth * 0.9,
-                            ),
-                          ),
-                        ),
-                        CardBackView(
-                          width: AppDimens.tableCardWidth * 0.9,
-                          isHighlighted: canDraw,
-                          onTap: canDraw ? onDraw : null,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$drawPileCount',
-                      style: AppTextStyles.caption.copyWith(fontSize: 9),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(width: AppDimens.lg),
-
-                // Discard pile
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (child, animation) => ScaleTransition(
-                        scale: Tween(begin: 0.75, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutBack,
-                          ),
-                        ),
-                        child: FadeTransition(opacity: animation, child: child),
-                      ),
-                      child: topCard == null
-                          ? const _EmptySlot(key: ValueKey('empty'))
-                          : Transform.rotate(
-                              key: ValueKey(topCard!.cardId),
-                              angle: -0.05,
-                              child: PlayingCardView(
-                                card: topCard!,
-                                width: AppDimens.tableCardWidth,
-                                overrideColor: topCard!.color.isWild &&
-                                        !currentColor.isWild
-                                    ? currentColor
-                                    : null,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 4),
-                    _ColorDot(color: currentColor),
-                  ],
-                ),
-              ],
+    return SizedBox(
+      width: 330,
+      height: 250,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Radial glow behind the piles.
+          Container(
+            width: 300,
+            height: 220,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFFFFB020).withValues(alpha: 0.85),
+                  const Color(0xFFFF7A00).withValues(alpha: 0.45),
+                  const Color(0xFFD8340E).withValues(alpha: 0.15),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.35, 0.62, 1.0],
+              ),
             ),
-          ],
-        ),
-      ],
-    );
-  }
-}
+          ),
 
-class _YourTurnBanner extends StatefulWidget {
-  const _YourTurnBanner();
+          // Rotating direction arrows.
+          _DirectionArrows(direction: direction),
 
-  @override
-  State<_YourTurnBanner> createState() => _YourTurnBannerState();
-}
-
-class _YourTurnBannerState extends State<_YourTurnBanner>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: Tween(begin: 0.65, end: 1.0).animate(_c),
-      child: Text(
-        'YOUR TURN',
-        style: AppTextStyles.h4.copyWith(
-          color: const Color(0xFF7CFFA8),
-          letterSpacing: 2,
-          fontSize: 13,
-          shadows: [
-            Shadow(
-              color: AppColors.green.withValues(alpha: 0.9),
-              blurRadius: 14,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptySlot extends StatelessWidget {
-  const _EmptySlot({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: AppDimens.tableCardWidth,
-      height: AppDimens.tableCardHeight,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(AppDimens.tableCardWidth * 0.14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-    );
-  }
-}
-
-class _ColorDot extends StatelessWidget {
-  final CardColor color;
-
-  const _ColorDot({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final swatch = AppColors.forCardColor(color.wire);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 280),
-      width: 34,
-      height: 6,
-      decoration: BoxDecoration(
-        color: swatch,
-        borderRadius: AppDimens.brPill,
-        boxShadow: [
-          BoxShadow(color: swatch.withValues(alpha: 0.7), blurRadius: 8),
+          // Piles.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _DrawPile(count: drawPileCount, canDraw: canDraw, onDraw: onDraw),
+              const SizedBox(width: AppDimens.xl),
+              _DiscardPile(topCard: topCard, currentColor: currentColor),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-/// Rotating dashed ring showing play direction.
-class _DirectionRing extends StatefulWidget {
+class _DrawPile extends StatelessWidget {
+  final int count;
+  final bool canDraw;
+  final VoidCallback onDraw;
+
+  const _DrawPile({
+    required this.count,
+    required this.canDraw,
+    required this.onDraw,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const w = 76.0;
+
+    return SizedBox(
+      width: w + 10,
+      height: w / 0.68 + 12,
+      child: Stack(
+        children: [
+          // Stacked white edges suggesting depth.
+          for (var i = 4; i >= 1; i--)
+            Positioned(
+              left: 2.0 - i * 0.5,
+              top: i * 1.8,
+              child: Container(
+                width: w,
+                height: w / 0.68,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(w * 0.13),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          CardBackView(
+            width: w,
+            isHighlighted: canDraw,
+            onTap: canDraw ? onDraw : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiscardPile extends StatelessWidget {
+  final GameCard? topCard;
+  final CardColor currentColor;
+
+  const _DiscardPile({required this.topCard, required this.currentColor});
+
+  @override
+  Widget build(BuildContext context) {
+    const w = 82.0;
+
+    if (topCard == null) {
+      return Container(
+        width: w,
+        height: w / 0.68,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(w * 0.13),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: w + 22,
+      height: w / 0.68 + 22,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Two scattered cards beneath, as in the mockup.
+          Transform.translate(
+            offset: const Offset(10, 8),
+            child: Transform.rotate(
+              angle: 0.18,
+              child: Container(
+                width: w,
+                height: w / 0.68,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(w * 0.13),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: const Offset(-6, 4),
+            child: Transform.rotate(
+              angle: -0.12,
+              child: Container(
+                width: w,
+                height: w / 0.68,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(w * 0.13),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            transitionBuilder: (child, anim) => ScaleTransition(
+              scale: Tween(begin: 0.78, end: 1.0).animate(
+                CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+              ),
+              child: FadeTransition(opacity: anim, child: child),
+            ),
+            child: PlayingCardView(
+              key: ValueKey(topCard!.cardId),
+              card: topCard!,
+              width: w,
+              overrideColor: topCard!.color.isWild && !currentColor.isWild
+                  ? currentColor
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two curved arrows circling the piles to show play direction.
+class _DirectionArrows extends StatefulWidget {
   final GameDirection direction;
-  final CardColor color;
 
-  const _DirectionRing({required this.direction, required this.color});
+  const _DirectionArrows({required this.direction});
 
   @override
-  State<_DirectionRing> createState() => _DirectionRingState();
+  State<_DirectionArrows> createState() => _DirectionArrowsState();
 }
 
-class _DirectionRingState extends State<_DirectionRing>
+class _DirectionArrowsState extends State<_DirectionArrows>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 14),
+    duration: const Duration(seconds: 18),
   )..repeat();
 
   @override
@@ -240,41 +247,59 @@ class _DirectionRingState extends State<_DirectionRing>
       builder: (context, _) => Transform.rotate(
         angle: _c.value * 2 * math.pi * sign,
         child: CustomPaint(
-          size: const Size(190, 150),
-          painter: _RingPainter(
-            color: AppColors.forCardColor(widget.color.wire),
-          ),
+          size: const Size(300, 230),
+          painter: _ArrowPainter(),
         ),
       ),
     );
   }
 }
 
-class _RingPainter extends CustomPainter {
-  final Color color;
-
-  _RingPainter({required this.color});
-
+class _ArrowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromCenter(
       center: size.center(Offset.zero),
-      width: size.width,
-      height: size.height,
+      width: size.width * 0.86,
+      height: size.height * 0.86,
     );
+
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
+      ..strokeWidth = 9
       ..strokeCap = StrokeCap.round
-      ..color = color.withValues(alpha: 0.28);
+      ..color = const Color(0xFFFFA726).withValues(alpha: 0.75);
 
-    const segments = 20;
-    const sweep = (2 * math.pi / segments) * 0.5;
-    for (var i = 0; i < segments; i++) {
-      canvas.drawArc(rect, (2 * math.pi / segments) * i, sweep, false, paint);
-    }
+    // Two opposing arcs.
+    canvas.drawArc(rect, -0.55, 1.15, false, paint);
+    canvas.drawArc(rect, math.pi - 0.55, 1.15, false, paint);
+
+    // Arrow heads at each arc end.
+    _head(canvas, rect, 0.60, paint.color);
+    _head(canvas, rect, math.pi + 0.60, paint.color);
+  }
+
+  void _head(Canvas canvas, Rect rect, double angle, Color color) {
+    final cx = rect.center.dx + math.cos(angle) * rect.width / 2;
+    final cy = rect.center.dy + math.sin(angle) * rect.height / 2;
+
+    final path = Path();
+    const s = 15.0;
+    final dir = angle + math.pi / 2;
+    path.moveTo(cx + math.cos(dir) * s, cy + math.sin(dir) * s);
+    path.lineTo(
+      cx + math.cos(dir + 2.4) * s,
+      cy + math.sin(dir + 2.4) * s,
+    );
+    path.lineTo(
+      cx + math.cos(dir - 2.4) * s,
+      cy + math.sin(dir - 2.4) * s,
+    );
+    path.close();
+
+    canvas.drawPath(path, Paint()..color = color);
   }
 
   @override
-  bool shouldRepaint(covariant _RingPainter old) => old.color != color;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
