@@ -1,86 +1,93 @@
 # Making multiplayer work on Render
 
-The socket protocol is fine — the problem is **shared state**. Two settings
-decide whether players can see each other.
+**You do not need Redis.** The app now uses your existing Postgres for shared
+state, so the expired free-tier Redis is not a problem.
 
 ---
 
-## 1. REDIS_URL — required
+## What was actually broken
 
-`src/config/redis.ts` previously *always* used an in-process map, whatever you
-configured. Rooms, matchmaking queues, live match state and socket sessions all
-live in that store, so:
+Five separate bugs, all found by probing the socket layer with two simulated
+clients:
 
-* every instance had its own private set of rooms
-* a restart wiped every room and match
-* Render's free tier sleeps after ~15 min idle, so this happened constantly
+### 1. There was no shared state at all
+`src/config/redis.ts` always used an in-process `Map`, ignoring `REDIS_URL`
+entirely. Rooms, matchmaking queues, match state and sessions all live there,
+so every instance had a private view and every restart wiped it.
 
-It now uses real Redis whenever `REDIS_URL` is set, and logs a loud warning
-when it is not.
+**Fixed:** real Redis when `REDIS_URL` is set, otherwise a Postgres-backed
+key/value store (`src/config/pgstore.ts`) that gives the same shared,
+restart-surviving behaviour on the database you already pay for.
 
-**Set it up:**
+### 2. Taps during connection were silently dropped
+The backend registers its gameplay handlers *inside* the
+`socket:authenticate` callback. Anything emitted before that arrives at a
+socket with no listener and is discarded — no room, no error. On a cold Render
+start that window is up to a minute, which is why **Create Room did nothing**.
 
-1. Render dashboard → **New → Key Value** (Redis). The free plan is enough.
-2. Copy its **Internal Redis URL**.
-3. On your web service → **Environment** → add:
+**Fixed:** the client queues emits until authentication completes, then
+replays them. Verified: a tap 200 ms into a connect that authenticates at
+800 ms now succeeds.
 
-   ```
-   REDIS_URL = redis://red-xxxxx:6379
-   ```
+### 3. Friends showed OFFLINE while both were online
+`broadcastUserStatus` looped `io.sockets.sockets`, which only contains
+sockets on the current instance.
 
-4. Deploy.
+**Fixed:** presence is emitted to each friend's `user:<id>` room, which the
+Redis adapter routes across instances.
 
-Confirm in the logs:
+### 4. Friend requests only appeared after a restart
+Same local-scan bug in `friends.controller.ts`.
+
+**Fixed:** emits to `user:<id>` instead. Requests now arrive immediately.
+
+### 5. Reconnects lost room membership
+After a drop the server no longer has the socket in the room, but the client
+carried on. Reproduced: the client stops receiving room events entirely.
+
+**Fixed:** on every re-authentication the lobby rejoins by room code and the
+game re-syncs its state.
+
+---
+
+## What you need to do
+
+Nothing, if `DATABASE_URL` is already set — Postgres is used automatically.
+
+Confirm in the Render logs after deploying:
+
+```
+Postgres KV store ready
+Shared state store: Postgres (no Redis configured)
+```
+
+If you later add Redis, set `REDIS_URL` and it will be preferred:
 
 ```
 Redis connected
 Socket.IO Redis adapter attached
 ```
 
-If you instead see `REDIS_URL is not set`, the variable did not apply.
+> **Scaling note:** the Postgres store shares state correctly, but Socket.IO
+> still needs the Redis adapter to route events between *multiple* instances.
+> On Render's free tier you run a single instance, so this is fine. If you
+> scale to 2+, add Redis.
 
 ---
 
-## 2. Socket.IO Redis adapter — required if you ever scale past one instance
+## Two-device test
 
-Socket.IO keeps room membership per process. `io.to(roomId).emit(...)` only
-reaches sockets on *that* instance, so two players on different instances never
-see each other even with Redis configured for application state.
-
-`src/server.ts` now attaches `@socket.io/redis-adapter` automatically when
-`REDIS_URL` is present. Nothing else to do.
-
----
-
-## 3. Free tier cold starts
-
-The instance sleeps after ~15 minutes idle. On wake:
-
-* the first request takes up to a minute (the app shows "Waking the server…")
-* **every socket is dropped**, and the server forgets which rooms each socket
-  was in
-
-The client now handles this: it re-authenticates, then re-syncs game state and
-rejoins its room by code. Verified against a simulated drop — without the
-rejoin the client silently stops receiving room events, which is exactly the
-"nothing is real-time" symptom.
-
-To avoid sleeping entirely, either upgrade the instance or ping
-`/api/v1/health` every 10 minutes from a free uptime monitor.
-
----
-
-## 4. Quick verification
-
-```bash
-curl https://nuno-backend-by35.onrender.com/api/v1/health
-```
-
-Then, with two devices (or two emulators):
-
-1. Both sign in → each should appear in the other's friends list as **Online**
+1. Sign in on both → each shows the other as **Online**
 2. One taps **Create Room**, shares the code
-3. The other taps **Join Code** → both should see **2 players** immediately
-4. Both tap **Ready** → countdown → the match starts on both
+3. The other taps **Join Code** → both see **2 players** at once
+4. Both tap **Ready** → countdown → match starts on both
+5. Send a friend request → it appears **without restarting**
 
-If step 1 works but step 3 does not, it is almost always `REDIS_URL`.
+---
+
+## Cold starts
+
+The free instance sleeps after ~15 minutes. The first request takes up to a
+minute and every socket is dropped. The client handles this now, but you can
+avoid it by pinging `/api/v1/health` every 10 minutes from a free uptime
+monitor.

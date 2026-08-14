@@ -1,5 +1,7 @@
 import { createClient, RedisClientType } from 'redis';
 import logger from '../utils/logger';
+import prisma from './database';
+import { PgStore } from './pgstore';
 
 /**
  * Shared state store.
@@ -229,27 +231,38 @@ export let rawRedisClient: RedisClientType | null = null;
 export const connectRedis = async (): Promise<void> => {
   const url = process.env.REDIS_URL;
 
-  if (!url) {
-    logger.warn(
-      'REDIS_URL is not set — using an in-process store. Rooms, queues and ' +
-        'match state will NOT be shared across instances or survive a restart. ' +
-        'Set REDIS_URL in production.'
-    );
-    return;
+  // Prefer Redis when one is configured.
+  if (url) {
+    try {
+      const client: RedisClientType = createClient({ url });
+      client.on('error', (err) => logger.error('Redis error', { err }));
+      await client.connect();
+
+      rawRedisClient = client;
+      activeStore = new RedisStore(client);
+      logger.info('Redis connected', { url: url.replace(/:[^:@]*@/, ':***@') });
+      return;
+    } catch (error) {
+      logger.error('Redis connection failed; trying Postgres instead', {
+        error,
+      });
+    }
   }
 
+  // Otherwise fall back to Postgres, which is already provisioned. Shared
+  // state is what multiplayer actually needs, and a managed Redis is not
+  // required to get it.
   try {
-    const client: RedisClientType = createClient({ url });
-    client.on('error', (err) => logger.error('Redis error', { err }));
-    await client.connect();
-
-    rawRedisClient = client;
-    activeStore = new RedisStore(client);
-    logger.info('Redis connected', { url: url.replace(/:[^:@]*@/, ':***@') });
+    const pg = new PgStore(prisma);
+    await pg.init();
+    activeStore = pg;
+    logger.info('Shared state store: Postgres (no Redis configured)');
+    return;
   } catch (error) {
     logger.error(
-      'Redis connection FAILED — falling back to the in-process store. ' +
-        'Multiplayer will not work correctly across instances.',
+      'Postgres KV store failed to initialise — falling back to an ' +
+        'in-process store. Multiplayer will NOT work across instances or ' +
+        'survive a restart.',
       { error }
     );
   }
@@ -264,5 +277,8 @@ export const disconnectRedis = async (): Promise<void> => {
 
 /** True when a real Redis is backing the store. */
 export const isRedisActive = (): boolean => rawRedisClient !== null;
+
+/** True when state is shared across instances (Redis or Postgres). */
+export const isSharedStore = (): boolean => !(activeStore instanceof InMemoryStore);
 
 export default redisClient;

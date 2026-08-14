@@ -66,25 +66,14 @@ export const initializeSocketHandlers = (io: Server): void => {
             try {
               if (!socket.userId || !inviteData?.targetUserId || !inviteData?.roomCode) return;
 
+              // The personal room reaches the target on any instance; the
+              // previous local scan also delivered a duplicate copy.
               io.to(`user:${inviteData.targetUserId}`).emit('invite.received', {
                 fromUserId: socket.userId,
                 fromUsername: socket.username,
                 roomCode: inviteData.roomCode,
                 timestamp: Date.now(),
               });
-
-              for (const [socketId, sock] of io.sockets.sockets) {
-                const s = sock as any;
-                if (s.userId === inviteData.targetUserId) {
-                  io.to(socketId).emit('invite.received', {
-                    fromUserId: socket.userId,
-                    fromUsername: socket.username,
-                    roomCode: inviteData.roomCode,
-                    timestamp: Date.now(),
-                  });
-                  break;
-                }
-              }
 
               socket.emit('invite.sent', { success: true });
             } catch (error) {
@@ -127,16 +116,10 @@ export const initializeSocketHandlers = (io: Server): void => {
             try {
               if (!socket.userId || !frData?.targetUserId) return;
 
-              for (const [sid, sock] of io.sockets.sockets) {
-                const s = sock as any;
-                if (s.userId === frData.targetUserId) {
-                  io.to(sid).emit('friend.requestAccepted', {
-                    userId: socket.userId,
-                    username: socket.username
-                  });
-                  break;
-                }
-              }
+              io.to(`user:${frData.targetUserId}`).emit('friend.requestAccepted', {
+                userId: socket.userId,
+                username: socket.username,
+              });
             } catch (err) {
               logger.error('Friend accept notification error', { error: err });
             }
@@ -156,19 +139,6 @@ export const initializeSocketHandlers = (io: Server): void => {
                 message: messageText,
                 timestamp: Date.now(),
               });
-
-              for (const [sid, sock] of io.sockets.sockets) {
-                const s = sock as any;
-                if (s.userId === dmData.targetUserId) {
-                  io.to(sid).emit('dm.received', {
-                    fromUserId: socket.userId,
-                    fromUsername: socket.username,
-                    message: messageText,
-                    timestamp: Date.now(),
-                  });
-                  break;
-                }
-              }
 
               // Also send back to sender for confirmation
               socket.emit('dm.sent', {

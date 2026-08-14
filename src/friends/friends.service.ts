@@ -327,15 +327,15 @@ export class FriendsService {
         friends.map((f) => (f.userOne === userId ? f.userTwo : f.userOne))
       );
 
-      for (const [, socket] of io.sockets.sockets) {
-        const s = socket as any;
-        if (s.userId && friendIds.has(s.userId)) {
-          io.to(s.id).emit('friend.statusUpdated', {
-            userId,
-            status,
-            roomCode,
-          });
-        }
+      // Emit to each friend's personal room. Scanning io.sockets.sockets
+      // only reaches this instance, which is why presence looked stuck at
+      // OFFLINE for players connected elsewhere.
+      for (const friendId of friendIds) {
+        io.to(`user:${friendId}`).emit('friend.statusUpdated', {
+          userId,
+          status,
+          roomCode,
+        });
       }
 
       logger.info('Broadcasted user status to friends', { userId, status, roomCode });

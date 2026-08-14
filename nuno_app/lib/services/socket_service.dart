@@ -66,13 +66,52 @@ class SocketService {
   /// Event names currently attached to the live socket instance.
   final Set<String> _registered = {};
 
+  /// Events emitted before authentication completes, replayed once it does.
+  ///
+  /// The backend registers its gameplay handlers only inside the
+  /// `socket:authenticate` callback, so anything sent earlier is received by
+  /// a socket that has no listener for it and is dropped without an error.
+  /// That is what made "Create Room" and "Join" appear to do nothing on a
+  /// cold start.
+  final List<({String event, Map<String, dynamic> payload})> _pendingEmits = [];
+
+  /// Events that are part of the handshake and must never be queued.
+  static const _handshakeEvents = {SocketEvents.authenticate};
+
   void emit(String event, [Map<String, dynamic>? payload]) {
+    final data = payload ?? <String, dynamic>{};
+
     if (_socket == null) {
-      debugPrint('[socket] dropped "$event" — not connected');
+      debugPrint('[socket] queued "$event" — no socket yet');
+      _queue(event, data);
+      connect();
       return;
     }
-    debugPrint('[socket] → $event ${payload ?? ''}');
-    _socket!.emit(event, payload ?? <String, dynamic>{});
+
+    if (!isAuthenticated && !_handshakeEvents.contains(event)) {
+      debugPrint('[socket] queued "$event" — not authenticated yet');
+      _queue(event, data);
+      return;
+    }
+
+    debugPrint('[socket] → $event $data');
+    _socket!.emit(event, data);
+  }
+
+  void _queue(String event, Map<String, dynamic> payload) {
+    // Bound the buffer so a long outage cannot grow it without limit.
+    if (_pendingEmits.length >= 32) _pendingEmits.removeAt(0);
+    _pendingEmits.add((event: event, payload: payload));
+  }
+
+  void _flushPending() {
+    if (_pendingEmits.isEmpty || _socket == null) return;
+    final queued = List.of(_pendingEmits);
+    _pendingEmits.clear();
+    for (final e in queued) {
+      debugPrint('[socket] → ${e.event} (replayed)');
+      _socket!.emit(e.event, e.payload);
+    }
   }
 
   // ── Lifecycle ───────────────────────────────────────────────
@@ -128,6 +167,7 @@ class SocketService {
       debugPrint('[socket] authenticated');
       _setState(SocketConnectionState.authenticated);
       _dispatch(SocketEvents.authenticated, data);
+      _flushPending();
       if (!_authedController.isClosed) _authedController.add(null);
     });
 

@@ -142,11 +142,11 @@ export const initializeRoomHandlers = (
 
       io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
 
+      io.to(`user:${data.targetUserId}`).emit('room.kicked', {
+        reason: 'Kicked by host.',
+      });
       const targetSocket = findSocketByUserId(io, data.targetUserId);
-      if (targetSocket) {
-        targetSocket.emit('room.kicked', { reason: 'Kicked by host.' });
-        targetSocket.leave(room.roomId);
-      }
+      targetSocket?.leave(room.roomId);
 
       await friendsService.broadcastUserStatus(io, data.targetUserId);
 
@@ -242,6 +242,8 @@ const startCountdown = (io: Server, roomId: string): void => {
   }, 1000);
 };
 
+/// Local lookup only. Prefer `io.to(`user:${id}`).emit(...)` for anything
+/// that must reach a player regardless of which instance serves them.
 const findSocketByUserId = (io: Server, userId: string): any => {
   for (const [, socket] of io.sockets.sockets) {
     const s = socket as AuthenticatedSocket;

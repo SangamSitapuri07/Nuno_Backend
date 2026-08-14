@@ -38,16 +38,12 @@ export class FriendsController {
 
     const io = req.app.get('io');
     if (io) {
-      for (const [sid, sock] of io.sockets.sockets) {
-        const s = sock as any;
-        if (s.userId === playerId) {
-          io.to(sid).emit('friend.requestReceived', {
-            senderId: userId,
-            timestamp: Date.now(),
-          });
-          break;
-        }
-      }
+      // Scanning io.sockets.sockets only sees this instance's sockets, so
+      // the target never got the event if they were served elsewhere.
+      io.to(`user:${playerId}`).emit('friend.requestReceived', {
+        senderId: userId,
+        timestamp: Date.now(),
+      });
     }
 
     sendSuccess(res, { message: 'Friend request sent.' }, HTTP_STATUS.CREATED);
@@ -75,16 +71,13 @@ export class FriendsController {
 
     const io = req.app.get('io');
     if (io && request) {
-      for (const [sid, sock] of io.sockets.sockets) {
-        const s = sock as any;
-        if (s.userId === request.senderId || s.userId === request.receiverId) {
-          io.to(sid).emit('friend.requestAccepted', {
-            senderId: request.senderId,
-            receiverId: request.receiverId,
-            timestamp: Date.now(),
-          });
-        }
-      }
+      const payload = {
+        senderId: request.senderId,
+        receiverId: request.receiverId,
+        timestamp: Date.now(),
+      };
+      io.to(`user:${request.senderId}`).emit('friend.requestAccepted', payload);
+      io.to(`user:${request.receiverId}`).emit('friend.requestAccepted', payload);
 
       await friendsService.broadcastUserStatus(io, request.senderId);
       await friendsService.broadcastUserStatus(io, request.receiverId);

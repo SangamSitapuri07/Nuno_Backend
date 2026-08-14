@@ -29,21 +29,27 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
-  /// The nav bar hides itself after a few idle seconds, the way most mobile
-  /// games do, and reappears on any tap.
+  /// On Home the bar hides after a moment of inactivity and returns on a
+  /// tap. On every other tab it stays hidden — the back button is the way
+  /// out, which is what most mobile games do.
   bool _navVisible = true;
   Timer? _hideTimer;
 
-  static const _idleBeforeHide = Duration(milliseconds: 1500);
+  static const _idleBeforeHide = Duration(milliseconds: 2500);
+
+  bool get _isHome => _index == 0;
 
   void _scheduleHide() {
     _hideTimer?.cancel();
+    if (!_isHome) return;
     _hideTimer = Timer(_idleBeforeHide, () {
-      if (mounted) setState(() => _navVisible = false);
+      if (mounted && _isHome) setState(() => _navVisible = false);
     });
   }
 
+  /// Only Home responds to taps by revealing the bar.
   void _revealNav() {
+    if (!_isHome) return;
     if (!_navVisible) setState(() => _navVisible = true);
     _scheduleHide();
   }
@@ -112,7 +118,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   void _go(int i) {
     HapticFeedback.selectionClick();
-    setState(() => _index = i);
+    setState(() {
+      _index = i;
+      // Visible on Home, hidden everywhere else.
+      _navVisible = i == 0;
+    });
     _scheduleHide();
   }
 
@@ -151,13 +161,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       // While hidden it also ignores pointers, so the Listener above (and
       // the handle drawn inside _BottomBar) is what brings it back.
       bottomNavigationBar: IgnorePointer(
-        ignoring: !_navVisible,
+        ignoring: !_navVisible || !_isHome,
         child: AnimatedSlide(
-          offset: _navVisible ? Offset.zero : const Offset(0, 1),
+          offset: (_navVisible && _isHome) ? Offset.zero : const Offset(0, 1),
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
           child: AnimatedOpacity(
-            opacity: _navVisible ? 1 : 0,
+            opacity: (_navVisible && _isHome) ? 1 : 0,
             duration: const Duration(milliseconds: 100),
             child: _BottomBar(
               index: _index,
