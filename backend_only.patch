@@ -1,0 +1,1001 @@
+diff --git a/.gitignore b/.gitignore
+index 6b21ebd..77bd8a5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,3 +5,4 @@ logs/
+ *.log
+ coverage/
+ .DS_Store
++nuno_app.zip
+diff --git a/RENDER_SETUP.md b/RENDER_SETUP.md
+new file mode 100644
+index 0000000..88c6a0a
+--- /dev/null
++++ b/RENDER_SETUP.md
+@@ -0,0 +1,93 @@
++# Making multiplayer work on Render
++
++**You do not need Redis.** The app now uses your existing Postgres for shared
++state, so the expired free-tier Redis is not a problem.
++
++---
++
++## What was actually broken
++
++Five separate bugs, all found by probing the socket layer with two simulated
++clients:
++
++### 1. There was no shared state at all
++`src/config/redis.ts` always used an in-process `Map`, ignoring `REDIS_URL`
++entirely. Rooms, matchmaking queues, match state and sessions all live there,
++so every instance had a private view and every restart wiped it.
++
++**Fixed:** real Redis when `REDIS_URL` is set, otherwise a Postgres-backed
++key/value store (`src/config/pgstore.ts`) that gives the same shared,
++restart-surviving behaviour on the database you already pay for.
++
++### 2. Taps during connection were silently dropped
++The backend registers its gameplay handlers *inside* the
++`socket:authenticate` callback. Anything emitted before that arrives at a
++socket with no listener and is discarded — no room, no error. On a cold Render
++start that window is up to a minute, which is why **Create Room did nothing**.
++
++**Fixed:** the client queues emits until authentication completes, then
++replays them. Verified: a tap 200 ms into a connect that authenticates at
++800 ms now succeeds.
++
++### 3. Friends showed OFFLINE while both were online
++`broadcastUserStatus` looped `io.sockets.sockets`, which only contains
++sockets on the current instance.
++
++**Fixed:** presence is emitted to each friend's `user:<id>` room, which the
++Redis adapter routes across instances.
++
++### 4. Friend requests only appeared after a restart
++Same local-scan bug in `friends.controller.ts`.
++
++**Fixed:** emits to `user:<id>` instead. Requests now arrive immediately.
++
++### 5. Reconnects lost room membership
++After a drop the server no longer has the socket in the room, but the client
++carried on. Reproduced: the client stops receiving room events entirely.
++
++**Fixed:** on every re-authentication the lobby rejoins by room code and the
++game re-syncs its state.
++
++---
++
++## What you need to do
++
++Nothing, if `DATABASE_URL` is already set — Postgres is used automatically.
++
++Confirm in the Render logs after deploying:
++
++```
++Postgres KV store ready
++Shared state store: Postgres (no Redis configured)
++```
++
++If you later add Redis, set `REDIS_URL` and it will be preferred:
++
++```
++Redis connected
++Socket.IO Redis adapter attached
++```
++
++> **Scaling note:** the Postgres store shares state correctly, but Socket.IO
++> still needs the Redis adapter to route events between *multiple* instances.
++> On Render's free tier you run a single instance, so this is fine. If you
++> scale to 2+, add Redis.
++
++---
++
++## Two-device test
++
++1. Sign in on both → each shows the other as **Online**
++2. One taps **Create Room**, shares the code
++3. The other taps **Join Code** → both see **2 players** at once
++4. Both tap **Ready** → countdown → match starts on both
++5. Send a friend request → it appears **without restarting**
++
++---
++
++## Cold starts
++
++The free instance sleeps after ~15 minutes. The first request takes up to a
++minute and every socket is dropped. The client handles this now, but you can
++avoid it by pinging `/api/v1/health` every 10 minutes from a free uptime
++monitor.
+diff --git a/package-lock.json b/package-lock.json
+index f41d96d..b266947 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -74,7 +74,6 @@
+       "integrity": "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "@babel/code-frame": "^7.29.7",
+         "@babel/generator": "^7.29.7",
+@@ -604,13 +603,39 @@
+         "kuler": "^2.0.0"
+       }
+     },
++    "node_modules/@emnapi/core": {
++      "version": "1.11.3",
++      "resolved": "https://registry.npmjs.org/@emnapi/core/-/core-1.11.3.tgz",
++      "integrity": "sha512-zLpS5asjEb7lq8jYLq37N6XKaE41DIexlY1rF/z4/tIl3wo13Sqm28fRyfIsKZD+NZ8mM5RoKkpW/rBcuoSZSg==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "peer": true,
++      "dependencies": {
++        "@emnapi/wasi-threads": "1.2.3",
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@emnapi/runtime": {
++      "version": "1.11.3",
++      "resolved": "https://registry.npmjs.org/@emnapi/runtime/-/runtime-1.11.3.tgz",
++      "integrity": "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "peer": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
+     "node_modules/@emnapi/wasi-threads": {
+-      "version": "1.2.2",
+-      "resolved": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.2.tgz",
+-      "integrity": "sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==",
++      "version": "1.2.3",
++      "resolved": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.3.tgz",
++      "integrity": "sha512-ELEBe8PsLvvJ6QMr0zLt8ffvOHW/dc1m3CEzNMg7aJUv3bMaoDtw2TXyDAwkYBuroxxuHEwhRTLJSe5sya547g==",
+       "dev": true,
+       "license": "MIT",
+       "optional": true,
++      "peer": true,
+       "dependencies": {
+         "tslib": "^2.4.0"
+       }
+@@ -1264,7 +1289,6 @@
+       "resolved": "https://registry.npmjs.org/@redis/client/-/client-1.5.16.tgz",
+       "integrity": "sha512-X1a3xQ5kEMvTib5fBrHKh6Y+pXbeKXqziYuxOUo1ojQNECg4M5Etd1qqyhMap+lFUOAh8S7UYevgJHOm4A+NOg==",
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "cluster-key-slot": "1.1.2",
+         "generic-pool": "3.9.0",
+@@ -1615,7 +1639,6 @@
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-26.0.1.tgz",
+       "integrity": "sha512-fc3KiUoBt6kie0N9bIW3E47vZsuaMf0PM2AaUpLCLT0s/LvX1nxAim6Fc049cNxODPpGm6qRAuUOB86SkRuPQw==",
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "undici-types": "~8.3.0"
+       }
+@@ -2467,7 +2490,6 @@
+         }
+       ],
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "baseline-browser-mapping": "^2.10.38",
+         "caniuse-lite": "^1.0.30001799",
+@@ -3361,7 +3383,6 @@
+       "resolved": "https://registry.npmjs.org/express/-/express-5.2.1.tgz",
+       "integrity": "sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==",
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "accepts": "^2.0.0",
+         "body-parser": "^2.2.1",
+@@ -4109,7 +4130,6 @@
+       "integrity": "sha512-Yi1jqNC/Oq0N4hBgNH/YvBpP1P57QqundgytzYqy3yqAa7NZPNjSoi4SGbRAXDMdBzNE6xBCi5U7RgfrvMEUVQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "@jest/core": "30.4.2",
+         "@jest/types": "30.4.1",
+@@ -5491,7 +5511,6 @@
+       "integrity": "sha512-vtpjW3XuYCSnMsNVBjLMNkTj6OZbudcPPTPYHqX0CJfpcdWciI1dM8uHETwmDxxiqEwCIE6WvXucWUetJgfu/A==",
+       "hasInstallScript": true,
+       "license": "Apache-2.0",
+-      "peer": true,
+       "dependencies": {
+         "@prisma/engines": "5.22.0"
+       },
+@@ -5912,7 +5931,6 @@
+       "resolved": "https://registry.npmjs.org/socket.io-adapter/-/socket.io-adapter-2.5.8.tgz",
+       "integrity": "sha512-6Oy52pbg+kvdCVvjcN+FnY7BvxZ7cIHNScbvztT/It5d0vbwoJoVZmF2gjJmnV0/4WlXRfG15zc45ySk9Ah8bw==",
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "debug": "~4.4.1",
+         "ws": "~8.21.0"
+@@ -6445,7 +6463,6 @@
+       "integrity": "sha512-f0FFpIdcHgn8zcPSbf1dRevwt047YMnaiJM3u2w2RewrB+fob/zePZcrOyQoLMMO7aBIddLcQIEK5dYjkLnGrQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "@cspotcode/source-map-support": "^0.8.0",
+         "@tsconfig/node10": "^1.0.7",
+@@ -6552,7 +6569,6 @@
+       "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+       "dev": true,
+       "license": "Apache-2.0",
+-      "peer": true,
+       "bin": {
+         "tsc": "bin/tsc",
+         "tsserver": "bin/tsserver"
+@@ -6760,7 +6776,6 @@
+       "resolved": "https://registry.npmjs.org/winston/-/winston-3.19.0.tgz",
+       "integrity": "sha512-LZNJgPzfKR+/J3cHkxcpHKpKKvGfDZVPS4hfJCc4cCG0CgYzvlD6yE/S3CIL/Yt91ak327YCpiF/0MyeZHEHKA==",
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "@colors/colors": "^1.6.0",
+         "@dabh/diagnostics": "^2.0.8",
+diff --git a/src/config/pgstore.ts b/src/config/pgstore.ts
+new file mode 100644
+index 0000000..c3f7dc5
+--- /dev/null
++++ b/src/config/pgstore.ts
+@@ -0,0 +1,212 @@
++import { PrismaClient } from '@prisma/client';
++import logger from '../utils/logger';
++
++/**
++ * A Redis-shaped key/value store backed by the Postgres database you already
++ * have.
++ *
++ * Render's free Redis expires, and the app only needs a small, shared,
++ * restart-surviving store — not Redis' throughput. Postgres gives us exactly
++ * that at no extra cost, and every instance sees the same rows, which is the
++ * property that was actually missing.
++ *
++ * Keys carry an optional expiry and are cleaned up lazily on read plus by a
++ * periodic sweep, mirroring Redis' TTL semantics closely enough for rooms,
++ * queues, sessions and match state.
++ */
++export class PgStore {
++  private sweepTimer: NodeJS.Timeout | null = null;
++
++  constructor(private prisma: PrismaClient) {}
++
++  /// Prisma's generated client types the raw helpers loosely, so results are
++  /// cast at the call site rather than via type arguments.
++  private async query<T>(sql: string, ...params: unknown[]): Promise<T[]> {
++    return (await (this.prisma as any).$queryRawUnsafe(
++      sql,
++      ...params
++    )) as T[];
++  }
++
++  /** Creates the table and indexes if they do not exist yet. */
++  async init(): Promise<void> {
++    await this.prisma.$executeRawUnsafe(`
++      CREATE TABLE IF NOT EXISTS kv_store (
++        key         TEXT PRIMARY KEY,
++        value       TEXT,
++        members     TEXT[] DEFAULT '{}',
++        list_items  TEXT[] DEFAULT '{}',
++        expires_at  TIMESTAMPTZ
++      )
++    `);
++    await this.prisma.$executeRawUnsafe(
++      `CREATE INDEX IF NOT EXISTS kv_store_expires_idx ON kv_store (expires_at)`
++    );
++
++    // Drop anything that expired while the process was down.
++    await this.sweep();
++    this.sweepTimer = setInterval(() => {
++      this.sweep().catch(() => {});
++    }, 60_000);
++
++    logger.info('Postgres KV store ready');
++  }
++
++  async close(): Promise<void> {
++    if (this.sweepTimer) clearInterval(this.sweepTimer);
++    this.sweepTimer = null;
++  }
++
++  private async sweep(): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `DELETE FROM kv_store WHERE expires_at IS NOT NULL AND expires_at < NOW()`
++    );
++  }
++
++  // ── strings ─────────────────────────────────────────────────
++
++  async get(key: string): Promise<string | null> {
++    const rows: any[] = await this.query<{ value: string | null }>(
++      `SELECT value FROM kv_store
++        WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
++      key
++    );
++    return rows[0]?.value ?? null;
++  }
++
++  async set(
++    key: string,
++    value: string,
++    options?: { EX?: number }
++  ): Promise<void> {
++    const expires = options?.EX
++      ? new Date(Date.now() + options.EX * 1000)
++      : null;
++
++    await this.prisma.$executeRawUnsafe(
++      `INSERT INTO kv_store (key, value, expires_at) VALUES ($1, $2, $3)
++       ON CONFLICT (key) DO UPDATE SET value = $2, expires_at = $3`,
++      key,
++      value,
++      expires
++    );
++  }
++
++  async del(key: string): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `DELETE FROM kv_store WHERE key = $1`,
++      key
++    );
++  }
++
++  async exists(key: string): Promise<number> {
++    return (await this.get(key)) === null ? 0 : 1;
++  }
++
++  async incr(key: string): Promise<number> {
++    const rows: any[] = await this.query<{ value: string }>(
++      `INSERT INTO kv_store (key, value) VALUES ($1, '1')
++       ON CONFLICT (key) DO UPDATE
++         SET value = (COALESCE(kv_store.value, '0')::bigint + 1)::text
++       RETURNING value`,
++      key
++    );
++    return parseInt(rows[0]?.value ?? '1', 10);
++  }
++
++  async expire(key: string, seconds: number): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `UPDATE kv_store SET expires_at = $2 WHERE key = $1`,
++      key,
++      new Date(Date.now() + seconds * 1000)
++    );
++  }
++
++  async keys(pattern: string): Promise<string[]> {
++    const like = pattern.replace(/\*/g, '%');
++    const rows: any[] = await this.query<{ key: string }>(
++      `SELECT key FROM kv_store
++        WHERE key LIKE $1 AND (expires_at IS NULL OR expires_at > NOW())`,
++      like
++    );
++    return rows.map((r) => r.key);
++  }
++
++  // ── sets (online_players, etc.) ─────────────────────────────
++
++  async sAdd(key: string, member: string): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `INSERT INTO kv_store (key, members) VALUES ($1, ARRAY[$2])
++       ON CONFLICT (key) DO UPDATE
++         SET members = (
++           SELECT ARRAY(SELECT DISTINCT unnest(kv_store.members || ARRAY[$2]))
++         )`,
++      key,
++      member
++    );
++  }
++
++  async sRem(key: string, member: string): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `UPDATE kv_store SET members = array_remove(members, $2) WHERE key = $1`,
++      key,
++      member
++    );
++  }
++
++  async sIsMember(key: string, member: string): Promise<boolean> {
++    const rows: any[] = await this.query<{ found: boolean }>(
++      `SELECT $2 = ANY(members) AS found FROM kv_store WHERE key = $1`,
++      key,
++      member
++    );
++    return rows[0]?.found ?? false;
++  }
++
++  async sMembers(key: string): Promise<string[]> {
++    const rows: any[] = await this.query<{ members: string[] }>(
++      `SELECT members FROM kv_store WHERE key = $1`,
++      key
++    );
++    return rows[0]?.members ?? [];
++  }
++
++  // ── lists (matchmaking queues) ──────────────────────────────
++
++  async lPush(key: string, value: string): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `INSERT INTO kv_store (key, list_items) VALUES ($1, ARRAY[$2])
++       ON CONFLICT (key) DO UPDATE
++         SET list_items = ARRAY[$2] || kv_store.list_items`,
++      key,
++      value
++    );
++  }
++
++  async lRange(key: string, start: number, stop: number): Promise<string[]> {
++    const rows: any[] = await this.query<{ list_items: string[] }>(
++      `SELECT list_items FROM kv_store WHERE key = $1`,
++      key
++    );
++    const list = rows[0]?.list_items ?? [];
++    return stop === -1 ? list.slice(start) : list.slice(start, stop + 1);
++  }
++
++  async lRem(key: string, _count: number, value: string): Promise<void> {
++    await this.prisma.$executeRawUnsafe(
++      `UPDATE kv_store SET list_items = array_remove(list_items, $2)
++        WHERE key = $1`,
++      key,
++      value
++    );
++  }
++
++  async lLen(key: string): Promise<number> {
++    const rows: any[] = await this.query<{ n: bigint }>(
++      `SELECT COALESCE(array_length(list_items, 1), 0) AS n
++         FROM kv_store WHERE key = $1`,
++      key
++    );
++    return Number(rows[0]?.n ?? 0);
++  }
++}
+diff --git a/src/config/redis.ts b/src/config/redis.ts
+index 33627d7..6675d4b 100644
+--- a/src/config/redis.ts
++++ b/src/config/redis.ts
+@@ -1,9 +1,47 @@
++import { createClient, RedisClientType } from 'redis';
+ import logger from '../utils/logger';
++import prisma from './database';
++import { PgStore } from './pgstore';
+ 
+-class InMemoryStore {
+-  private store: Map<string, { value: string; expiry: number | null }> = new Map();
+-  private sets: Map<string, Set<string>> = new Map();
+-  private lists: Map<string, string[]> = new Map();
++/**
++ * Shared state store.
++ *
++ * Rooms, matchmaking queues, live match state and socket sessions all live
++ * here. On a hosted platform the process can be restarted or scaled to more
++ * than one instance at any time, so this MUST be a real Redis when a
++ * REDIS_URL is configured — an in-process map would silently give each
++ * instance its own private view, and two players would never see each other.
++ *
++ * The in-memory implementation is retained only as a local-development
++ * convenience, and the server logs loudly when it is in use.
++ */
++
++interface Store {
++  get(key: string): Promise<string | null>;
++  set(key: string, value: string, options?: { EX?: number }): Promise<void>;
++  del(key: string): Promise<void>;
++  exists(key: string): Promise<number>;
++  incr(key: string): Promise<number>;
++  expire(key: string, seconds: number): Promise<void>;
++  keys(pattern: string): Promise<string[]>;
++  sAdd(key: string, member: string): Promise<void>;
++  sRem(key: string, member: string): Promise<void>;
++  sIsMember(key: string, member: string): Promise<boolean>;
++  sMembers(key: string): Promise<string[]>;
++  lPush(key: string, value: string): Promise<void>;
++  lRange(key: string, start: number, stop: number): Promise<string[]>;
++  lRem(key: string, count: number, value: string): Promise<void>;
++  lLen(key: string): Promise<number>;
++}
++
++// ─────────────────────────────────────────
++// IN-MEMORY FALLBACK (local development only)
++// ─────────────────────────────────────────
++
++class InMemoryStore implements Store {
++  private store = new Map<string, { value: string; expiry: number | null }>();
++  private sets = new Map<string, Set<string>>();
++  private lists = new Map<string, string[]>();
+ 
+   async get(key: string): Promise<string | null> {
+     const item = this.store.get(key);
+@@ -16,8 +54,10 @@ class InMemoryStore {
+   }
+ 
+   async set(key: string, value: string, options?: { EX?: number }): Promise<void> {
+-    const expiry = options?.EX ? Date.now() + (options.EX * 1000) : null;
+-    this.store.set(key, { value, expiry });
++    this.store.set(key, {
++      value,
++      expiry: options?.EX ? Date.now() + options.EX * 1000 : null,
++    });
+   }
+ 
+   async del(key: string): Promise<void> {
+@@ -27,30 +67,28 @@ class InMemoryStore {
+   }
+ 
+   async exists(key: string): Promise<number> {
++    return (await this.get(key)) === null ? 0 : 1;
++  }
++
++  async incr(key: string): Promise<number> {
++    const next = parseInt((await this.get(key)) ?? '0', 10) + 1;
++    // Preserve any existing TTL: only the value changes.
+     const item = this.store.get(key);
+-    if (!item) return 0;
+-    if (item.expiry && Date.now() > item.expiry) {
+-      this.store.delete(key);
+-      return 0;
+-    }
+-    return 1;
++    this.store.set(key, { value: String(next), expiry: item?.expiry ?? null });
++    return next;
+   }
+ 
+   async expire(key: string, seconds: number): Promise<void> {
+     const item = this.store.get(key);
+-    if (item) {
+-      item.expiry = Date.now() + (seconds * 1000);
+-    }
++    if (item) item.expiry = Date.now() + seconds * 1000;
+   }
+ 
+-  async incr(key: string): Promise<number> {
+-    const current = await this.get(key);
+-    const newVal = (parseInt(current || '0') + 1).toString();
+-    await this.set(key, newVal);
+-    return parseInt(newVal);
++  async keys(pattern: string): Promise<string[]> {
++    const re = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
++    return [...this.store.keys(), ...this.sets.keys(), ...this.lists.keys()]
++      .filter((k) => re.test(k));
+   }
+ 
+-  // Set operations
+   async sAdd(key: string, member: string): Promise<void> {
+     if (!this.sets.has(key)) this.sets.set(key, new Set());
+     this.sets.get(key)!.add(member);
+@@ -60,46 +98,187 @@ class InMemoryStore {
+     this.sets.get(key)?.delete(member);
+   }
+ 
+-  async sMembers(key: string): Promise<string[]> {
+-    return Array.from(this.sets.get(key) || []);
++  async sIsMember(key: string, member: string): Promise<boolean> {
++    return this.sets.get(key)?.has(member) ?? false;
+   }
+ 
+-  async sIsMember(key: string, member: string): Promise<boolean> {
+-    return this.sets.get(key)?.has(member) || false;
++  async sMembers(key: string): Promise<string[]> {
++    return [...(this.sets.get(key) ?? [])];
+   }
+ 
+-  // List operations
+   async lPush(key: string, value: string): Promise<void> {
+     if (!this.lists.has(key)) this.lists.set(key, []);
+     this.lists.get(key)!.unshift(value);
+   }
+ 
+   async lRange(key: string, start: number, stop: number): Promise<string[]> {
+-    const list = this.lists.get(key) || [];
+-    if (stop === -1) return list.slice(start);
+-    return list.slice(start, stop + 1);
++    const list = this.lists.get(key) ?? [];
++    return stop === -1 ? list.slice(start) : list.slice(start, stop + 1);
+   }
+ 
+-  async lRem(key: string, count: number, value: string): Promise<void> {
++  async lRem(key: string, _count: number, value: string): Promise<void> {
+     const list = this.lists.get(key);
+     if (!list) return;
+-    const index = list.indexOf(value);
+-    if (index !== -1) list.splice(index, 1);
++    const i = list.indexOf(value);
++    if (i !== -1) list.splice(i, 1);
+   }
+ 
+   async lLen(key: string): Promise<number> {
+-    return (this.lists.get(key) || []).length;
++    return (this.lists.get(key) ?? []).length;
+   }
+ }
+ 
+-const redisClient = new InMemoryStore();
++// ─────────────────────────────────────────
++// REDIS-BACKED STORE
++// ─────────────────────────────────────────
++
++class RedisStore implements Store {
++  constructor(private client: RedisClientType) {}
++
++  async get(key: string) {
++    return this.client.get(key);
++  }
++
++  async set(key: string, value: string, options?: { EX?: number }) {
++    if (options?.EX) await this.client.set(key, value, { EX: options.EX });
++    else await this.client.set(key, value);
++  }
++
++  async del(key: string) {
++    await this.client.del(key);
++  }
++
++  async exists(key: string) {
++    return this.client.exists(key);
++  }
++
++  async incr(key: string) {
++    return this.client.incr(key);
++  }
++
++  async expire(key: string, seconds: number) {
++    await this.client.expire(key, seconds);
++  }
++
++  async keys(pattern: string) {
++    return this.client.keys(pattern);
++  }
++
++  async sAdd(key: string, member: string) {
++    await this.client.sAdd(key, member);
++  }
++
++  async sRem(key: string, member: string) {
++    await this.client.sRem(key, member);
++  }
++
++  async sIsMember(key: string, member: string) {
++    return this.client.sIsMember(key, member);
++  }
++
++  async sMembers(key: string) {
++    return this.client.sMembers(key);
++  }
++
++  async lPush(key: string, value: string) {
++    await this.client.lPush(key, value);
++  }
++
++  async lRange(key: string, start: number, stop: number) {
++    return this.client.lRange(key, start, stop);
++  }
++
++  async lRem(key: string, count: number, value: string) {
++    await this.client.lRem(key, count, value);
++  }
++
++  async lLen(key: string) {
++    return this.client.lLen(key);
++  }
++}
++
++// ─────────────────────────────────────────
++// SELECTION
++// ─────────────────────────────────────────
++
++const memoryStore = new InMemoryStore();
++
++/** Swapped for a RedisStore by connectRedis() when a REDIS_URL is present. */
++let activeStore: Store = memoryStore;
++
++/** Proxy so modules can import this once at load time. */
++const redisClient: Store = {
++  get: (k) => activeStore.get(k),
++  set: (k, v, o) => activeStore.set(k, v, o),
++  del: (k) => activeStore.del(k),
++  exists: (k) => activeStore.exists(k),
++  incr: (k) => activeStore.incr(k),
++  expire: (k, s) => activeStore.expire(k, s),
++  keys: (p) => activeStore.keys(p),
++  sAdd: (k, m) => activeStore.sAdd(k, m),
++  sRem: (k, m) => activeStore.sRem(k, m),
++  sIsMember: (k, m) => activeStore.sIsMember(k, m),
++  sMembers: (k) => activeStore.sMembers(k),
++  lPush: (k, v) => activeStore.lPush(k, v),
++  lRange: (k, a, b) => activeStore.lRange(k, a, b),
++  lRem: (k, c, v) => activeStore.lRem(k, c, v),
++  lLen: (k) => activeStore.lLen(k),
++};
++
++/** Raw client, used by the Socket.IO Redis adapter. */
++export let rawRedisClient: RedisClientType | null = null;
+ 
+ export const connectRedis = async (): Promise<void> => {
+-  logger.info('In-memory store initialized (no Redis needed)');
++  const url = process.env.REDIS_URL;
++
++  // Prefer Redis when one is configured.
++  if (url) {
++    try {
++      const client: RedisClientType = createClient({ url });
++      client.on('error', (err) => logger.error('Redis error', { err }));
++      await client.connect();
++
++      rawRedisClient = client;
++      activeStore = new RedisStore(client);
++      logger.info('Redis connected', { url: url.replace(/:[^:@]*@/, ':***@') });
++      return;
++    } catch (error) {
++      logger.error('Redis connection failed; trying Postgres instead', {
++        error,
++      });
++    }
++  }
++
++  // Otherwise fall back to Postgres, which is already provisioned. Shared
++  // state is what multiplayer actually needs, and a managed Redis is not
++  // required to get it.
++  try {
++    const pg = new PgStore(prisma);
++    await pg.init();
++    activeStore = pg;
++    logger.info('Shared state store: Postgres (no Redis configured)');
++    return;
++  } catch (error) {
++    logger.error(
++      'Postgres KV store failed to initialise — falling back to an ' +
++        'in-process store. Multiplayer will NOT work across instances or ' +
++        'survive a restart.',
++      { error }
++    );
++  }
+ };
+ 
+ export const disconnectRedis = async (): Promise<void> => {
+-  logger.info('In-memory store closed');
++  if (rawRedisClient) {
++    await rawRedisClient.quit();
++    rawRedisClient = null;
++  }
+ };
+ 
+-export default redisClient;
+\ No newline at end of file
++/** True when a real Redis is backing the store. */
++export const isRedisActive = (): boolean => rawRedisClient !== null;
++
++/** True when state is shared across instances (Redis or Postgres). */
++export const isSharedStore = (): boolean => !(activeStore instanceof InMemoryStore);
++
++export default redisClient;
+diff --git a/src/friends/friends.controller.ts b/src/friends/friends.controller.ts
+index a8d54c0..2d372f9 100644
+--- a/src/friends/friends.controller.ts
++++ b/src/friends/friends.controller.ts
+@@ -38,16 +38,12 @@ export class FriendsController {
+ 
+     const io = req.app.get('io');
+     if (io) {
+-      for (const [sid, sock] of io.sockets.sockets) {
+-        const s = sock as any;
+-        if (s.userId === playerId) {
+-          io.to(sid).emit('friend.requestReceived', {
+-            senderId: userId,
+-            timestamp: Date.now(),
+-          });
+-          break;
+-        }
+-      }
++      // Scanning io.sockets.sockets only sees this instance's sockets, so
++      // the target never got the event if they were served elsewhere.
++      io.to(`user:${playerId}`).emit('friend.requestReceived', {
++        senderId: userId,
++        timestamp: Date.now(),
++      });
+     }
+ 
+     sendSuccess(res, { message: 'Friend request sent.' }, HTTP_STATUS.CREATED);
+@@ -75,16 +71,13 @@ export class FriendsController {
+ 
+     const io = req.app.get('io');
+     if (io && request) {
+-      for (const [sid, sock] of io.sockets.sockets) {
+-        const s = sock as any;
+-        if (s.userId === request.senderId || s.userId === request.receiverId) {
+-          io.to(sid).emit('friend.requestAccepted', {
+-            senderId: request.senderId,
+-            receiverId: request.receiverId,
+-            timestamp: Date.now(),
+-          });
+-        }
+-      }
++      const payload = {
++        senderId: request.senderId,
++        receiverId: request.receiverId,
++        timestamp: Date.now(),
++      };
++      io.to(`user:${request.senderId}`).emit('friend.requestAccepted', payload);
++      io.to(`user:${request.receiverId}`).emit('friend.requestAccepted', payload);
+ 
+       await friendsService.broadcastUserStatus(io, request.senderId);
+       await friendsService.broadcastUserStatus(io, request.receiverId);
+diff --git a/src/friends/friends.service.ts b/src/friends/friends.service.ts
+index cf046d2..3b9375c 100644
+--- a/src/friends/friends.service.ts
++++ b/src/friends/friends.service.ts
+@@ -327,15 +327,15 @@ export class FriendsService {
+         friends.map((f) => (f.userOne === userId ? f.userTwo : f.userOne))
+       );
+ 
+-      for (const [, socket] of io.sockets.sockets) {
+-        const s = socket as any;
+-        if (s.userId && friendIds.has(s.userId)) {
+-          io.to(s.id).emit('friend.statusUpdated', {
+-            userId,
+-            status,
+-            roomCode,
+-          });
+-        }
++      // Emit to each friend's personal room. Scanning io.sockets.sockets
++      // only reaches this instance, which is why presence looked stuck at
++      // OFFLINE for players connected elsewhere.
++      for (const friendId of friendIds) {
++        io.to(`user:${friendId}`).emit('friend.statusUpdated', {
++          userId,
++          status,
++          roomCode,
++        });
+       }
+ 
+       logger.info('Broadcasted user status to friends', { userId, status, roomCode });
+diff --git a/src/rooms/room.handler.ts b/src/rooms/room.handler.ts
+index 42dae60..3d9af4d 100644
+--- a/src/rooms/room.handler.ts
++++ b/src/rooms/room.handler.ts
+@@ -142,11 +142,11 @@ export const initializeRoomHandlers = (
+ 
+       io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+ 
++      io.to(`user:${data.targetUserId}`).emit('room.kicked', {
++        reason: 'Kicked by host.',
++      });
+       const targetSocket = findSocketByUserId(io, data.targetUserId);
+-      if (targetSocket) {
+-        targetSocket.emit('room.kicked', { reason: 'Kicked by host.' });
+-        targetSocket.leave(room.roomId);
+-      }
++      targetSocket?.leave(room.roomId);
+ 
+       await friendsService.broadcastUserStatus(io, data.targetUserId);
+ 
+@@ -242,6 +242,8 @@ const startCountdown = (io: Server, roomId: string): void => {
+   }, 1000);
+ };
+ 
++/// Local lookup only. Prefer `io.to(`user:${id}`).emit(...)` for anything
++/// that must reach a player regardless of which instance serves them.
+ const findSocketByUserId = (io: Server, userId: string): any => {
+   for (const [, socket] of io.sockets.sockets) {
+     const s = socket as AuthenticatedSocket;
+diff --git a/src/server.ts b/src/server.ts
+index 85b082d..7d2735b 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
+ import config from './config/config';
+ import logger from './utils/logger';
+ import { connectDatabase } from './config/database';
+-import { connectRedis } from './config/redis';
++import { connectRedis, rawRedisClient } from './config/redis';
+ import { errorMiddleware } from './middleware/error.middleware';
+ import { apiRateLimit, authRateLimit } from './middleware/rateLimit.middleware';
+ import { initializeSocketHandlers } from './websocket/socket.handler';
+@@ -127,6 +127,25 @@ const startServer = async () => {
+     await connectDatabase();
+     await connectRedis();
+ 
++    // Without this adapter every instance keeps its own set of rooms, so
++    // two players served by different instances can never see each other.
++    if (rawRedisClient) {
++      try {
++        const { createAdapter } = await import('@socket.io/redis-adapter');
++        const subClient = rawRedisClient.duplicate();
++        await subClient.connect();
++        io.adapter(createAdapter(rawRedisClient, subClient));
++        logger.info('Socket.IO Redis adapter attached');
++      } catch (err) {
++        logger.error('Failed to attach the Socket.IO Redis adapter', { err });
++      }
++    } else {
++      logger.warn(
++        'Socket.IO is running without the Redis adapter. This is fine on a ' +
++          'single instance, but rooms will not be shared if you scale out.'
++      );
++    }
++
+     httpServer.listen(config.server.port, () => {
+       logger.info(`${config.server.appName} server started`, {
+         port: config.server.port,
+diff --git a/src/websocket/socket.handler.ts b/src/websocket/socket.handler.ts
+index 08e392d..10c91b3 100644
+--- a/src/websocket/socket.handler.ts
++++ b/src/websocket/socket.handler.ts
+@@ -66,6 +66,8 @@ export const initializeSocketHandlers = (io: Server): void => {
+             try {
+               if (!socket.userId || !inviteData?.targetUserId || !inviteData?.roomCode) return;
+ 
++              // The personal room reaches the target on any instance; the
++              // previous local scan also delivered a duplicate copy.
+               io.to(`user:${inviteData.targetUserId}`).emit('invite.received', {
+                 fromUserId: socket.userId,
+                 fromUsername: socket.username,
+@@ -73,19 +75,6 @@ export const initializeSocketHandlers = (io: Server): void => {
+                 timestamp: Date.now(),
+               });
+ 
+-              for (const [socketId, sock] of io.sockets.sockets) {
+-                const s = sock as any;
+-                if (s.userId === inviteData.targetUserId) {
+-                  io.to(socketId).emit('invite.received', {
+-                    fromUserId: socket.userId,
+-                    fromUsername: socket.username,
+-                    roomCode: inviteData.roomCode,
+-                    timestamp: Date.now(),
+-                  });
+-                  break;
+-                }
+-              }
+-
+               socket.emit('invite.sent', { success: true });
+             } catch (error) {
+               logger.error('Invite error', { error });
+@@ -127,16 +116,10 @@ export const initializeSocketHandlers = (io: Server): void => {
+             try {
+               if (!socket.userId || !frData?.targetUserId) return;
+ 
+-              for (const [sid, sock] of io.sockets.sockets) {
+-                const s = sock as any;
+-                if (s.userId === frData.targetUserId) {
+-                  io.to(sid).emit('friend.requestAccepted', {
+-                    userId: socket.userId,
+-                    username: socket.username
+-                  });
+-                  break;
+-                }
+-              }
++              io.to(`user:${frData.targetUserId}`).emit('friend.requestAccepted', {
++                userId: socket.userId,
++                username: socket.username,
++              });
+             } catch (err) {
+               logger.error('Friend accept notification error', { error: err });
+             }
+@@ -157,19 +140,6 @@ export const initializeSocketHandlers = (io: Server): void => {
+                 timestamp: Date.now(),
+               });
+ 
+-              for (const [sid, sock] of io.sockets.sockets) {
+-                const s = sock as any;
+-                if (s.userId === dmData.targetUserId) {
+-                  io.to(sid).emit('dm.received', {
+-                    fromUserId: socket.userId,
+-                    fromUsername: socket.username,
+-                    message: messageText,
+-                    timestamp: Date.now(),
+-                  });
+-                  break;
+-                }
+-              }
+-
+               // Also send back to sender for confirmation
+               socket.emit('dm.sent', {
+                 targetUserId: dmData.targetUserId,
