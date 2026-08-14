@@ -66,6 +66,8 @@ class HomeScreen extends ConsumerWidget {
         ),
 
         SafeArea(
+          // No bottom inset: PLAY is meant to sit flush on the screen edge.
+          bottom: false,
           child: LayoutBuilder(
             builder: (context, box) {
               final w = box.maxWidth;
@@ -145,10 +147,15 @@ class HomeScreen extends ConsumerWidget {
                                 children: [
                                   Expanded(
                                     flex: 7,
-                                    child: _FloatingAsset(
-                                      asset: Art.cardPodium,
-                                      onTap: () =>
-                                          context.push(AppRoutes.playMenu),
+                                    // Paint-time shift: keeps the art at its
+                                    // current size and simply drops it lower.
+                                    child: Transform.translate(
+                                      offset: const Offset(0, 22),
+                                      child: _FloatingAsset(
+                                        asset: Art.cardPodium,
+                                        onTap: () =>
+                                            context.push(AppRoutes.playMenu),
+                                      ),
                                     ),
                                   ),
                                   Expanded(
