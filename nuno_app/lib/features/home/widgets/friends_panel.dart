@@ -50,10 +50,10 @@ class _FriendsPanelState extends ConsumerState<FriendsPanel> {
           // ── Header ─────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppDimens.lg,
-              AppDimens.md,
               AppDimens.md,
               AppDimens.sm,
+              AppDimens.sm,
+              AppDimens.xs,
             ),
             child: Row(
               children: [
@@ -63,8 +63,8 @@ class _FriendsPanelState extends ConsumerState<FriendsPanel> {
                 Text(
                   'FRIENDS',
                   style: AppTextStyles.h4.copyWith(
-                    fontSize: 16,
-                    letterSpacing: 0.8,
+                    fontSize: 14,
+                    letterSpacing: 0.6,
                   ),
                 ),
                 const Spacer(),
@@ -85,10 +85,10 @@ class _FriendsPanelState extends ConsumerState<FriendsPanel> {
           Flexible(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(
-                AppDimens.md,
+                AppDimens.sm,
                 0,
-                AppDimens.md,
-                AppDimens.md,
+                AppDimens.sm,
+                AppDimens.sm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

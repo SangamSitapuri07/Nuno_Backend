@@ -10,21 +10,35 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/user_models.dart';
 import '../auth/auth_controller.dart';
 import 'widgets/friends_panel.dart';
 import 'widgets/player_badge.dart';
 
-/// Home screen — galaxy backdrop with a card podium, daily-gift chest, an
-/// ornate gold PLAY button and a docked friends panel.
+/// Home screen.
 ///
-/// Everything is laid out proportionally from the real canvas size, because
-/// phone aspect ratios in landscape vary hugely (2.0 to 2.4+) and fixed
-/// offsets caused the podium to collide with the header.
+/// Laid out with Column/Row slots rather than a Stack of Positioned widgets.
+/// Every element owns a real box, and each image is wrapped so it scales to
+/// fit its box — so nothing can overflow into a neighbour regardless of the
+/// device aspect ratio.
+///
+///   ┌──────────────────────────────────────────────┐
+///   │ header: badge · coins · gems · settings      │  fixed height
+///   ├───────────────────────────────┬──────────────┤
+///   │ stage: podium │ chest         │ friends      │  flexible
+///   │                               ├──────────────┤
+///   │                               │ PLAY         │
+///   ├───────────────────────────────┴──────────────┤
+///   │ (space reserved for the floating nav bar)    │
+///   └──────────────────────────────────────────────┘
 class HomeScreen extends ConsumerWidget {
   final ValueChanged<int>? onNavigate;
   final int navIndex;
 
   const HomeScreen({super.key, this.onNavigate, this.navIndex = 0});
+
+  /// Height reserved at the bottom for the shell's floating nav bar.
+  static const double navReserve = 60;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,7 +47,6 @@ class HomeScreen extends ConsumerWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // ── Galaxy backdrop ──────────────────────────
         Image.asset(
           Art.bgGalaxy,
           fit: BoxFit.cover,
@@ -41,14 +54,12 @@ class HomeScreen extends ConsumerWidget {
             decoration: BoxDecoration(gradient: AppColors.backgroundGradient),
           ),
         ),
-
-        // Darken top and bottom so the HUD stays readable.
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xB305030F), Color(0x1A05030F), Color(0xB305030F)],
+              colors: [Color(0xB805030F), Color(0x1405030F), Color(0xB805030F)],
               stops: [0.0, 0.45, 1.0],
             ),
           ),
@@ -60,98 +71,133 @@ class HomeScreen extends ConsumerWidget {
               final w = box.maxWidth;
               final h = box.maxHeight;
 
-              // Reserve columns so nothing overlaps:
-              //   left   header badge
-              //   right  friends panel, and the PLAY button beneath it
-              final panelWidth = (w * 0.30).clamp(230.0, 330.0);
-              final headerHeight = (h * 0.20).clamp(52.0, 78.0);
+              // Right column: friends panel above, PLAY below.
+              final panelWidth = (w * 0.29).clamp(200.0, 320.0);
+              // Header shrinks on short canvases so the stage keeps room.
+              final headerHeight = (h * 0.19).clamp(46.0, 66.0);
 
-              // The bottom nav floats over the left of the screen.
-              const navHeight = 60.0;
-
-              // Stage = the area left of the friends panel, below the header
-              // and above the floating nav bar.
-              final stageWidth = w - panelWidth - AppDimens.xl;
-              final stageHeight = h - headerHeight - navHeight;
-
-              // Podium is the hero; size it off the smaller constraint.
-              final podiumWidth =
-                  (stageWidth * 0.46).clamp(150.0, stageHeight * 1.15);
-              final chestWidth = (podiumWidth * 0.42).clamp(70.0, 130.0);
-              final playWidth = (panelWidth * 0.62).clamp(110.0, 190.0);
-
-              return Stack(
-                children: [
-                  // ── Header: badge + currency ───────
-                  Positioned(
-                    top: AppDimens.sm,
-                    left: AppDimens.lg,
-                    right: panelWidth + AppDimens.xl,
-                    child: _Header(
-                      profile: profile,
-                      onProfile: () => onNavigate?.call(3),
-                      onShop: () => onNavigate?.call(2),
-                      onSettings: () => context.push(AppRoutes.settings),
-                    ),
-                  ),
-
-                  // ── Podium, centred in the stage ───
-                  Positioned(
-                    left: 0,
-                    right: panelWidth + AppDimens.xl,
-                    top: headerHeight,
-                    bottom: navHeight,
-                    child: Align(
-                      alignment: const Alignment(-0.30, 0.35),
-                      child: _FloatingAsset(
-                        asset: Art.cardPodium,
-                        width: podiumWidth,
-                        onTap: () => context.push(AppRoutes.playMenu),
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimens.md,
+                  AppDimens.sm,
+                  AppDimens.md,
+                  0,
+                ),
+                child: Column(
+                  children: [
+                    // ── Header ─────────────────────────
+                    SizedBox(
+                      height: headerHeight,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: PlayerBadge(
+                              username: profile?.username ?? 'Player',
+                              avatarUrl: profile?.avatarUrl,
+                              level: profile?.level ?? 1,
+                              levelProgress: profile?.levelProgress ?? 0,
+                              tier: profile?.leaderboard?.tier ??
+                                  RankTier.bronze,
+                              onTap: () => onNavigate?.call(3),
+                            ),
+                          ),
+                          const SizedBox(width: AppDimens.sm),
+                          _CurrencyCapsule(
+                            icon: Icons.monetization_on_rounded,
+                            iconColor: AppColors.gold,
+                            value: profile?.coins ?? 0,
+                            onAdd: () => onNavigate?.call(2),
+                          ),
+                          const SizedBox(width: 6),
+                          const _CurrencyCapsule(
+                            icon: Icons.diamond_rounded,
+                            iconColor: AppColors.cyan,
+                            // The backend has no gem currency yet.
+                            value: 0,
+                          ),
+                          const SizedBox(width: 6),
+                          _GlassCircleButton(
+                            icon: Icons.settings_rounded,
+                            onTap: () => context.push(AppRoutes.settings),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
 
-                  // ── Daily gift chest ───────────────
-                  Positioned(
-                    left: 0,
-                    right: panelWidth + AppDimens.xl,
-                    top: headerHeight,
-                    bottom: navHeight,
-                    child: Align(
-                      alignment: const Alignment(0.88, 0.10),
-                      child: _FloatingAsset(
-                        asset: Art.treasureChest,
-                        width: chestWidth,
-                        amplitude: 5,
-                        onTap: () => context.push(AppRoutes.dailyRewards),
+                    // ── Body ───────────────────────────
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Stage: podium + chest
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                right: AppDimens.sm,
+                                bottom: AppDimens.xs,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  // Podium takes the space the chest leaves.
+                                  Expanded(
+                                    flex: 7,
+                                    child: _FloatingAsset(
+                                      asset: Art.cardPodium,
+                                      onTap: () =>
+                                          context.push(AppRoutes.playMenu),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 3,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: AppDimens.lg,
+                                      ),
+                                      child: _FloatingAsset(
+                                        asset: Art.treasureChest,
+                                        amplitude: 5,
+                                        onTap: () => context
+                                            .push(AppRoutes.dailyRewards),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // Right column
+                          SizedBox(
+                            width: panelWidth,
+                            child: Column(
+                              children: [
+                                const Expanded(child: FriendsPanel()),
+                                SizedBox(
+                                  height: (h * 0.26).clamp(56.0, 104.0),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: AppDimens.sm,
+                                      bottom: AppDimens.xs,
+                                    ),
+                                    child: _PlayButton(
+                                      onTap: () =>
+                                          context.push(AppRoutes.playMenu),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
 
-                  // ── Friends panel, docked right ────
-                  Positioned(
-                    top: AppDimens.sm,
-                    right: AppDimens.lg,
-                    width: panelWidth,
-                    // Leave room for PLAY underneath.
-                    height: h * 0.52,
-                    child: const FriendsPanel(),
-                  ),
-
-                  // ── PLAY, below the friends panel ──
-                  Positioned(
-                    right: AppDimens.lg,
-                    bottom: AppDimens.sm,
-                    width: panelWidth,
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: _PlayButton(
-                        width: playWidth,
-                        onTap: () => context.push(AppRoutes.playMenu),
-                      ),
-                    ),
-                  ),
-                ],
+                    // ── Reserved for the floating nav bar ──
+                    const SizedBox(height: navReserve),
+                  ],
+                ),
               );
             },
           ),
@@ -161,75 +207,26 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Header row ────────────────────────────────────────────────
-
-class _Header extends StatelessWidget {
-  final dynamic profile;
-  final VoidCallback onProfile;
-  final VoidCallback onShop;
-  final VoidCallback onSettings;
-
-  const _Header({
-    required this.profile,
-    required this.onProfile,
-    required this.onShop,
-    required this.onSettings,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Flexible(
-          child: PlayerBadge(
-            username: profile?.username ?? 'Player',
-            avatarUrl: profile?.avatarUrl,
-            level: profile?.level ?? 1,
-            levelProgress: profile?.levelProgress ?? 0,
-            tier: profile?.leaderboard?.tier ?? RankTier.bronze,
-            onTap: onProfile,
-          ),
-        ),
-        const SizedBox(width: AppDimens.sm),
-        _CurrencyCapsule(
-          icon: Icons.monetization_on_rounded,
-          iconColor: AppColors.gold,
-          value: profile?.coins ?? 0,
-          onAdd: onShop,
-        ),
-        const SizedBox(width: AppDimens.sm),
-        _CurrencyCapsule(
-          icon: Icons.diamond_rounded,
-          iconColor: AppColors.cyan,
-          // The backend has no gem currency yet.
-          value: 0,
-          onAdd: onShop,
-        ),
-        const SizedBox(width: AppDimens.sm),
-        _GlassCircleButton(icon: Icons.settings_rounded, onTap: onSettings),
-      ],
-    );
-  }
-}
+// ── Currency capsule ──────────────────────────────────────────
 
 class _CurrencyCapsule extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final int value;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
 
   const _CurrencyCapsule({
     required this.icon,
     required this.iconColor,
     required this.value,
-    required this.onAdd,
+    this.onAdd,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 36,
-      padding: const EdgeInsets.only(left: 5, right: 4),
+      height: 34,
+      padding: const EdgeInsets.only(left: 4, right: 4),
       decoration: BoxDecoration(
         color: const Color(0xE6121430),
         borderRadius: AppDimens.brPill,
@@ -239,33 +236,36 @@ class _CurrencyCapsule extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 24,
-            height: 24,
+            width: 22,
+            height: 22,
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 15, color: iconColor),
+            child: Icon(icon, size: 14, color: iconColor),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Text(
             Formatters.compact(value),
-            style: AppTextStyles.h4.copyWith(fontSize: 15),
+            style: AppTextStyles.h4.copyWith(fontSize: 14),
           ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: onAdd,
-            child: Container(
-              width: 21,
-              height: 21,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
+          if (onAdd != null) ...[
+            const SizedBox(width: 5),
+            GestureDetector(
+              onTap: onAdd,
+              child: Container(
+                width: 19,
+                height: 19,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_rounded,
+                    size: 12, color: Colors.white),
               ),
-              child:
-                  const Icon(Icons.add_rounded, size: 13, color: Colors.white),
             ),
-          ),
+          ] else
+            const SizedBox(width: 4),
         ],
       ),
     );
@@ -283,30 +283,28 @@ class _GlassCircleButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 36,
-        height: 36,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           color: const Color(0xE6121430),
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         ),
-        child: Icon(icon, size: 19, color: Colors.white70),
+        child: Icon(icon, size: 18, color: Colors.white70),
       ),
     );
   }
 }
 
-// ── Gently bobbing image asset ────────────────────────────────
+// ── Bobbing asset that always fits its slot ───────────────────
 
 class _FloatingAsset extends StatefulWidget {
   final String asset;
-  final double width;
   final double amplitude;
   final VoidCallback? onTap;
 
   const _FloatingAsset({
     required this.asset,
-    required this.width,
     this.amplitude = 7,
     this.onTap,
   });
@@ -332,17 +330,18 @@ class _FloatingAssetState extends State<_FloatingAsset>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedBuilder(
         animation: _c,
         builder: (context, child) => Transform.translate(
           offset: Offset(0, -widget.amplitude * _c.value),
           child: child,
         ),
+        // BoxFit.contain guarantees the art never exceeds its slot.
         child: Image.asset(
           widget.asset,
-          width: widget.width,
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => SizedBox(width: widget.width),
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         ),
       ),
     );
@@ -353,9 +352,8 @@ class _FloatingAssetState extends State<_FloatingAsset>
 
 class _PlayButton extends StatefulWidget {
   final VoidCallback onTap;
-  final double width;
 
-  const _PlayButton({required this.onTap, this.width = 170});
+  const _PlayButton({required this.onTap});
 
   @override
   State<_PlayButton> createState() => _PlayButtonState();
@@ -391,39 +389,32 @@ class _PlayButtonState extends State<_PlayButton>
         duration: const Duration(milliseconds: 110),
         child: AnimatedBuilder(
           animation: _pulse,
-          builder: (context, child) => Container(
+          builder: (context, child) => DecoratedBox(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.gold
-                      .withValues(alpha: 0.28 + 0.20 * _pulse.value),
-                  blurRadius: 26 + 14 * _pulse.value,
-                  spreadRadius: 1,
+                      .withValues(alpha: 0.26 + 0.20 * _pulse.value),
+                  blurRadius: 22 + 12 * _pulse.value,
                 ),
               ],
             ),
             child: child,
           ),
-          child: Transform.rotate(
-            angle: -0.03,
-            child: Image.asset(
-              Art.btnPlay,
-              width: widget.width,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Container(
-                width: widget.width,
-                height: widget.width * 0.5,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: AppColors.goldGradient,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Text(
-                  'PLAY',
-                  style: AppTextStyles.h1.copyWith(
-                    color: const Color(0xFF3A2600),
-                  ),
+          child: Image.asset(
+            Art.btnPlay,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: AppColors.goldGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                'PLAY',
+                style: AppTextStyles.h2.copyWith(
+                  color: const Color(0xFF3A2600),
                 ),
               ),
             ),
