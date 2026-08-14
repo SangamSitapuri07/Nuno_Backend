@@ -7,8 +7,8 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/game_assets.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
 import '../auth/auth_controller.dart';
 import 'widgets/friends_panel.dart';
@@ -16,6 +16,10 @@ import 'widgets/player_badge.dart';
 
 /// Home screen — galaxy backdrop with a card podium, daily-gift chest, an
 /// ornate gold PLAY button and a docked friends panel.
+///
+/// Everything is laid out proportionally from the real canvas size, because
+/// phone aspect ratios in landscape vary hugely (2.0 to 2.4+) and fixed
+/// offsets caused the podium to collide with the header.
 class HomeScreen extends ConsumerWidget {
   final ValueChanged<int>? onNavigate;
   final int navIndex;
@@ -38,100 +42,118 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
 
-        // Darken the corners so the HUD stays readable.
+        // Darken top and bottom so the HUD stays readable.
         const DecoratedBox(
           decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0.15, -0.1),
-              radius: 1.1,
-              colors: [Colors.transparent, Color(0xCC05030F)],
-              stops: [0.45, 1.0],
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xB305030F), Color(0x1A05030F), Color(0xB305030F)],
+              stops: [0.0, 0.45, 1.0],
             ),
           ),
         ),
 
         SafeArea(
-          child: Stack(
-            children: [
-              // ── Top-left: player badge ─────────────
-              Positioned(
-                top: AppDimens.md,
-                left: AppDimens.lg,
-                child: PlayerBadge(
-                  username: profile?.username ?? 'Player',
-                  avatarUrl: profile?.avatarUrl,
-                  level: profile?.level ?? 1,
-                  levelProgress: profile?.levelProgress ?? 0,
-                  tier: profile?.leaderboard?.tier ?? RankTier.bronze,
-                  onTap: () => onNavigate?.call(3),
-                ),
-              ),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final w = box.maxWidth;
+              final h = box.maxHeight;
 
-              // ── Currency + settings ────────────────
-              Positioned(
-                top: AppDimens.md + 6,
-                left: 300,
-                child: Row(
-                  children: [
-                    _CurrencyCapsule(
-                      icon: Icons.monetization_on_rounded,
-                      iconColor: AppColors.gold,
-                      value: profile?.coins ?? 0,
-                      onAdd: () => onNavigate?.call(2),
+              // Reserve columns so nothing overlaps:
+              //   left   header badge
+              //   right  friends panel, and the PLAY button beneath it
+              final panelWidth = (w * 0.30).clamp(230.0, 330.0);
+              final headerHeight = (h * 0.20).clamp(52.0, 78.0);
+
+              // The bottom nav floats over the left of the screen.
+              const navHeight = 60.0;
+
+              // Stage = the area left of the friends panel, below the header
+              // and above the floating nav bar.
+              final stageWidth = w - panelWidth - AppDimens.xl;
+              final stageHeight = h - headerHeight - navHeight;
+
+              // Podium is the hero; size it off the smaller constraint.
+              final podiumWidth =
+                  (stageWidth * 0.46).clamp(150.0, stageHeight * 1.15);
+              final chestWidth = (podiumWidth * 0.42).clamp(70.0, 130.0);
+              final playWidth = (panelWidth * 0.62).clamp(110.0, 190.0);
+
+              return Stack(
+                children: [
+                  // ── Header: badge + currency ───────
+                  Positioned(
+                    top: AppDimens.sm,
+                    left: AppDimens.lg,
+                    right: panelWidth + AppDimens.xl,
+                    child: _Header(
+                      profile: profile,
+                      onProfile: () => onNavigate?.call(3),
+                      onShop: () => onNavigate?.call(2),
+                      onSettings: () => context.push(AppRoutes.settings),
                     ),
-                    const SizedBox(width: AppDimens.md),
-                    _CurrencyCapsule(
-                      icon: Icons.diamond_rounded,
-                      iconColor: AppColors.cyan,
-                      // The backend has no gem currency yet.
-                      value: 0,
-                      onAdd: () => onNavigate?.call(2),
+                  ),
+
+                  // ── Podium, centred in the stage ───
+                  Positioned(
+                    left: 0,
+                    right: panelWidth + AppDimens.xl,
+                    top: headerHeight,
+                    bottom: navHeight,
+                    child: Align(
+                      alignment: const Alignment(-0.30, 0.35),
+                      child: _FloatingAsset(
+                        asset: Art.cardPodium,
+                        width: podiumWidth,
+                        onTap: () => context.push(AppRoutes.playMenu),
+                      ),
                     ),
-                    const SizedBox(width: AppDimens.md),
-                    _GlassCircleButton(
-                      icon: Icons.settings_rounded,
-                      onTap: () => context.push(AppRoutes.settings),
+                  ),
+
+                  // ── Daily gift chest ───────────────
+                  Positioned(
+                    left: 0,
+                    right: panelWidth + AppDimens.xl,
+                    top: headerHeight,
+                    bottom: navHeight,
+                    child: Align(
+                      alignment: const Alignment(0.88, 0.10),
+                      child: _FloatingAsset(
+                        asset: Art.treasureChest,
+                        width: chestWidth,
+                        amplitude: 5,
+                        onTap: () => context.push(AppRoutes.dailyRewards),
+                      ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              // ── Card podium, left of centre ────────
-              Align(
-                alignment: const Alignment(-0.52, 0.16),
-                child: _FloatingAsset(
-                  asset: Art.cardPodium,
-                  width: 380,
-                  onTap: () => context.push(AppRoutes.playMenu),
-                ),
-              ),
+                  // ── Friends panel, docked right ────
+                  Positioned(
+                    top: AppDimens.sm,
+                    right: AppDimens.lg,
+                    width: panelWidth,
+                    // Leave room for PLAY underneath.
+                    height: h * 0.52,
+                    child: const FriendsPanel(),
+                  ),
 
-              // ── Daily gift chest ───────────────────
-              Align(
-                alignment: const Alignment(0.18, 0.16),
-                child: _FloatingAsset(
-                  asset: Art.treasureChest,
-                  width: 170,
-                  amplitude: 5,
-                  onTap: () => context.push(AppRoutes.dailyRewards),
-                ),
-              ),
-
-              // ── Ornate gold PLAY ───────────────────
-              Align(
-                alignment: const Alignment(0.72, 0.52),
-                child: _PlayButton(
-                  onTap: () => context.push(AppRoutes.playMenu),
-                ),
-              ),
-
-              // ── Friends panel, docked right ────────
-              const Positioned(
-                top: AppDimens.sm,
-                right: AppDimens.lg,
-                child: FriendsPanel(),
-              ),
-            ],
+                  // ── PLAY, below the friends panel ──
+                  Positioned(
+                    right: AppDimens.lg,
+                    bottom: AppDimens.sm,
+                    width: panelWidth,
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: _PlayButton(
+                        width: playWidth,
+                        onTap: () => context.push(AppRoutes.playMenu),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -139,7 +161,56 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Currency capsule with a "+" button ────────────────────────
+// ── Header row ────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  final dynamic profile;
+  final VoidCallback onProfile;
+  final VoidCallback onShop;
+  final VoidCallback onSettings;
+
+  const _Header({
+    required this.profile,
+    required this.onProfile,
+    required this.onShop,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Flexible(
+          child: PlayerBadge(
+            username: profile?.username ?? 'Player',
+            avatarUrl: profile?.avatarUrl,
+            level: profile?.level ?? 1,
+            levelProgress: profile?.levelProgress ?? 0,
+            tier: profile?.leaderboard?.tier ?? RankTier.bronze,
+            onTap: onProfile,
+          ),
+        ),
+        const SizedBox(width: AppDimens.sm),
+        _CurrencyCapsule(
+          icon: Icons.monetization_on_rounded,
+          iconColor: AppColors.gold,
+          value: profile?.coins ?? 0,
+          onAdd: onShop,
+        ),
+        const SizedBox(width: AppDimens.sm),
+        _CurrencyCapsule(
+          icon: Icons.diamond_rounded,
+          iconColor: AppColors.cyan,
+          // The backend has no gem currency yet.
+          value: 0,
+          onAdd: onShop,
+        ),
+        const SizedBox(width: AppDimens.sm),
+        _GlassCircleButton(icon: Icons.settings_rounded, onTap: onSettings),
+      ],
+    );
+  }
+}
 
 class _CurrencyCapsule extends StatelessWidget {
   final IconData icon;
@@ -157,8 +228,8 @@ class _CurrencyCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 42,
-      padding: const EdgeInsets.only(left: 6, right: 5),
+      height: 36,
+      padding: const EdgeInsets.only(left: 5, right: 4),
       decoration: BoxDecoration(
         color: const Color(0xE6121430),
         borderRadius: AppDimens.brPill,
@@ -168,30 +239,31 @@ class _CurrencyCapsule extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 17, color: iconColor),
+            child: Icon(icon, size: 15, color: iconColor),
           ),
-          const SizedBox(width: AppDimens.sm),
+          const SizedBox(width: 6),
           Text(
             Formatters.compact(value),
-            style: AppTextStyles.h4.copyWith(fontSize: 17),
+            style: AppTextStyles.h4.copyWith(fontSize: 15),
           ),
-          const SizedBox(width: AppDimens.sm),
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: onAdd,
             child: Container(
-              width: 24,
-              height: 24,
+              width: 21,
+              height: 21,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded, size: 15, color: Colors.white),
+              child:
+                  const Icon(Icons.add_rounded, size: 13, color: Colors.white),
             ),
           ),
         ],
@@ -211,14 +283,14 @@ class _GlassCircleButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 42,
-        height: 42,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: const Color(0xE6121430),
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         ),
-        child: Icon(icon, size: 21, color: Colors.white70),
+        child: Icon(icon, size: 19, color: Colors.white70),
       ),
     );
   }
@@ -281,8 +353,9 @@ class _FloatingAssetState extends State<_FloatingAsset>
 
 class _PlayButton extends StatefulWidget {
   final VoidCallback onTap;
+  final double width;
 
-  const _PlayButton({required this.onTap});
+  const _PlayButton({required this.onTap, this.width = 170});
 
   @override
   State<_PlayButton> createState() => _PlayButtonState();
@@ -320,31 +393,31 @@ class _PlayButtonState extends State<_PlayButton>
           animation: _pulse,
           builder: (context, child) => Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.gold
-                      .withValues(alpha: 0.30 + 0.22 * _pulse.value),
-                  blurRadius: 30 + 18 * _pulse.value,
-                  spreadRadius: 2,
+                      .withValues(alpha: 0.28 + 0.20 * _pulse.value),
+                  blurRadius: 26 + 14 * _pulse.value,
+                  spreadRadius: 1,
                 ),
               ],
             ),
             child: child,
           ),
           child: Transform.rotate(
-            angle: -0.04,
+            angle: -0.03,
             child: Image.asset(
               Art.btnPlay,
-              width: 190,
+              width: widget.width,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => Container(
-                width: 190,
-                height: 92,
+                width: widget.width,
+                height: widget.width * 0.5,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: AppColors.goldGradient,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Text(
                   'PLAY',

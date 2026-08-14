@@ -151,14 +151,21 @@ class _BottomBar extends StatelessWidget {
         child: Align(
           alignment: Alignment.bottomLeft,
           child: Container(
-            width: 470,
-            height: AppDimens.bottomNavHeight - 8,
-            padding: const EdgeInsets.symmetric(horizontal: AppDimens.lg),
-            decoration: const BoxDecoration(
-              color: Color(0xF00A0C22),
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(AppDimens.radiusXxl),
-              ),
+            width: 380,
+            height: 54,
+            margin: const EdgeInsets.only(left: AppDimens.md, bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
+            decoration: BoxDecoration(
+              color: const Color(0xE60A0C22),
+              borderRadius: BorderRadius.circular(AppDimens.radiusXl),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -207,7 +214,7 @@ class _Item extends StatelessWidget {
               children: [
                 Icon(
                   isActive ? spec.active : spec.inactive,
-                  size: 26,
+                  size: 22,
                   color: isActive ? Colors.white : const Color(0xFF6E7396),
                 ),
                 if (badge > 0)
@@ -241,12 +248,12 @@ class _Item extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               spec.label,
               style: AppTextStyles.caption.copyWith(
-                fontSize: 12,
-                letterSpacing: 0.8,
+                fontSize: 10,
+                letterSpacing: 0.6,
                 color: isActive ? Colors.white : const Color(0xFF6E7396),
                 fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
               ),

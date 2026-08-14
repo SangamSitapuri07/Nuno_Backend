@@ -33,8 +33,6 @@ class _FriendsPanelState extends ConsumerState<FriendsPanel> {
     final requests = ref.watch(friendRequestsProvider).valueOrNull ?? const [];
 
     return Container(
-      width: 300,
-      constraints: const BoxConstraints(maxHeight: 300),
       decoration: BoxDecoration(
         color: const Color(0xE60C0E28),
         borderRadius: AppDimens.brXl,
@@ -48,7 +46,6 @@ class _FriendsPanelState extends ConsumerState<FriendsPanel> {
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           // ── Header ─────────────────────────────────
           Padding(

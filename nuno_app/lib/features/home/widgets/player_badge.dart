@@ -33,10 +33,10 @@ class PlayerBadge extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 268,
+        constraints: const BoxConstraints(maxWidth: 250, minWidth: 150),
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimens.sm,
-          vertical: AppDimens.sm,
+          vertical: 6,
         ),
         decoration: BoxDecoration(
           color: const Color(0xE60E1030),
@@ -51,27 +51,28 @@ class PlayerBadge extends StatelessWidget {
           ],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Avatar with a violet ring.
             SizedBox(
-              width: 54,
-              height: 54,
+              width: 46,
+              height: 46,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   PlayerAvatar(
                     username: username,
                     avatarUrl: avatarUrl,
-                    size: 38,
+                    size: 32,
                   ),
-                  ArtImage(Art.frameForLevel(level), width: 54),
+                  ArtImage(Art.frameForLevel(level), width: 46),
                 ],
               ),
             ),
 
             const SizedBox(width: AppDimens.sm),
 
-            Expanded(
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -80,7 +81,7 @@ class PlayerBadge extends StatelessWidget {
                     username,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.h4.copyWith(fontSize: 17),
+                    style: AppTextStyles.h4.copyWith(fontSize: 15),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -117,7 +118,7 @@ class PlayerBadge extends StatelessWidget {
             // Tier shield
             ArtImage(
               Art.tierShield(tier.wire),
-              height: 44,
+              height: 38,
               fallback: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
