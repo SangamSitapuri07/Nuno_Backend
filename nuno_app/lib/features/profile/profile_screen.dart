@@ -69,12 +69,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (widget.embedded) {
       return SafeArea(
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
             AppDimens.xl,
             AppDimens.sm,
             AppDimens.xl,
-            AppDimens.bottomNavHeight,
+            AppDimens.sm,
           ),
           child: Container(
             decoration: BoxDecoration(

@@ -167,7 +167,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                       AppDimens.xl,
                       0,
                       AppDimens.xl,
-                      AppDimens.bottomNavHeight,
+                      AppDimens.sm,
                     ),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(

@@ -250,7 +250,7 @@ class _LeaderboardList extends ConsumerWidget {
               AppDimens.xl,
               0,
               AppDimens.xl,
-              AppDimens.bottomNavHeight,
+              AppDimens.sm,
             ),
             children: [
               if (podium.length >= 3) ...[

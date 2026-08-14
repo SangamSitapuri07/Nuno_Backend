@@ -78,19 +78,50 @@ class PlayerProfile extends Equatable {
         leaderboard: leaderboard,
       );
 
-  /// XP floor of the current level, from LEVEL_THRESHOLDS.
+  /// XP floor of the current level.
+  ///
+  /// Derived from the next target so the two always bracket the current xp,
+  /// even when the server reports a level and xp that disagree.
   int get levelFloorXp {
-    final i = (level - 1).clamp(0, kLevelThresholds.length - 1);
-    return kLevelThresholds[i];
+    final target = nextLevelXp;
+
+    // Highest threshold strictly below the target...
+    int floor = 0;
+    for (final t in kLevelThresholds) {
+      if (t < target) floor = t;
+    }
+
+    // ...but past the table the bands are 1000 wide.
+    if (target > kLevelThresholds.last) floor = target - 1000;
+
+    // Never let the floor sit above the player's xp, or the bar goes empty.
+    return floor > xp ? (target - 1000).clamp(0, xp) : floor;
   }
 
   /// XP needed to reach the next level.
+  ///
+  /// The server may report xp beyond the level it also reports (levels are
+  /// awarded on match end, xp can run ahead), so the result is always kept
+  /// above the current xp rather than trusting the table blindly.
   int get nextLevelXp {
-    final i = level.clamp(0, kLevelThresholds.length - 1);
+    int target;
     if (level >= kLevelThresholds.length) {
-      return kLevelThresholds.last + 1000 * (level - kLevelThresholds.length + 1);
+      target =
+          kLevelThresholds.last + 1000 * (level - kLevelThresholds.length + 1);
+    } else {
+      target = kLevelThresholds[level.clamp(0, kLevelThresholds.length - 1)];
     }
-    return kLevelThresholds[i];
+
+    // Never show a target the player has already passed.
+    if (target <= xp) {
+      for (final t in kLevelThresholds) {
+        if (t > xp) return t;
+      }
+      // Past the table: round up to the next 1000 above the floor.
+      final over = xp - kLevelThresholds.last;
+      return kLevelThresholds.last + ((over ~/ 1000) + 1) * 1000;
+    }
+    return target;
   }
 
   /// 0..1 progress through the current level.

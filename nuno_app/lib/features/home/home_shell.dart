@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +29,25 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
+  /// The nav bar hides itself after a few idle seconds, the way most mobile
+  /// games do, and reappears on any tap.
+  bool _navVisible = true;
+  Timer? _hideTimer;
+
+  static const _idleBeforeHide = Duration(seconds: 4);
+
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(_idleBeforeHide, () {
+      if (mounted) setState(() => _navVisible = false);
+    });
+  }
+
+  void _revealNav() {
+    if (!_navVisible) setState(() => _navVisible = true);
+    _scheduleHide();
+  }
+
   static const _tabs = [
     _TabSpec(Icons.home_rounded, Icons.home_rounded, 'HOME'),
     _TabSpec(Icons.emoji_events_rounded, Icons.emoji_events_rounded, 'RANK'),
@@ -40,6 +61,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(socketBootstrapProvider);
       _listenForInvites();
+      _scheduleHide();
     });
   }
 
@@ -92,29 +114,56 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void _go(int i) {
     HapticFeedback.selectionClick();
     setState(() => _index = i);
+    _scheduleHide();
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(color: AppColors.background),
-        child: IndexedStack(
-          index: _index,
-          children: [
-            HomeScreen(onNavigate: _go, navIndex: _index),
-            const LeaderboardScreen(embedded: true),
-            const StoreScreen(embedded: true),
-            const ProfileScreen(embedded: true),
-          ],
+      body: Listener(
+        // Any touch reveals the bar and restarts the idle countdown.
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _revealNav(),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(color: AppColors.background),
+          child: IndexedStack(
+            index: _index,
+            children: [
+              HomeScreen(onNavigate: _go, navIndex: _index),
+              const LeaderboardScreen(embedded: true),
+              const StoreScreen(embedded: true),
+              const ProfileScreen(embedded: true),
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: _BottomBar(
-        index: _index,
-        tabs: _tabs,
-        badges: const {},
-        onChanged: _go,
+      // Slides out of view when idle instead of occupying layout space.
+      // While hidden it also ignores pointers, so the Listener above (and
+      // the handle drawn inside _BottomBar) is what brings it back.
+      bottomNavigationBar: IgnorePointer(
+        ignoring: !_navVisible,
+        child: AnimatedSlide(
+          offset: _navVisible ? Offset.zero : const Offset(0, 1),
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          child: AnimatedOpacity(
+            opacity: _navVisible ? 1 : 0,
+            duration: const Duration(milliseconds: 220),
+            child: _BottomBar(
+              index: _index,
+              tabs: _tabs,
+              badges: const {},
+              onChanged: _go,
+            ),
+          ),
+        ),
       ),
     );
   }
