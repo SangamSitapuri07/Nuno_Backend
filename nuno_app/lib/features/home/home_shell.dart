@@ -9,7 +9,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../services/socket_events.dart';
-import '../friends/friends_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../store/store_screen.dart';
@@ -29,12 +28,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
   static const _tabs = [
-    _TabSpec(Icons.home_rounded, Icons.home_outlined, 'Home'),
-    _TabSpec(Icons.people_alt_rounded, Icons.people_alt_outlined, 'Friends'),
-    _TabSpec(
-        Icons.emoji_events_rounded, Icons.emoji_events_outlined, 'Leaderboard'),
-    _TabSpec(Icons.shopping_cart_rounded, Icons.shopping_cart_outlined, 'Shop'),
-    _TabSpec(Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+    _TabSpec(Icons.home_rounded, Icons.home_rounded, 'HOME'),
+    _TabSpec(Icons.emoji_events_rounded, Icons.emoji_events_rounded, 'RANK'),
+    _TabSpec(Icons.shopping_cart_rounded, Icons.shopping_cart_rounded, 'SHOP'),
+    _TabSpec(Icons.person_rounded, Icons.person_rounded, 'PROFILE'),
   ];
 
   @override
@@ -102,14 +99,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return Scaffold(
       extendBody: true,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(color: AppColors.background),
         child: IndexedStack(
           index: _index,
           children: [
             HomeScreen(onNavigate: _go, navIndex: _index),
-            const FriendsScreen(embedded: true),
             const LeaderboardScreen(embedded: true),
             const StoreScreen(embedded: true),
             const ProfileScreen(embedded: true),
@@ -119,7 +113,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       bottomNavigationBar: _BottomBar(
         index: _index,
         tabs: _tabs,
-        badges: {1: ref.watch(unreadBadgeProvider)},
+        badges: const {},
         onChanged: _go,
       ),
     );
@@ -151,26 +145,34 @@ class _BottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: AppDimens.bottomNavHeight,
-      padding: const EdgeInsets.symmetric(horizontal: AppDimens.xxxl),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundAlt.withValues(alpha: 0.97),
-        border: const Border(
-          top: BorderSide(color: AppColors.surfaceStroke),
-        ),
-      ),
+      color: Colors.transparent,
       child: SafeArea(
         top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            for (var i = 0; i < tabs.length; i++)
-              _Item(
-                spec: tabs[i],
-                isActive: i == index,
-                badge: badges[i] ?? 0,
-                onTap: () => onChanged(i),
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: Container(
+            width: 470,
+            height: AppDimens.bottomNavHeight - 8,
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.lg),
+            decoration: const BoxDecoration(
+              color: Color(0xF00A0C22),
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(AppDimens.radiusXxl),
               ),
-          ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (var i = 0; i < tabs.length; i++)
+                  _Item(
+                    spec: tabs[i],
+                    isActive: i == index,
+                    badge: badges[i] ?? 0,
+                    onTap: () => onChanged(i),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -203,30 +205,10 @@ class _Item extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.xxl,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive ? AppColors.blue : Colors.transparent,
-                    borderRadius: AppDimens.brPill,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: AppColors.blue.withValues(alpha: 0.45),
-                              blurRadius: 14,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    isActive ? spec.active : spec.inactive,
-                    size: 24,
-                    color:
-                        isActive ? Colors.white : AppColors.textMuted,
-                  ),
+                Icon(
+                  isActive ? spec.active : spec.inactive,
+                  size: 26,
+                  color: isActive ? Colors.white : const Color(0xFF6E7396),
                 ),
                 if (badge > 0)
                   Positioned(
@@ -259,13 +241,14 @@ class _Item extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               spec.label,
               style: AppTextStyles.caption.copyWith(
                 fontSize: 12,
-                color: isActive ? Colors.white : AppColors.textMuted,
-                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                letterSpacing: 0.8,
+                color: isActive ? Colors.white : const Color(0xFF6E7396),
+                fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
               ),
             ),
           ],
