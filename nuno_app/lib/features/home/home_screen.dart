@@ -76,7 +76,7 @@ class HomeScreen extends ConsumerWidget {
               // Header shrinks on short canvases so the stage keeps room.
               final headerHeight = (h * 0.19).clamp(46.0, 66.0);
               // PLAY is pinned bottom-right; the panel takes the rest.
-              final playHeight = (h * 0.24).clamp(60.0, 104.0);
+              final playHeight = (h * 0.28).clamp(70.0, 120.0);
 
               return Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -134,11 +134,14 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Stage: podium + chest, nudged down.
+                          // Stage: podium + chest. The negative bottom margin
+                          // lets the art extend into the nav reserve so it can
+                          // sit lower at full size instead of being scaled
+                          // down by a smaller box.
                           Expanded(
-                            child: Padding(
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: -28),
                               padding: const EdgeInsets.only(
-                                top: AppDimens.huge,
                                 right: AppDimens.sm,
                               ),
                               child: Row(
@@ -156,7 +159,7 @@ class HomeScreen extends ConsumerWidget {
                                     flex: 3,
                                     child: Padding(
                                       padding: const EdgeInsets.only(
-                                        bottom: AppDimens.xxl,
+                                        bottom: 52,
                                       ),
                                       child: _FloatingAsset(
                                         asset: Art.treasureChest,
@@ -171,8 +174,10 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Space for the floating nav bar, which is
-                          // docked to the bottom-left.
+                          // Space for the floating nav bar. The podium is
+                          // allowed to hang into part of it (see the stage's
+                          // negative bottom margin) because the bar is only
+                          // 380 wide and the art tapers at its base.
                           const SizedBox(height: navReserve),
                         ],
                       ),
@@ -186,12 +191,7 @@ class HomeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppDimens.xs,
-                              ),
-                              child: const FriendsPanel(),
-                            ),
+                            child: const FriendsPanel(),
                           ),
                           SizedBox(
                             height: playHeight,
@@ -199,8 +199,7 @@ class HomeScreen extends ConsumerWidget {
                               onTap: () => context.push(AppRoutes.playMenu),
                             ),
                           ),
-                          // Flush to the bottom edge.
-                          const SizedBox(height: AppDimens.xs),
+
                         ],
                       ),
                     ),
