@@ -76,7 +76,7 @@ class HomeScreen extends ConsumerWidget {
               // Header shrinks on short canvases so the stage keeps room.
               final headerHeight = (h * 0.19).clamp(46.0, 66.0);
               // PLAY is pinned bottom-right; the panel takes the rest.
-              final playHeight = (h * 0.27).clamp(64.0, 116.0);
+              final playHeight = (h * 0.24).clamp(60.0, 104.0);
 
               return Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -138,7 +138,7 @@ class HomeScreen extends ConsumerWidget {
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.only(
-                                top: AppDimens.lg,
+                                top: AppDimens.huge,
                                 right: AppDimens.sm,
                               ),
                               child: Row(
@@ -188,7 +188,7 @@ class HomeScreen extends ConsumerWidget {
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.only(
-                                bottom: AppDimens.sm,
+                                bottom: AppDimens.xs,
                               ),
                               child: const FriendsPanel(),
                             ),
@@ -199,7 +199,8 @@ class HomeScreen extends ConsumerWidget {
                               onTap: () => context.push(AppRoutes.playMenu),
                             ),
                           ),
-                          const SizedBox(height: AppDimens.sm),
+                          // Flush to the bottom edge.
+                          const SizedBox(height: AppDimens.xs),
                         ],
                       ),
                     ),
