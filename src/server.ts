@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import config from './config/config';
 import logger from './utils/logger';
 import { connectDatabase } from './config/database';
-import { connectRedis } from './config/redis';
+import { connectRedis, rawRedisClient } from './config/redis';
 import { errorMiddleware } from './middleware/error.middleware';
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit.middleware';
 import { initializeSocketHandlers } from './websocket/socket.handler';
@@ -126,6 +126,25 @@ const startServer = async () => {
   try {
     await connectDatabase();
     await connectRedis();
+
+    // Without this adapter every instance keeps its own set of rooms, so
+    // two players served by different instances can never see each other.
+    if (rawRedisClient) {
+      try {
+        const { createAdapter } = await import('@socket.io/redis-adapter');
+        const subClient = rawRedisClient.duplicate();
+        await subClient.connect();
+        io.adapter(createAdapter(rawRedisClient, subClient));
+        logger.info('Socket.IO Redis adapter attached');
+      } catch (err) {
+        logger.error('Failed to attach the Socket.IO Redis adapter', { err });
+      }
+    } else {
+      logger.warn(
+        'Socket.IO is running without the Redis adapter. This is fine on a ' +
+          'single instance, but rooms will not be shared if you scale out.'
+      );
+    }
 
     httpServer.listen(config.server.port, () => {
       logger.info(`${config.server.appName} server started`, {

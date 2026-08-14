@@ -59,7 +59,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(socketBootstrapProvider);
       _listenForInvites();
       _scheduleHide();
     });
@@ -125,6 +124,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Watched, not read once: this keeps the socket alive across auth
+    // changes and reconnects for as long as the shell is mounted.
+    ref.watch(socketBootstrapProvider);
+
     return Scaffold(
       extendBody: true,
       body: Listener(

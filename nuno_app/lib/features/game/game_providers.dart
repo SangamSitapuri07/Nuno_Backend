@@ -104,6 +104,11 @@ class GameController extends StateNotifier<GameUiState> {
 
   GameController(this._ref) : super(const GameUiState()) {
     _listen();
+
+    // A sleeping free-tier host drops the socket; on every re-auth the
+    // server has forgotten our rooms, so ask for the state again.
+    _subs.add(_socket.onAuthenticated.listen((_) => requestSync()));
+
     requestSync();
   }
 

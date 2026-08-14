@@ -22,6 +22,11 @@ class SocketService {
 
   final _stateController =
       StreamController<SocketConnectionState>.broadcast();
+
+  /// Fires every time the socket (re)authenticates. Controllers listen to
+  /// this to re-sync their state, because a dropped connection on a sleeping
+  /// free-tier host loses all room membership on the server side.
+  final _authedController = StreamController<void>.broadcast();
   final _errorController = StreamController<SocketError>.broadcast();
 
   /// event name -> broadcast controller of payload maps
@@ -35,6 +40,7 @@ class SocketService {
 
   SocketConnectionState get state => _state;
   Stream<SocketConnectionState> get onStateChanged => _stateController.stream;
+  Stream<void> get onAuthenticated => _authedController.stream;
   Stream<SocketError> get onError => _errorController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
@@ -122,6 +128,7 @@ class SocketService {
       debugPrint('[socket] authenticated');
       _setState(SocketConnectionState.authenticated);
       _dispatch(SocketEvents.authenticated, data);
+      if (!_authedController.isClosed) _authedController.add(null);
     });
 
     // Server-side errors: { code, message }
@@ -169,6 +176,7 @@ class SocketService {
       await c.close();
     }
     _controllers.clear();
+    await _authedController.close();
     await _stateController.close();
     await _errorController.close();
   }

@@ -65,6 +65,15 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   LobbyController(this._ref) : super(const LobbyState()) {
     _listen();
+
+    // After a reconnect the server has dropped our socket from the room, so
+    // rejoin by code to restore membership and resume receiving updates.
+    _subs.add(_socket.onAuthenticated.listen((_) {
+      final code = state.room?.roomCode;
+      if (code != null && !state.gameStarted) {
+        _socket.emit(SocketEvents.roomJoin, {'roomCode': code});
+      }
+    }));
   }
 
   SocketService get _socket => _ref.read(socketServiceProvider);

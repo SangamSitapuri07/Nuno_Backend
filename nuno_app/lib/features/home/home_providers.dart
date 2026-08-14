@@ -24,6 +24,17 @@ class FriendsNotifier extends AsyncNotifier<List<Friend>> {
     });
     ref.onDispose(sub.cancel);
 
+    // Presence broadcasts sent while we were disconnected are lost, so pull
+    // the authoritative list again on every (re)authentication.
+    final authSub = socket.onAuthenticated.listen((_) => refresh());
+    ref.onDispose(authSub.cancel);
+
+    // Friend requests can also arrive while offline.
+    final reqSub = socket
+        .on(SocketEvents.friendRequestAccepted)
+        .listen((_) => refresh());
+    ref.onDispose(reqSub.cancel);
+
     return ref.read(socialRepositoryProvider).getFriends();
   }
 
@@ -146,10 +157,17 @@ final matchHistoryProvider = FutureProvider<List<MatchHistoryEntry>>(
 final myRankProvider = FutureProvider<PlayerRank?>(
     (ref) => ref.watch(leaderboardRepositoryProvider).getMyRank());
 
-/// Ensures the socket is connected while the authenticated UI is mounted.
+/// Keeps the socket connected for as long as the user is authenticated.
+///
+/// This watches auth state rather than being read once, so signing in, a
+/// token refresh, or a dropped connection all result in a reconnect.
 final socketBootstrapProvider = Provider<void>((ref) {
   final isLoggedIn = ref.watch(authControllerProvider).isLoggedIn;
+  final socket = ref.watch(socketServiceProvider);
+
   if (isLoggedIn) {
-    ref.read(socketServiceProvider).connect();
+    socket.connect();
+  } else {
+    socket.disconnect();
   }
 });

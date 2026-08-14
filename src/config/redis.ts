@@ -1,9 +1,45 @@
+import { createClient, RedisClientType } from 'redis';
 import logger from '../utils/logger';
 
-class InMemoryStore {
-  private store: Map<string, { value: string; expiry: number | null }> = new Map();
-  private sets: Map<string, Set<string>> = new Map();
-  private lists: Map<string, string[]> = new Map();
+/**
+ * Shared state store.
+ *
+ * Rooms, matchmaking queues, live match state and socket sessions all live
+ * here. On a hosted platform the process can be restarted or scaled to more
+ * than one instance at any time, so this MUST be a real Redis when a
+ * REDIS_URL is configured — an in-process map would silently give each
+ * instance its own private view, and two players would never see each other.
+ *
+ * The in-memory implementation is retained only as a local-development
+ * convenience, and the server logs loudly when it is in use.
+ */
+
+interface Store {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, options?: { EX?: number }): Promise<void>;
+  del(key: string): Promise<void>;
+  exists(key: string): Promise<number>;
+  incr(key: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<void>;
+  keys(pattern: string): Promise<string[]>;
+  sAdd(key: string, member: string): Promise<void>;
+  sRem(key: string, member: string): Promise<void>;
+  sIsMember(key: string, member: string): Promise<boolean>;
+  sMembers(key: string): Promise<string[]>;
+  lPush(key: string, value: string): Promise<void>;
+  lRange(key: string, start: number, stop: number): Promise<string[]>;
+  lRem(key: string, count: number, value: string): Promise<void>;
+  lLen(key: string): Promise<number>;
+}
+
+// ─────────────────────────────────────────
+// IN-MEMORY FALLBACK (local development only)
+// ─────────────────────────────────────────
+
+class InMemoryStore implements Store {
+  private store = new Map<string, { value: string; expiry: number | null }>();
+  private sets = new Map<string, Set<string>>();
+  private lists = new Map<string, string[]>();
 
   async get(key: string): Promise<string | null> {
     const item = this.store.get(key);
@@ -16,8 +52,10 @@ class InMemoryStore {
   }
 
   async set(key: string, value: string, options?: { EX?: number }): Promise<void> {
-    const expiry = options?.EX ? Date.now() + (options.EX * 1000) : null;
-    this.store.set(key, { value, expiry });
+    this.store.set(key, {
+      value,
+      expiry: options?.EX ? Date.now() + options.EX * 1000 : null,
+    });
   }
 
   async del(key: string): Promise<void> {
@@ -27,30 +65,28 @@ class InMemoryStore {
   }
 
   async exists(key: string): Promise<number> {
+    return (await this.get(key)) === null ? 0 : 1;
+  }
+
+  async incr(key: string): Promise<number> {
+    const next = parseInt((await this.get(key)) ?? '0', 10) + 1;
+    // Preserve any existing TTL: only the value changes.
     const item = this.store.get(key);
-    if (!item) return 0;
-    if (item.expiry && Date.now() > item.expiry) {
-      this.store.delete(key);
-      return 0;
-    }
-    return 1;
+    this.store.set(key, { value: String(next), expiry: item?.expiry ?? null });
+    return next;
   }
 
   async expire(key: string, seconds: number): Promise<void> {
     const item = this.store.get(key);
-    if (item) {
-      item.expiry = Date.now() + (seconds * 1000);
-    }
+    if (item) item.expiry = Date.now() + seconds * 1000;
   }
 
-  async incr(key: string): Promise<number> {
-    const current = await this.get(key);
-    const newVal = (parseInt(current || '0') + 1).toString();
-    await this.set(key, newVal);
-    return parseInt(newVal);
+  async keys(pattern: string): Promise<string[]> {
+    const re = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    return [...this.store.keys(), ...this.sets.keys(), ...this.lists.keys()]
+      .filter((k) => re.test(k));
   }
 
-  // Set operations
   async sAdd(key: string, member: string): Promise<void> {
     if (!this.sets.has(key)) this.sets.set(key, new Set());
     this.sets.get(key)!.add(member);
@@ -60,46 +96,173 @@ class InMemoryStore {
     this.sets.get(key)?.delete(member);
   }
 
-  async sMembers(key: string): Promise<string[]> {
-    return Array.from(this.sets.get(key) || []);
-  }
-
   async sIsMember(key: string, member: string): Promise<boolean> {
-    return this.sets.get(key)?.has(member) || false;
+    return this.sets.get(key)?.has(member) ?? false;
   }
 
-  // List operations
+  async sMembers(key: string): Promise<string[]> {
+    return [...(this.sets.get(key) ?? [])];
+  }
+
   async lPush(key: string, value: string): Promise<void> {
     if (!this.lists.has(key)) this.lists.set(key, []);
     this.lists.get(key)!.unshift(value);
   }
 
   async lRange(key: string, start: number, stop: number): Promise<string[]> {
-    const list = this.lists.get(key) || [];
-    if (stop === -1) return list.slice(start);
-    return list.slice(start, stop + 1);
+    const list = this.lists.get(key) ?? [];
+    return stop === -1 ? list.slice(start) : list.slice(start, stop + 1);
   }
 
-  async lRem(key: string, count: number, value: string): Promise<void> {
+  async lRem(key: string, _count: number, value: string): Promise<void> {
     const list = this.lists.get(key);
     if (!list) return;
-    const index = list.indexOf(value);
-    if (index !== -1) list.splice(index, 1);
+    const i = list.indexOf(value);
+    if (i !== -1) list.splice(i, 1);
   }
 
   async lLen(key: string): Promise<number> {
-    return (this.lists.get(key) || []).length;
+    return (this.lists.get(key) ?? []).length;
   }
 }
 
-const redisClient = new InMemoryStore();
+// ─────────────────────────────────────────
+// REDIS-BACKED STORE
+// ─────────────────────────────────────────
+
+class RedisStore implements Store {
+  constructor(private client: RedisClientType) {}
+
+  async get(key: string) {
+    return this.client.get(key);
+  }
+
+  async set(key: string, value: string, options?: { EX?: number }) {
+    if (options?.EX) await this.client.set(key, value, { EX: options.EX });
+    else await this.client.set(key, value);
+  }
+
+  async del(key: string) {
+    await this.client.del(key);
+  }
+
+  async exists(key: string) {
+    return this.client.exists(key);
+  }
+
+  async incr(key: string) {
+    return this.client.incr(key);
+  }
+
+  async expire(key: string, seconds: number) {
+    await this.client.expire(key, seconds);
+  }
+
+  async keys(pattern: string) {
+    return this.client.keys(pattern);
+  }
+
+  async sAdd(key: string, member: string) {
+    await this.client.sAdd(key, member);
+  }
+
+  async sRem(key: string, member: string) {
+    await this.client.sRem(key, member);
+  }
+
+  async sIsMember(key: string, member: string) {
+    return this.client.sIsMember(key, member);
+  }
+
+  async sMembers(key: string) {
+    return this.client.sMembers(key);
+  }
+
+  async lPush(key: string, value: string) {
+    await this.client.lPush(key, value);
+  }
+
+  async lRange(key: string, start: number, stop: number) {
+    return this.client.lRange(key, start, stop);
+  }
+
+  async lRem(key: string, count: number, value: string) {
+    await this.client.lRem(key, count, value);
+  }
+
+  async lLen(key: string) {
+    return this.client.lLen(key);
+  }
+}
+
+// ─────────────────────────────────────────
+// SELECTION
+// ─────────────────────────────────────────
+
+const memoryStore = new InMemoryStore();
+
+/** Swapped for a RedisStore by connectRedis() when a REDIS_URL is present. */
+let activeStore: Store = memoryStore;
+
+/** Proxy so modules can import this once at load time. */
+const redisClient: Store = {
+  get: (k) => activeStore.get(k),
+  set: (k, v, o) => activeStore.set(k, v, o),
+  del: (k) => activeStore.del(k),
+  exists: (k) => activeStore.exists(k),
+  incr: (k) => activeStore.incr(k),
+  expire: (k, s) => activeStore.expire(k, s),
+  keys: (p) => activeStore.keys(p),
+  sAdd: (k, m) => activeStore.sAdd(k, m),
+  sRem: (k, m) => activeStore.sRem(k, m),
+  sIsMember: (k, m) => activeStore.sIsMember(k, m),
+  sMembers: (k) => activeStore.sMembers(k),
+  lPush: (k, v) => activeStore.lPush(k, v),
+  lRange: (k, a, b) => activeStore.lRange(k, a, b),
+  lRem: (k, c, v) => activeStore.lRem(k, c, v),
+  lLen: (k) => activeStore.lLen(k),
+};
+
+/** Raw client, used by the Socket.IO Redis adapter. */
+export let rawRedisClient: RedisClientType | null = null;
 
 export const connectRedis = async (): Promise<void> => {
-  logger.info('In-memory store initialized (no Redis needed)');
+  const url = process.env.REDIS_URL;
+
+  if (!url) {
+    logger.warn(
+      'REDIS_URL is not set — using an in-process store. Rooms, queues and ' +
+        'match state will NOT be shared across instances or survive a restart. ' +
+        'Set REDIS_URL in production.'
+    );
+    return;
+  }
+
+  try {
+    const client: RedisClientType = createClient({ url });
+    client.on('error', (err) => logger.error('Redis error', { err }));
+    await client.connect();
+
+    rawRedisClient = client;
+    activeStore = new RedisStore(client);
+    logger.info('Redis connected', { url: url.replace(/:[^:@]*@/, ':***@') });
+  } catch (error) {
+    logger.error(
+      'Redis connection FAILED — falling back to the in-process store. ' +
+        'Multiplayer will not work correctly across instances.',
+      { error }
+    );
+  }
 };
 
 export const disconnectRedis = async (): Promise<void> => {
-  logger.info('In-memory store closed');
+  if (rawRedisClient) {
+    await rawRedisClient.quit();
+    rawRedisClient = null;
+  }
 };
+
+/** True when a real Redis is backing the store. */
+export const isRedisActive = (): boolean => rawRedisClient !== null;
 
 export default redisClient;
