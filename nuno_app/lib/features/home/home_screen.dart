@@ -150,7 +150,7 @@ class HomeScreen extends ConsumerWidget {
                                     // Paint-time shift: keeps the art at its
                                     // current size and simply drops it lower.
                                     child: Transform.translate(
-                                      offset: const Offset(0, 10),
+                                      offset: const Offset(0, -2),
                                       // Decorative only: the game starts from
                                       // the PLAY button, nowhere else.
                                       child: const _FloatingAsset(
