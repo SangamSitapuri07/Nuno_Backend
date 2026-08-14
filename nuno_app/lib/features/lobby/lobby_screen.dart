@@ -9,6 +9,7 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/player_avatar.dart';
 import '../../core/widgets/titled_panel.dart';
 import '../../data/models/enums.dart';
@@ -212,31 +213,29 @@ class _LobbyBody extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppDimens.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      label: 'INVITE FRIEND',
-                      size: AppButtonSize.medium,
-                      variant: AppButtonVariant.ghost,
-                      onPressed: () => InviteFriendsSheet.show(
+              Center(
+                child: Column(
+                  children: [
+                    ArtButton(
+                      asset: Art.btnInvite,
+                      fallbackLabel: 'INVITE',
+                      width: 190,
+                      onTap: () => InviteFriendsSheet.show(
                         context,
                         onInvite: controller.invite,
                         alreadyIn:
                             room.players.map((p) => p.userId).toSet(),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.sm),
-              AppButton(
-                label: isHost
-                    ? 'START GAME'
-                    : (isReady ? 'NOT READY' : 'READY UP'),
-                size: AppButtonSize.medium,
-                variant: AppButtonVariant.gold,
-                onPressed: () => controller.setReady(!isReady),
+                    const SizedBox(height: AppDimens.xs),
+                    ArtButton(
+                      asset: isHost ? Art.btnStart : Art.btnReady,
+                      fallbackLabel: isHost ? 'START' : 'READY',
+                      width: 190,
+                      onTap: () => controller.setReady(!isReady),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

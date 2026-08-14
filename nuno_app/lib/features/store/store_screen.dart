@@ -11,6 +11,7 @@ import '../../core/widgets/titled_panel.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/store_models.dart';
 import '../auth/auth_controller.dart';
@@ -333,10 +334,14 @@ class _StoreItemCard extends StatelessWidget {
                     ),
                   ),
                   child: Center(
-                    child: Icon(
-                      _iconFor(item.type),
-                      size: 44,
-                      color: rarityColor,
+                    child: ArtImage(
+                      Art.shopBundle,
+                      width: 74,
+                      fallback: Icon(
+                        _iconFor(item.type),
+                        size: 44,
+                        color: rarityColor,
+                      ),
                     ),
                   ),
                 ),

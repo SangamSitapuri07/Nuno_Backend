@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/game_card.dart';
 import '../../data/models/game_state.dart';
@@ -128,22 +129,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         if (!didPop) _confirmExit();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF2A0507),
-        body: DecoratedBox(
-          // Deep red table, brighter toward the middle.
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment.center,
-              radius: 0.95,
-              colors: [
-                Color(0xFF9E1A10),
-                Color(0xFF6E0F0C),
-                Color(0xFF3A0708),
-                Color(0xFF1E0304),
-              ],
-              stops: [0.0, 0.42, 0.75, 1.0],
-            ),
-          ),
+        backgroundColor: const Color(0xFF0A0618),
+        body: ArtBackground(
+          asset: Art.bgTable,
           child: SafeArea(
             child: game == null
                 ? const LoadingView(label: 'Joining the table...')

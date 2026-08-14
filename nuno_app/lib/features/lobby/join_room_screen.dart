@@ -7,6 +7,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/titled_panel.dart';
 import 'lobby_providers.dart';
 
@@ -105,11 +106,14 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
               Expanded(child: _Key(label: '0', onTap: () => _tap('0'))),
               const SizedBox(width: AppDimens.sm),
               Expanded(
-                child: _Key(
-                  icon: Icons.check_rounded,
-                  onTap: complete ? _submit : null,
-                  highlight: complete,
-                ),
+                child: complete
+                    ? ArtButton(
+                        asset: Art.btnJoin,
+                        fallbackLabel: 'JOIN',
+                        width: 110,
+                        onTap: _submit,
+                      )
+                    : const _Key(icon: Icons.check_rounded),
               ),
             ],
           ),

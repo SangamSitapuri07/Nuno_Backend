@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/game_assets.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../data/models/game_state.dart';
 
@@ -79,32 +80,24 @@ class GameOverScreen extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Crowned winner
-                      Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          Positioned(
-                            top: -16,
-                            child: Icon(
-                              Icons.emoji_events_rounded,
-                              size: 26,
-                              color: AppColors.gold,
-                              shadows: [
-                                Shadow(
-                                  color:
-                                      AppColors.gold.withValues(alpha: 0.8),
-                                  blurRadius: 14,
-                                ),
-                              ],
-                            ),
+                      // Ornate VICTORY banner above the winner.
+                      if (winnerId == myId)
+                        ArtImage(
+                          Art.victoryBanner,
+                          width: 240,
+                          fallback: Text(
+                            'VICTORY',
+                            style: AppTextStyles.h2
+                                .copyWith(color: AppColors.gold),
                           ),
-                          PlayerAvatar(
-                            username: winnerName,
-                            size: 52,
-                            ringColor: AppColors.gold,
-                          ),
-                        ],
+                        )
+                      else
+                        ArtImage(Art.trophy, width: 74),
+                      const SizedBox(height: AppDimens.xs),
+                      PlayerAvatar(
+                        username: winnerName,
+                        size: 52,
+                        ringColor: AppColors.gold,
                       ),
                       const SizedBox(height: AppDimens.sm),
                       Text(

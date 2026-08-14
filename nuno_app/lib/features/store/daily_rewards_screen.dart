@@ -8,6 +8,7 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/titled_panel.dart';
 import '../auth/auth_controller.dart';
 
@@ -56,6 +57,8 @@ class _DailyRewardsScreenState extends ConsumerState<DailyRewardsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ArtImage(Art.treasureChest, width: 110),
+          const SizedBox(height: AppDimens.sm),
           Text(
             _claimed ? 'COME BACK TOMORROW' : 'CLAIM YOUR DAILY REWARD',
             style: AppTextStyles.label.copyWith(color: AppColors.gold),
@@ -141,15 +144,19 @@ class _DayTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Icon(
-            isClaimed
-                ? Icons.check_circle_rounded
-                : (isGem
-                    ? Icons.diamond_rounded
-                    : Icons.monetization_on_rounded),
-            size: 20,
-            color: isClaimed ? AppColors.green : accent,
-          ),
+          if (isClaimed)
+            const Icon(Icons.check_circle_rounded,
+                size: 26, color: AppColors.green)
+          else
+            ArtImage(
+              isGem ? Art.gemStack : Art.coinStack,
+              width: 34,
+              fallback: Icon(
+                isGem ? Icons.diamond_rounded : Icons.monetization_on_rounded,
+                size: 20,
+                color: accent,
+              ),
+            ),
           const SizedBox(height: 4),
           Text(
             '$amount',

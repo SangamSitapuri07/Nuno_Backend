@@ -7,6 +7,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/enums.dart';
 import '../auth/auth_controller.dart';
@@ -30,7 +31,7 @@ class HomeScreen extends ConsumerWidget {
       children: [
         // ── Galaxy backdrop ──────────────────────────
         Image.asset(
-          'assets/images/bg_galaxy.jpg',
+          Art.bgGalaxy,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => const DecoratedBox(
             decoration: BoxDecoration(gradient: AppColors.backgroundGradient),
@@ -99,7 +100,7 @@ class HomeScreen extends ConsumerWidget {
               Align(
                 alignment: const Alignment(-0.52, 0.16),
                 child: _FloatingAsset(
-                  asset: 'assets/images/card_podium.png',
+                  asset: Art.cardPodium,
                   width: 380,
                   onTap: () => context.push(AppRoutes.playMenu),
                 ),
@@ -109,7 +110,7 @@ class HomeScreen extends ConsumerWidget {
               Align(
                 alignment: const Alignment(0.18, 0.16),
                 child: _FloatingAsset(
-                  asset: 'assets/images/treasure_chest.png',
+                  asset: Art.treasureChest,
                   width: 170,
                   amplitude: 5,
                   onTap: () => context.push(AppRoutes.dailyRewards),
@@ -334,7 +335,7 @@ class _PlayButtonState extends State<_PlayButton>
           child: Transform.rotate(
             angle: -0.04,
             child: Image.asset(
-              'assets/images/btn_play_gold.png',
+              Art.btnPlay,
               width: 190,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => Container(

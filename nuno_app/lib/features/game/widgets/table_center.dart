@@ -35,20 +35,18 @@ class TableCenter extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Radial glow behind the piles.
+          // The vortex is painted into bg_table.jpg, so only a soft lift
+          // is needed here to seat the piles against it.
           Container(
-            width: 300,
-            height: 220,
+            width: 260,
+            height: 200,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  const Color(0xFFFFB020).withValues(alpha: 0.85),
-                  const Color(0xFFFF7A00).withValues(alpha: 0.45),
-                  const Color(0xFFD8340E).withValues(alpha: 0.15),
+                  Colors.white.withValues(alpha: 0.10),
                   Colors.transparent,
                 ],
-                stops: const [0.0, 0.35, 0.62, 1.0],
               ),
             ),
           ),
