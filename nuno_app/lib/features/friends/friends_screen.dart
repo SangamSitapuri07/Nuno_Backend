@@ -105,7 +105,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
                               horizontal: 5,
                               vertical: 1,
                             ),
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: AppColors.danger,
                               borderRadius: AppDimens.brPill,
                             ),

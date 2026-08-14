@@ -400,7 +400,7 @@ class _HistorySection extends ConsumerWidget {
                 horizontal: AppDimens.sm,
                 vertical: 6,
               ),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.surfaceHigh,
                 borderRadius: AppDimens.brSm,
               ),

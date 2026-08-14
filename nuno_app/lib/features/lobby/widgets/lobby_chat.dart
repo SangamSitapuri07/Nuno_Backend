@@ -103,24 +103,24 @@ class _LobbyChatState extends State<LobbyChat> {
                     cursorColor: AppColors.accent,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _send(),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Type a message...',
                       counterText: '',
                       filled: true,
                       fillColor: AppColors.background,
-                      contentPadding: const EdgeInsets.symmetric(
+                      contentPadding: EdgeInsets.symmetric(
                         horizontal: AppDimens.lg,
                         vertical: AppDimens.md,
                       ),
-                      border: const OutlineInputBorder(
+                      border: OutlineInputBorder(
                         borderRadius: AppDimens.brPill,
                         borderSide: BorderSide.none,
                       ),
-                      enabledBorder: const OutlineInputBorder(
+                      enabledBorder: OutlineInputBorder(
                         borderRadius: AppDimens.brPill,
                         borderSide: BorderSide.none,
                       ),
-                      focusedBorder: const OutlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
                         borderRadius: AppDimens.brPill,
                         borderSide:
                             BorderSide(color: AppColors.primary, width: 1.4),
@@ -168,7 +168,7 @@ class _ChatBubble extends StatelessWidget {
               horizontal: AppDimens.md,
               vertical: 5,
             ),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.background,
               borderRadius: AppDimens.brPill,
             ),

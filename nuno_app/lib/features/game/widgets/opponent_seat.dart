@@ -161,7 +161,7 @@ class _MiniFan extends StatelessWidget {
     const step = 6.0;
 
     if (visible == 0) {
-      return SizedBox(width: w, height: h);
+      return const SizedBox(width: w, height: h);
     }
 
     return SizedBox(
