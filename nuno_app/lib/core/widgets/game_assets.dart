@@ -28,6 +28,23 @@ class Art {
   static const panelFrame = 'assets/images/panel_frame.png';
 
   static const bgPanel = 'assets/images/bg_panel.jpg';
+  static const bgStore = 'assets/images/bg_store.jpg';
+
+  static const appIcon = 'assets/images/app_icon.png';
+
+  // Collectible card-back skins sold in the store.
+  static const skinClassic = 'assets/images/skin_classic.png';
+  static const skinNeon = 'assets/images/skin_neon.png';
+  static const skinGold = 'assets/images/skin_gold.png';
+  static const skinDiamond = 'assets/images/skin_diamond.png';
+
+  // Achievement medals.
+  static const medalStar = 'assets/images/medal_star.png';
+  static const medalCards = 'assets/images/medal_cards.png';
+  static const medalFirst = 'assets/images/medal_first.png';
+  static const medalFlame = 'assets/images/medal_flame.png';
+  static const medalBolt = 'assets/images/medal_bolt.png';
+  static const medalCrown = 'assets/images/medal_crown.png';
 
   // Rank tier shields, indexed by RankTier.
   static const tierBronze = 'assets/images/tier_bronze.png';
@@ -75,6 +92,26 @@ class Art {
     if (level >= 20) return frameGold;
     if (level >= 10) return frameSilver;
     return frameBronze;
+  }
+
+  /// Card-back skin art for a store itemId, or null when the item is not a
+  /// card back with bespoke art.
+  static String? cardSkin(String itemId) {
+    if (itemId.contains('neon')) return skinNeon;
+    if (itemId.contains('gold')) return skinGold;
+    if (itemId.contains('diamond')) return skinDiamond;
+    if (itemId.contains('card_back') || itemId.contains('classic')) {
+      return skinClassic;
+    }
+    return null;
+  }
+
+  /// Medal art cycled by achievement index.
+  static String medalFor(int index) {
+    const all = [
+      medalStar, medalCards, medalFirst, medalFlame, medalBolt, medalCrown,
+    ];
+    return all[index % all.length];
   }
 
   /// Bubble art for an emote key, or null if that key has no art.

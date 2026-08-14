@@ -197,7 +197,13 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
       ),
     );
 
-    if (widget.embedded) return content;
+    if (widget.embedded) {
+      return ArtBackground(
+        asset: Art.bgStore,
+        vignette: false,
+        child: content,
+      );
+    }
 
     return PanelScreen(
       title: 'Store',
@@ -335,8 +341,10 @@ class _StoreItemCard extends StatelessWidget {
                   ),
                   child: Center(
                     child: ArtImage(
-                      Art.shopBundle,
-                      width: 74,
+                      // Card backs show their real skin; everything else
+                      // falls back to the generic bundle art.
+                      Art.cardSkin(item.itemId) ?? Art.shopBundle,
+                      height: item.type == CosmeticType.cardBack ? 74 : 62,
                       fallback: Icon(
                         _iconFor(item.type),
                         size: 44,

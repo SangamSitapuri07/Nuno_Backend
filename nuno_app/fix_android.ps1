@@ -53,3 +53,17 @@ Write-Host ""
 Write-Host "Next:" -ForegroundColor Yellow
 Write-Host "  flutter build apk --release"
 Write-Host "  -> build\app\outputs\flutter-apk\app-release.apk"
+
+# ── Launcher icons ───────────────────────────────────────────
+# Flutter's template ships a generic icon; copy ours over every density.
+$densities = @('mdpi','hdpi','xhdpi','xxhdpi','xxxhdpi')
+$copied = 0
+foreach ($d in $densities) {
+    $srcIcon = "assets\launcher\ic_launcher_$d.png"
+    $dstDir  = "android\app\src\main\res\mipmap-$d"
+    if ((Test-Path $srcIcon) -and (Test-Path $dstDir)) {
+        Copy-Item $srcIcon "$dstDir\ic_launcher.png" -Force
+        $copied++
+    }
+}
+if ($copied -gt 0) { Write-Host "  + launcher icon ($copied densities)" -ForegroundColor Green }

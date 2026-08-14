@@ -47,3 +47,6 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    # assets/launcher/ holds the Android mipmap sources; setup.sh and
+    # fix_android.ps1 copy them into android/. They are deliberately not
+    # bundled into the app itself.

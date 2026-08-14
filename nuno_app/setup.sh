@@ -62,6 +62,16 @@ if [ -f "$PLIST" ] && ! grep -q "NSAppTransportSecurity" "$PLIST"; then
   perl -0pi -e 's|(<dict>)|$1\n\t<key>NSAppTransportSecurity</key>\n\t<dict>\n\t\t<key>NSAllowsArbitraryLoads</key>\n\t\t<true/>\n\t</dict>|' "$PLIST"
 fi
 
+# ── 5b. Launcher icons ───────────────────────────────────────
+for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+  SRC="assets/launcher/ic_launcher_$d.png"
+  DST="android/app/src/main/res/mipmap-$d"
+  if [ -f "$SRC" ] && [ -d "$DST" ]; then
+    cp "$SRC" "$DST/ic_launcher.png"
+  fi
+done
+echo "--- Launcher icons installed ---"
+
 # ── 6. Sanity check ──────────────────────────────────────────
 echo
 echo "--- Analyzing ---"

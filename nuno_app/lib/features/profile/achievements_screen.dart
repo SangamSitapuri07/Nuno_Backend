@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/titled_panel.dart';
 import '../../data/models/user_models.dart';
 import '../home/home_providers.dart';
@@ -36,6 +37,7 @@ class AchievementsScreen extends ConsumerWidget {
             final current = stats == null ? 0 : def.progress(stats);
             return _AchievementTile(
               def: def,
+              index: i,
               current: current.clamp(0, def.target),
             );
           },
@@ -117,9 +119,14 @@ class _AchievementDef {
 
 class _AchievementTile extends StatelessWidget {
   final _AchievementDef def;
+  final int index;
   final int current;
 
-  const _AchievementTile({required this.def, required this.current});
+  const _AchievementTile({
+    required this.def,
+    required this.index,
+    required this.current,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -139,17 +146,17 @@ class _AchievementTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: def.color.withValues(alpha: complete ? 0.25 : 0.10),
-              borderRadius: AppDimens.brSm,
-            ),
-            child: Icon(
-              def.icon,
-              size: 18,
-              color: complete ? def.color : AppColors.textMuted,
+          Opacity(
+            // Locked achievements read as dimmed.
+            opacity: complete ? 1 : 0.42,
+            child: ArtImage(
+              Art.medalFor(index),
+              height: 40,
+              fallback: Icon(
+                def.icon,
+                size: 22,
+                color: complete ? def.color : AppColors.textMuted,
+              ),
             ),
           ),
           const SizedBox(width: AppDimens.md),
