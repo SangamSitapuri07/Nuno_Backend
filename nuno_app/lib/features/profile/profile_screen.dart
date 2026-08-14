@@ -15,6 +15,7 @@ import '../../core/widgets/currency_pill.dart';
 import '../../core/widgets/player_avatar.dart';
 import '../../core/widgets/side_nav.dart';
 import '../../core/widgets/titled_panel.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/user_models.dart';
 import '../auth/auth_controller.dart';
 import '../home/home_providers.dart';

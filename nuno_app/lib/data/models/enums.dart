@@ -1,5 +1,6 @@
 /// Enums mirroring the backend TypeScript enums.
 /// Parsing is tolerant: unknown values fall back to a sane default.
+library;
 
 // ── src/gameplay/game.types.ts ──────────────────────────────
 

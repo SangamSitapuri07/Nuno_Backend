@@ -33,12 +33,12 @@ class AppTheme {
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: const CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: AppDimens.brLg,
-          side: const BorderSide(color: AppColors.surfaceStroke),
+          side: BorderSide(color: AppColors.surfaceStroke),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -56,25 +56,25 @@ class AppTheme {
         hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
         labelStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
         errorStyle: AppTextStyles.bodySm.copyWith(color: AppColors.danger),
-        border: OutlineInputBorder(
+        border: const OutlineInputBorder(
           borderRadius: AppDimens.brMd,
-          borderSide: const BorderSide(color: AppColors.surfaceStroke),
+          borderSide: BorderSide(color: AppColors.surfaceStroke),
         ),
-        enabledBorder: OutlineInputBorder(
+        enabledBorder: const OutlineInputBorder(
           borderRadius: AppDimens.brMd,
-          borderSide: const BorderSide(color: AppColors.surfaceStroke),
+          borderSide: BorderSide(color: AppColors.surfaceStroke),
         ),
-        focusedBorder: OutlineInputBorder(
+        focusedBorder: const OutlineInputBorder(
           borderRadius: AppDimens.brMd,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.6),
         ),
-        errorBorder: OutlineInputBorder(
+        errorBorder: const OutlineInputBorder(
           borderRadius: AppDimens.brMd,
-          borderSide: const BorderSide(color: AppColors.danger),
+          borderSide: BorderSide(color: AppColors.danger),
         ),
-        focusedErrorBorder: OutlineInputBorder(
+        focusedErrorBorder: const OutlineInputBorder(
           borderRadius: AppDimens.brMd,
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.6),
+          borderSide: BorderSide(color: AppColors.danger, width: 1.6),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -95,9 +95,9 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: AppDimens.brXl,
-          side: const BorderSide(color: AppColors.surfaceStroke),
+          side: BorderSide(color: AppColors.surfaceStroke),
         ),
         titleTextStyle: AppTextStyles.h3,
         contentTextStyle: AppTextStyles.body,

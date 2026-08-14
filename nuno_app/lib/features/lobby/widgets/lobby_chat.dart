@@ -112,11 +112,11 @@ class _LobbyChatState extends State<LobbyChat> {
                         horizontal: AppDimens.lg,
                         vertical: AppDimens.md,
                       ),
-                      border: OutlineInputBorder(
+                      border: const OutlineInputBorder(
                         borderRadius: AppDimens.brPill,
                         borderSide: BorderSide.none,
                       ),
-                      enabledBorder: OutlineInputBorder(
+                      enabledBorder: const OutlineInputBorder(
                         borderRadius: AppDimens.brPill,
                         borderSide: BorderSide.none,
                       ),

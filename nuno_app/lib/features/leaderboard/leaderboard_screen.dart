@@ -11,6 +11,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/player_avatar.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/social_models.dart';
 import '../../data/models/user_models.dart';
 import '../auth/auth_controller.dart';
@@ -92,7 +93,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
               padding: const EdgeInsets.all(4),
               child: TabBar(
                 controller: _tabs,
-                indicator: BoxDecoration(
+                indicator: const BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: AppDimens.brSm,
                 ),

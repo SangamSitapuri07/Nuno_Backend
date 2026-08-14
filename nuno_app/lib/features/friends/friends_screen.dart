@@ -15,6 +15,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/player_avatar.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/social_models.dart';
 import '../../services/socket_events.dart';
 import '../home/home_providers.dart';
@@ -83,7 +84,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
               padding: const EdgeInsets.all(4),
               child: TabBar(
                 controller: _tabs,
-                indicator: BoxDecoration(
+                indicator: const BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: AppDimens.brSm,
                 ),

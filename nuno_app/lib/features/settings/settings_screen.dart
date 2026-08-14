@@ -29,7 +29,10 @@ class SettingsNotifier extends AsyncNotifier<PlayerSettings> {
 
   /// Applies optimistically, then persists (debounced so slider drags don't
   /// hammer PUT /api/v1/settings).
-  void update(PlayerSettings next, Map<String, dynamic> patch) {
+  ///
+  /// Named `save` rather than `update` because AsyncNotifier already declares
+  /// an `update` method with a different signature.
+  void save(PlayerSettings next, Map<String, dynamic> patch) {
     state = AsyncData(next);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
@@ -144,7 +147,7 @@ class _GeneralSection extends StatelessWidget {
           children: [
             for (final e in _languages.entries)
               GestureDetector(
-                onTap: () => notifier.update(
+                onTap: () => notifier.save(
                   settings.copyWith(language: e.key),
                   {'language': e.key},
                 ),
@@ -181,7 +184,7 @@ class _GeneralSection extends StatelessWidget {
         _SettingRow(
           label: 'Dark mode',
           value: settings.darkMode,
-          onChanged: (v) => notifier.update(
+          onChanged: (v) => notifier.save(
             settings.copyWith(darkMode: v),
             {'darkMode': v},
           ),
@@ -231,7 +234,7 @@ class _AudioSection extends StatelessWidget {
           label: 'Music',
           icon: Icons.music_note_rounded,
           value: settings.musicVolume,
-          onChanged: (v) => notifier.update(
+          onChanged: (v) => notifier.save(
             settings.copyWith(musicVolume: v),
             {'musicVolume': v},
           ),
@@ -240,7 +243,7 @@ class _AudioSection extends StatelessWidget {
           label: 'SFX',
           icon: Icons.graphic_eq_rounded,
           value: settings.soundVolume,
-          onChanged: (v) => notifier.update(
+          onChanged: (v) => notifier.save(
             settings.copyWith(soundVolume: v),
             {'soundVolume': v},
           ),
@@ -249,7 +252,7 @@ class _AudioSection extends StatelessWidget {
           label: 'Voice chat',
           icon: Icons.mic_rounded,
           value: settings.voiceVolume,
-          onChanged: (v) => notifier.update(
+          onChanged: (v) => notifier.save(
             settings.copyWith(voiceVolume: v),
             {'voiceVolume': v},
           ),
@@ -273,7 +276,7 @@ class _ControlsSection extends StatelessWidget {
           label: 'Push to talk',
           description: 'Hold a button to speak',
           value: settings.pushToTalk,
-          onChanged: (v) => notifier.update(
+          onChanged: (v) => notifier.save(
             settings.copyWith(pushToTalk: v),
             {'pushToTalk': v},
           ),
@@ -300,7 +303,7 @@ class _NotificationsSection extends StatelessWidget {
           label: 'Push notifications',
           description: 'Invites, requests and match alerts',
           value: settings.notifications,
-          onChanged: (v) => notifier.update(
+          onChanged: (v) => notifier.save(
             settings.copyWith(notifications: v),
             {'notifications': v},
           ),

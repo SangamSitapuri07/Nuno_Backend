@@ -7,6 +7,7 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/app_states.dart';
+import '../../data/models/enums.dart';
 import '../../core/widgets/titled_panel.dart';
 import '../home/home_providers.dart';
 

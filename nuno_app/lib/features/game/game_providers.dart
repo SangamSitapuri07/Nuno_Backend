@@ -12,6 +12,7 @@ import '../../data/models/json.dart';
 import '../../data/models/social_models.dart';
 import '../../services/socket_events.dart';
 import '../../services/socket_service.dart';
+import '../auth/auth_controller.dart';
 
 /// A transient visual event (emote, UNO call, quick chat) shown over the table.
 @immutable

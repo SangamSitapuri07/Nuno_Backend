@@ -46,9 +46,9 @@ class TitledPanel extends StatelessWidget {
           // ── Header strip ────────────────────────────
           Container(
             height: AppDimens.panelHeaderHeight,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.panelHeader,
-              border: const Border(
+              border: Border(
                 bottom: BorderSide(color: AppColors.surfaceStroke),
               ),
             ),

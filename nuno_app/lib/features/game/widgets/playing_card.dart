@@ -210,11 +210,11 @@ class _WildPinwheel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       children: [
         Expanded(
           child: Row(
-            children: const [
+            children: [
               Expanded(child: ColoredBox(color: AppColors.cardRed)),
               Expanded(child: ColoredBox(color: AppColors.cardBlue)),
             ],
@@ -222,7 +222,7 @@ class _WildPinwheel extends StatelessWidget {
         ),
         Expanded(
           child: Row(
-            children: const [
+            children: [
               Expanded(child: ColoredBox(color: AppColors.cardYellow)),
               Expanded(child: ColoredBox(color: AppColors.cardGreen)),
             ],

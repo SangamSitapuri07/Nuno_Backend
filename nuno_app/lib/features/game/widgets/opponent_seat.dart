@@ -156,7 +156,7 @@ class _MiniFan extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const w = AppDimens.opponentCardWidth;
-    final h = w / 0.68;
+    const h = w / 0.68;
     final visible = count.clamp(0, 5);
     const step = 6.0;
 

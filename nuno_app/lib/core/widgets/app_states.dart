@@ -147,27 +147,27 @@ class SkeletonListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppDimens.sm),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppDimens.sm),
       child: Row(
         children: [
-          const SkeletonBox(
+          SkeletonBox(
             width: AppDimens.avatarMd,
             height: AppDimens.avatarMd,
             borderRadius: BorderRadius.all(Radius.circular(100)),
           ),
-          const SizedBox(width: AppDimens.md),
+          SizedBox(width: AppDimens.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 SkeletonBox(width: 130, height: 14),
                 SizedBox(height: AppDimens.sm),
                 SkeletonBox(width: 80, height: 11),
               ],
             ),
           ),
-          const SkeletonBox(width: 52, height: 26, borderRadius: AppDimens.brSm),
+          SkeletonBox(width: 52, height: 26, borderRadius: AppDimens.brSm),
         ],
       ),
     );

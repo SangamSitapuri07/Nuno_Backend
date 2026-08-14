@@ -54,7 +54,7 @@ class TableCenter extends StatelessWidget {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        Positioned(
+                        const Positioned(
                           left: 3,
                           top: 3,
                           child: Opacity(

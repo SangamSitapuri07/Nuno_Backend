@@ -47,7 +47,7 @@ class GameChatSheet extends ConsumerWidget {
               child: Container(
                 width: 42,
                 height: 4,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.surfaceStroke,
                   borderRadius: AppDimens.brPill,
                 ),
