@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,13 +49,7 @@ class HomeScreen extends ConsumerWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          Art.bgGalaxy,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const DecoratedBox(
-            decoration: BoxDecoration(gradient: AppColors.backgroundGradient),
-          ),
-        ),
+        const _RotatingBackground(),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -150,7 +146,7 @@ class HomeScreen extends ConsumerWidget {
                                     // Paint-time shift: keeps the art at its
                                     // current size and simply drops it lower.
                                     child: Transform.translate(
-                                      offset: const Offset(0, -2),
+                                      offset: const Offset(0, -12),
                                       // Decorative only: the game starts from
                                       // the PLAY button, nowhere else.
                                       child: const _FloatingAsset(
@@ -215,6 +211,83 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Slowly rotating galaxy backdrop ───────────────────────────
+
+/// The galaxy image turning very slowly, with a gentle breathing zoom.
+///
+/// The image is oversized before rotating: a rotated rectangle needs a
+/// diagonal-sized source or its corners sweep into view as empty space.
+class _RotatingBackground extends StatefulWidget {
+  const _RotatingBackground();
+
+  @override
+  State<_RotatingBackground> createState() => _RotatingBackgroundState();
+}
+
+class _RotatingBackgroundState extends State<_RotatingBackground>
+    with TickerProviderStateMixin {
+  // One full turn takes two minutes, so it reads as drift rather than spin.
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 120),
+  )..repeat();
+
+  late final AnimationController _breathe = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 14),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    _breathe.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Cover the diagonal so no corner is ever empty mid-rotation.
+        final side = math.sqrt(
+              box.maxWidth * box.maxWidth + box.maxHeight * box.maxHeight,
+            ) *
+            1.04;
+
+        return ClipRect(
+          child: OverflowBox(
+            maxWidth: side,
+            maxHeight: side,
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_spin, _breathe]),
+              builder: (context, child) => Transform.rotate(
+                angle: _spin.value * 2 * math.pi,
+                child: Transform.scale(
+                  scale: 1.0 + 0.05 * _breathe.value,
+                  child: child,
+                ),
+              ),
+              child: SizedBox(
+                width: side,
+                height: side,
+                child: Image.asset(
+                  Art.bgGalaxy,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: AppColors.backgroundGradient,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
