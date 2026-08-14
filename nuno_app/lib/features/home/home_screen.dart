@@ -151,10 +151,11 @@ class HomeScreen extends ConsumerWidget {
                                     // current size and simply drops it lower.
                                     child: Transform.translate(
                                       offset: const Offset(0, 22),
-                                      child: _FloatingAsset(
+                                      // Decorative only: the game starts from
+                                      // the PLAY button, nowhere else.
+                                      child: const _FloatingAsset(
                                         asset: Art.cardPodium,
-                                        onTap: () =>
-                                            context.push(AppRoutes.playMenu),
+                                        scale: 0.88,
                                       ),
                                     ),
                                   ),
@@ -314,10 +315,15 @@ class _FloatingAsset extends StatefulWidget {
   final double amplitude;
   final VoidCallback? onTap;
 
+  /// Fraction of the slot the art fills. Below 1 leaves breathing room
+  /// without changing the surrounding layout.
+  final double scale;
+
   const _FloatingAsset({
     required this.asset,
     this.amplitude = 7,
     this.onTap,
+    this.scale = 1.0,
   });
 
   @override
@@ -339,22 +345,32 @@ class _FloatingAssetState extends State<_FloatingAsset>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, child) => Transform.translate(
-          offset: Offset(0, -widget.amplitude * _c.value),
-          child: child,
-        ),
-        // BoxFit.contain guarantees the art never exceeds its slot.
+    final art = AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, -widget.amplitude * _c.value),
+        child: child,
+      ),
+      // BoxFit.contain guarantees the art never exceeds its slot.
+      child: FractionallySizedBox(
+        widthFactor: widget.scale,
+        heightFactor: widget.scale,
         child: Image.asset(
           widget.asset,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         ),
       ),
+    );
+
+    // Without a handler the widget stays inert, so taps fall through
+    // instead of silently triggering navigation.
+    if (widget.onTap == null) return art;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: art,
     );
   }
 }
