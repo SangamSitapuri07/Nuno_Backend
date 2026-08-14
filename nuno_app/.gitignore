@@ -10,16 +10,25 @@ pubspec.lock
 
 # IDE
 .idea/
-.vscode/
 *.iml
 *.log
 
-# Platform build output
+# Generated platform folders are created by ./setup.sh
+# (uncomment if you prefer to commit them)
+# android/
+# ios/
+
 android/.gradle/
 android/app/debug/
 android/app/profile/
 android/app/release/
+android/local.properties
+android/key.properties
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/Flutter.framework
 ios/Flutter/Flutter.podspec
+ios/Flutter/flutter_export_environment.sh
+
+# macOS
+.DS_Store

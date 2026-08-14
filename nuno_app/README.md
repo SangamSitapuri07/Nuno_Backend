@@ -4,8 +4,9 @@ Phone client for the **Nuno_Backend** multiplayer card game (Express + Socket.IO
 Prisma/Postgres + Redis).
 
 Built with Flutter, Riverpod, GoRouter, Dio and socket_io_client.
-**Landscape-only**, implementing the 30-screen UI reference in `design/UI.png`
-(see `design/DESIGN_SPEC.md` for the sampled palette and screen inventory).
+**Landscape-only**, implementing a 30-screen UI reference sheet — see
+`design/DESIGN_SPEC.md` for the sampled palette and full screen inventory.
+(Drop the reference image in `design/UI.png` to keep it alongside the spec.)
 Every screen is wired to a real backend endpoint or socket event.
 
 ---
