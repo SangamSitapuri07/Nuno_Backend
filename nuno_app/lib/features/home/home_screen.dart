@@ -134,13 +134,9 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Stage: podium + chest. The negative bottom margin
-                          // lets the art extend into the nav reserve so it can
-                          // sit lower at full size instead of being scaled
-                          // down by a smaller box.
+                          // Stage: podium + chest.
                           Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: -28),
+                            child: Padding(
                               padding: const EdgeInsets.only(
                                 right: AppDimens.sm,
                               ),
@@ -174,11 +170,12 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Space for the floating nav bar. The podium is
-                          // allowed to hang into part of it (see the stage's
-                          // negative bottom margin) because the bar is only
-                          // 380 wide and the art tapers at its base.
-                          const SizedBox(height: navReserve),
+                          // Partial clearance for the floating nav bar. The
+                          // bar is only 380 wide and docked bottom-left, and
+                          // the podium art tapers at its base, so the stage
+                          // may reach into part of that band - which keeps the
+                          // podium box tall, so it renders large and low.
+                          const SizedBox(height: navReserve - 28),
                         ],
                       ),
                     ),
