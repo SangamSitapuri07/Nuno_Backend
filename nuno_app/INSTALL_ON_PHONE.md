@@ -165,6 +165,13 @@ check the backend is up:
 **"App not installed" when sideloading**
 Usually an older copy with the same package name — uninstall it first.
 
+**Windows desktop build fails: `Cannot open include file: 'atlstr.h'`**
+Unrelated to Android. `flutter_secure_storage` needs the Visual Studio **C++
+ATL** component for the *Windows desktop* target. Either ignore it and run on
+the phone, or install it: open **Visual Studio Installer → Modify → Individual
+components**, tick **"C++ ATL for latest v143 build tools (x86 & x64)"**,
+install, then reopen your terminal.
+
 **Gradle or build errors on first APK build**
 The first Android build downloads a lot. If it fails, `flutter clean` and retry;
 make sure you have a working JDK (`flutter doctor` reports this).
