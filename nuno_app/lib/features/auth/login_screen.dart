@@ -6,13 +6,13 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_background.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/app_text_field.dart';
+import '../../core/widgets/uno_logo.dart';
 import 'auth_controller.dart';
-import 'splash_screen.dart';
 
+/// Landscape sign-in: branding on the left, form on the right.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -55,126 +55,102 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final auth = ref.watch(authControllerProvider);
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: AppBackground(
-        child: Stack(
-          children: [
-            const ScatteredCardsDecoration(),
-            SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.xxl,
-                  vertical: AppDimens.xl,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.sizeOf(context).height -
-                        MediaQuery.paddingOf(context).vertical -
-                        AppDimens.huge,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(-0.5, -0.3),
+            radius: 1.1,
+            colors: [Color(0xFF1B1440), Color(0xFF07081A)],
+          ),
+        ),
+        child: SafeArea(
+          child: Row(
+            children: [
+              // ── Branding ─────────────────────────
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const UnoLogo(width: 210),
+                      const SizedBox(height: AppDimens.xl),
+                      Text(
+                        'Welcome back, challenger',
+                        style: AppTextStyles.bodySm,
+                      ),
+                    ],
                   ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: AppDimens.xxl),
+                ),
+              ),
 
-                        // ── Brand ──────────────────────────────
-                        const Center(child: NunoLogo(size: 72)),
-                        const SizedBox(height: AppDimens.xl),
-                        Center(
-                          child: Text(
-                            'NUNO',
-                            style: AppTextStyles.logo.copyWith(fontSize: 40),
-                          ),
-                        ),
-                        const SizedBox(height: AppDimens.xs),
-                        Center(
-                          child: Text(
-                            'Welcome back, challenger',
-                            style: AppTextStyles.bodySm,
-                          ),
-                        ),
-
-                        const SizedBox(height: AppDimens.huge),
-
-                        // ── Form ───────────────────────────────
-                        AppTextField(
-                          controller: _email,
-                          label: 'Email',
-                          hint: 'you@example.com',
-                          icon: Icons.alternate_email_rounded,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: Validators.email,
-                          enabled: !auth.isBusy,
-                        ),
-                        const SizedBox(height: AppDimens.xl),
-                        AppTextField(
-                          controller: _password,
-                          label: 'Password',
-                          hint: 'Enter your password',
-                          icon: Icons.lock_outline_rounded,
-                          obscure: true,
-                          textInputAction: TextInputAction.done,
-                          validator: (v) => Validators.required(v, 'Password'),
-                          onSubmitted: (_) => _submit(),
-                          enabled: !auth.isBusy,
-                        ),
-
-                        const SizedBox(height: AppDimens.xxl),
-
-                        AppButton(
-                          label: 'SIGN IN',
-                          icon: Icons.sports_esports_rounded,
-                          isLoading: auth.isBusy,
-                          onPressed: auth.isBusy ? null : _submit,
-                        ),
-
-                        const SizedBox(height: AppDimens.xl),
-
-                        Row(
+              // ── Form ─────────────────────────────
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.xxl,
+                      vertical: AppDimens.lg,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 340),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppDimens.md,
-                              ),
-                              child: Text('NEW HERE?',
-                                  style: AppTextStyles.label),
+                            Text('SIGN IN', style: AppTextStyles.h2),
+                            const SizedBox(height: AppDimens.lg),
+                            AppTextField(
+                              controller: _email,
+                              label: 'Email',
+                              hint: 'you@example.com',
+                              icon: Icons.alternate_email_rounded,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: Validators.email,
+                              enabled: !auth.isBusy,
                             ),
-                            const Expanded(child: Divider()),
+                            const SizedBox(height: AppDimens.md),
+                            AppTextField(
+                              controller: _password,
+                              label: 'Password',
+                              hint: 'Enter your password',
+                              icon: Icons.lock_outline_rounded,
+                              obscure: true,
+                              textInputAction: TextInputAction.done,
+                              validator: (v) =>
+                                  Validators.required(v, 'Password'),
+                              onSubmitted: (_) => _submit(),
+                              enabled: !auth.isBusy,
+                            ),
+                            const SizedBox(height: AppDimens.lg),
+                            AppButton(
+                              label: 'SIGN IN',
+                              icon: Icons.sports_esports_rounded,
+                              isLoading: auth.isBusy,
+                              onPressed: auth.isBusy ? null : _submit,
+                            ),
+                            const SizedBox(height: AppDimens.sm),
+                            TextButton(
+                              onPressed: auth.isBusy
+                                  ? null
+                                  : () => context.push(AppRoutes.register),
+                              child: Text(
+                                'Create an account',
+                                style: AppTextStyles.bodySm.copyWith(
+                                  color: AppColors.gold,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-
-                        const SizedBox(height: AppDimens.xl),
-
-                        AppButton(
-                          label: 'CREATE ACCOUNT',
-                          variant: AppButtonVariant.outline,
-                          onPressed: auth.isBusy
-                              ? null
-                              : () => context.push(AppRoutes.register),
-                        ),
-
-                        const SizedBox(height: AppDimens.xxl),
-
-                        Center(
-                          child: Text(
-                            'By continuing you agree to our Terms & Privacy Policy.',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppDimens.lg),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -7,7 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/widgets/app_background.dart';
+import '../../core/widgets/titled_panel.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
@@ -126,12 +126,12 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
                 gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: AppDimens.md,
-                  crossAxisSpacing: AppDimens.md,
-                  childAspectRatio: 0.78,
+                  crossAxisCount: 4,
+                  mainAxisSpacing: AppDimens.sm,
+                  crossAxisSpacing: AppDimens.sm,
+                  childAspectRatio: 0.74,
                 ),
-                itemCount: 6,
+                itemCount: 8,
                 itemBuilder: (_, __) => const SkeletonBox(
                   height: 200,
                   borderRadius: AppDimens.brLg,
@@ -166,14 +166,14 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                       AppDimens.xl,
                       0,
                       AppDimens.xl,
-                      AppDimens.bottomNavHeight + AppDimens.xl,
+                      AppDimens.bottomNavHeight,
                     ),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: AppDimens.md,
-                      crossAxisSpacing: AppDimens.md,
-                      childAspectRatio: 0.72,
+                      crossAxisCount: 4,
+                      mainAxisSpacing: AppDimens.sm,
+                      crossAxisSpacing: AppDimens.sm,
+                      childAspectRatio: 0.74,
                     ),
                     itemCount: filtered.length,
                     itemBuilder: (context, i) {
@@ -197,7 +197,14 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
     );
 
     if (widget.embedded) return content;
-    return Scaffold(body: AppBackground(child: content));
+
+    return PanelScreen(
+      title: 'Store',
+      onBack: () => context.pop(),
+      maxWidth: 700,
+      padding: EdgeInsets.zero,
+      child: SizedBox(height: 268, child: content),
+    );
   }
 
   Future<void> _purchase(StoreItem item) async {

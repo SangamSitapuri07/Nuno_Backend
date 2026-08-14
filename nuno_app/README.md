@@ -3,8 +3,10 @@
 Phone client for the **Nuno_Backend** multiplayer card game (Express + Socket.IO +
 Prisma/Postgres + Redis).
 
-Built with Flutter, Riverpod, GoRouter, Dio and socket_io_client. Every screen is
-wired to a real backend endpoint or socket event — there is no mock data.
+Built with Flutter, Riverpod, GoRouter, Dio and socket_io_client.
+**Landscape-only**, implementing the 30-screen UI reference in `design/UI.png`
+(see `design/DESIGN_SPEC.md` for the sampled palette and screen inventory).
+Every screen is wired to a real backend endpoint or socket event.
 
 ---
 
@@ -13,6 +15,7 @@ wired to a real backend endpoint or socket event — there is no mock data.
 - Flutter **3.27+** (Dart 3.6+) — the theme uses `Color.withValues`, `CardThemeData`,
   `DialogThemeData` and `TabBarThemeData`
 - The Nuno backend running with Postgres and Redis available
+- A **landscape** device or emulator — the app locks to landscape orientation
 
 ## 2. Setup
 
@@ -158,7 +161,20 @@ invites · Friend presence (`friend.statusUpdated`).
 
 ## 6. Theming
 
-All visual tokens live in `lib/core/theme/`. To re-skin the app, edit
-`app_colors.dart` (palette, gradients, card/rarity/tier colours),
-`app_dimens.dart` (spacing, radii, card geometry) and `app_text_styles.dart`
-(type scale). Screens reference tokens only, never raw values.
+All visual tokens live in `lib/core/theme/`, sampled from the reference sheet:
+
+- `app_colors.dart` — palette, gradients, card/rarity/tier colours, table glow
+- `app_dimens.dart` — spacing, radii, playing-card geometry
+- `app_text_styles.dart` — type scale
+
+Screens reference tokens only, never raw values, so re-skinning is localised to
+these three files.
+
+### Shared building blocks
+
+- `TitledPanel` / `PanelScreen` — the reference's dark panel with a centered
+  uppercase header strip; used by nearly every non-game screen
+- `SideNav` — the vertical section switcher on Profile and Settings
+- `CurrencyPill` / `CoinTag` — coin and gem readouts
+- `UnoLogo` — the tilted red oval wordmark
+- `PlayingCardView` / `CardBackView` — card faces and backs

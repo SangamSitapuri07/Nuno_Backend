@@ -1,51 +1,84 @@
 import 'package:flutter/material.dart';
 
-/// Central colour tokens for the whole app.
+/// Colour tokens sampled from the landscape UI reference sheet.
 ///
-/// Everything visual references these values, so re-skinning the app to match
-/// a design reference is a matter of editing this one file.
+/// Everything visual references these values, so re-skinning is a matter of
+/// editing this one file.
 class AppColors {
   AppColors._();
 
   // ── Surfaces ────────────────────────────────────────────────
-  static const Color background = Color(0xFF0B0A1F);
-  static const Color backgroundAlt = Color(0xFF12102B);
-  static const Color surface = Color(0xFF1A1836);
-  static const Color surfaceHigh = Color(0xFF232048);
-  static const Color surfaceStroke = Color(0xFF2E2A57);
+  static const Color background = Color(0xFF0A0B1E);
+  static const Color backgroundAlt = Color(0xFF0E1030);
+  static const Color surface = Color(0xFF161A3A);
+  static const Color surfaceHigh = Color(0xFF1E2350);
+  static const Color surfaceStroke = Color(0xFF2A2F5E);
+  static const Color panelHeader = Color(0xFF141833);
 
   // ── Brand ───────────────────────────────────────────────────
-  static const Color primary = Color(0xFF7C4DFF);
-  static const Color primaryDark = Color(0xFF5B32D6);
-  static const Color accent = Color(0xFF00E5C0);
-  static const Color gold = Color(0xFFFFC542);
+  /// UNO red — logo, PLAY button, destructive actions.
+  static const Color primary = Color(0xFFE01B24);
+  static const Color primaryDark = Color(0xFF8B0F16);
+
+  /// Gold — primary confirm CTAs (CREATE ROOM, START GAME, CLAIM).
+  static const Color gold = Color(0xFFFFC107);
+  static const Color goldDark = Color(0xFFFF9800);
+
+  static const Color blue = Color(0xFF2196F3);
+  static const Color green = Color(0xFF4CAF50);
+  static const Color violet = Color(0xFF6C4BF6);
+  static const Color cyan = Color(0xFF22D3EE);
+
+  /// Legacy alias kept so older widgets keep compiling.
+  static const Color accent = green;
 
   // ── Text ────────────────────────────────────────────────────
-  static const Color textPrimary = Color(0xFFF5F4FF);
-  static const Color textSecondary = Color(0xFFA9A4CC);
-  static const Color textMuted = Color(0xFF6F6A94);
+  static const Color textPrimary = Color(0xFFF2F4FF);
+  static const Color textSecondary = Color(0xFF9BA3D0);
+  static const Color textMuted = Color(0xFF636B9E);
 
   // ── Status ──────────────────────────────────────────────────
-  static const Color success = Color(0xFF2ED573);
-  static const Color danger = Color(0xFFFF4757);
-  static const Color warning = Color(0xFFFFA502);
-  static const Color info = Color(0xFF2E9BFF);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color danger = Color(0xFFE53935);
+  static const Color warning = Color(0xFFFFA726);
+  static const Color info = Color(0xFF2196F3);
 
-  // ── Card colours (match backend CardColor enum) ─────────────
-  static const Color cardRed = Color(0xFFED2939);
-  static const Color cardBlue = Color(0xFF1E7BE0);
-  static const Color cardGreen = Color(0xFF34C759);
-  static const Color cardYellow = Color(0xFFFFC300);
-  static const Color cardWild = Color(0xFF2B2B3D);
+  // ── Currency ────────────────────────────────────────────────
+  static const Color coin = Color(0xFFFFC107);
+  static const Color gem = Color(0xFF22D3EE);
 
-  // ── Rarity (match backend ItemRarity enum) ──────────────────
+  // ── Playing cards ───────────────────────────────────────────
+  static const Color cardRed = Color(0xFFE53935);
+  static const Color cardBlue = Color(0xFF1E88E5);
+  static const Color cardGreen = Color(0xFF43A047);
+  static const Color cardYellow = Color(0xFFFDD835);
+  static const Color cardWild = Color(0xFF1A1A2E);
+
+  // ── Table glow (screens 7 & 8) ──────────────────────────────
+  /// Opponent's turn — red ambience.
+  static const Color tableGlowRed = Color(0xFF7F1418);
+
+  /// Your turn — green ambience.
+  static const Color tableGlowGreen = Color(0xFF12673A);
+
+  static const Color tableBase = Color(0xFF11132C);
+
+  // ── Category accents (reference legend) ─────────────────────
+  static const Color catLobby = Color(0xFF3B82F6);
+  static const Color catGameplay = Color(0xFF22C55E);
+  static const Color catSocial = Color(0xFFE040FB);
+  static const Color catProfile = Color(0xFFFF9800);
+  static const Color catStore = Color(0xFFFFC107);
+  static const Color catSystem = Color(0xFF9E9E9E);
+
+  // ── Rarity ──────────────────────────────────────────────────
   static const Color rarityCommon = Color(0xFF9E9E9E);
-  static const Color rarityRare = Color(0xFF2E9BFF);
+  static const Color rarityRare = Color(0xFF2196F3);
   static const Color rarityEpic = Color(0xFFAB47BC);
   static const Color rarityLegendary = Color(0xFFFFA000);
   static const Color rarityMythic = Color(0xFFFF3D71);
 
-  // ── Rank tiers (match backend RankTier enum) ────────────────
+  // ── Rank tiers ──────────────────────────────────────────────
   static const Color tierBronze = Color(0xFFCD7F32);
   static const Color tierSilver = Color(0xFFC0C0C0);
   static const Color tierGold = Color(0xFFFFD700);
@@ -54,117 +87,117 @@ class AppColors {
   static const Color tierMaster = Color(0xFFB14BFF);
   static const Color tierGrandmaster = Color(0xFFFF4D6D);
 
-  // ── Presence (match backend PlayerOnlineStatus enum) ────────
-  static const Color statusOnline = success;
+  // ── Presence ────────────────────────────────────────────────
+  static const Color statusOnline = green;
   static const Color statusInMatch = warning;
-  static const Color statusInLobby = info;
+  static const Color statusInLobby = blue;
   static const Color statusAway = Color(0xFFB0A98F);
   static const Color statusOffline = Color(0xFF5A5578);
   static const Color statusDnd = danger;
 
   // ── Gradients ───────────────────────────────────────────────
-  static const LinearGradient primaryGradient = LinearGradient(
+
+  /// PLAY button — bright red into deep red.
+  static const LinearGradient playGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF8C5CFF), Color(0xFF5B32D6)],
+    colors: [Color(0xFFFF3B41), Color(0xFF9E1016)],
   );
 
-  static const LinearGradient accentGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF00E5C0), Color(0xFF00A9B5)],
-  );
+  static const LinearGradient primaryGradient = playGradient;
 
   static const LinearGradient goldGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFFD979), Color(0xFFFFA800)],
+    colors: [Color(0xFFFFD54F), Color(0xFFFFA000)],
+  );
+
+  static const LinearGradient blueGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF42A5F5), Color(0xFF1565C0)],
+  );
+
+  static const LinearGradient greenGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF66BB6A), Color(0xFF2E7D32)],
+  );
+
+  static const LinearGradient violetGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF8B6CF7), Color(0xFF5433D4)],
   );
 
   static const LinearGradient dangerGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFF6B7A), Color(0xFFE01E37)],
+    colors: [Color(0xFFFF5A5F), Color(0xFFC62828)],
   );
+
+  /// Legacy alias.
+  static const LinearGradient accentGradient = greenGradient;
 
   static const LinearGradient backgroundGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [Color(0xFF16123A), Color(0xFF0B0A1F)],
+    colors: [Color(0xFF12142F), Color(0xFF07081A)],
   );
 
-  /// Radial felt used behind the game table.
+  /// Radial ambience behind the game table; tinted by whose turn it is.
+  static RadialGradient tableGradient(Color glow) => RadialGradient(
+        center: Alignment.center,
+        radius: 0.95,
+        colors: [
+          Color.lerp(glow, Colors.white, 0.06)!,
+          glow,
+          tableBase,
+        ],
+        stops: const [0.0, 0.45, 1.0],
+      );
+
+  /// Legacy alias used by the old game screen.
   static const RadialGradient feltGradient = RadialGradient(
     center: Alignment.center,
     radius: 0.9,
-    colors: [Color(0xFF255F4C), Color(0xFF0D2A22)],
+    colors: [Color(0xFF7F1418), Color(0xFF11132C)],
   );
 
   // ── Helpers ─────────────────────────────────────────────────
 
-  static Color forCardColor(String color) {
-    switch (color.toUpperCase()) {
-      case 'RED':
-        return cardRed;
-      case 'BLUE':
-        return cardBlue;
-      case 'GREEN':
-        return cardGreen;
-      case 'YELLOW':
-        return cardYellow;
-      default:
-        return cardWild;
-    }
-  }
+  static Color forCardColor(String color) => switch (color.toUpperCase()) {
+        'RED' => cardRed,
+        'BLUE' => cardBlue,
+        'GREEN' => cardGreen,
+        'YELLOW' => cardYellow,
+        _ => cardWild,
+      };
 
-  static Color forRarity(String rarity) {
-    switch (rarity.toUpperCase()) {
-      case 'RARE':
-        return rarityRare;
-      case 'EPIC':
-        return rarityEpic;
-      case 'LEGENDARY':
-        return rarityLegendary;
-      case 'MYTHIC':
-        return rarityMythic;
-      default:
-        return rarityCommon;
-    }
-  }
+  static Color forRarity(String rarity) => switch (rarity.toUpperCase()) {
+        'RARE' => rarityRare,
+        'EPIC' => rarityEpic,
+        'LEGENDARY' => rarityLegendary,
+        'MYTHIC' => rarityMythic,
+        _ => rarityCommon,
+      };
 
-  static Color forTier(String tier) {
-    switch (tier.toUpperCase()) {
-      case 'SILVER':
-        return tierSilver;
-      case 'GOLD':
-        return tierGold;
-      case 'PLATINUM':
-        return tierPlatinum;
-      case 'DIAMOND':
-        return tierDiamond;
-      case 'MASTER':
-        return tierMaster;
-      case 'GRANDMASTER':
-        return tierGrandmaster;
-      default:
-        return tierBronze;
-    }
-  }
+  static Color forTier(String tier) => switch (tier.toUpperCase()) {
+        'SILVER' => tierSilver,
+        'GOLD' => tierGold,
+        'PLATINUM' => tierPlatinum,
+        'DIAMOND' => tierDiamond,
+        'MASTER' => tierMaster,
+        'GRANDMASTER' => tierGrandmaster,
+        _ => tierBronze,
+      };
 
-  static Color forStatus(String status) {
-    switch (status.toUpperCase()) {
-      case 'ONLINE':
-        return statusOnline;
-      case 'IN_MATCH':
-        return statusInMatch;
-      case 'IN_LOBBY':
-        return statusInLobby;
-      case 'AWAY':
-        return statusAway;
-      case 'DO_NOT_DISTURB':
-        return statusDnd;
-      default:
-        return statusOffline;
-    }
-  }
+  static Color forStatus(String status) => switch (status.toUpperCase()) {
+        'ONLINE' => statusOnline,
+        'IN_MATCH' => statusInMatch,
+        'IN_LOBBY' => statusInLobby,
+        'AWAY' => statusAway,
+        'DO_NOT_DISTURB' => statusDnd,
+        _ => statusOffline,
+      };
 }

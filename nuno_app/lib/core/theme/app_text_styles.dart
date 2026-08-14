@@ -48,7 +48,11 @@ class AppTextStyles {
 
   // Emphasis
   static TextStyle get button =>
-      _display(17, FontWeight.w700, spacing: 0.6);
+      _display(15, FontWeight.w700, spacing: 0.6);
+
+  /// Centered uppercase title on a panel header strip.
+  static TextStyle get panelTitle =>
+      _body(12, FontWeight.w800, spacing: 1.4);
   static TextStyle get label => _body(12, FontWeight.w700,
       color: AppColors.textSecondary, spacing: 1.1);
   static TextStyle get numeric =>

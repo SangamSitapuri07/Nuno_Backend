@@ -5,7 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
 
-enum AppButtonVariant { primary, accent, gold, danger, outline, ghost }
+enum AppButtonVariant { primary, accent, gold, blue, green, danger, outline, ghost }
 
 enum AppButtonSize { small, medium, large }
 
@@ -57,6 +57,8 @@ class _AppButtonState extends State<AppButton> {
       AppButtonVariant.primary => AppColors.primaryGradient,
       AppButtonVariant.accent => AppColors.accentGradient,
       AppButtonVariant.gold => AppColors.goldGradient,
+      AppButtonVariant.blue => AppColors.blueGradient,
+      AppButtonVariant.green => AppColors.greenGradient,
       AppButtonVariant.danger => AppColors.dangerGradient,
       _ => null,
     };
@@ -75,7 +77,7 @@ class _AppButtonState extends State<AppButton> {
     if (!_enabled) return AppColors.textMuted;
     return switch (widget.variant) {
       AppButtonVariant.gold => const Color(0xFF3A2600),
-      AppButtonVariant.accent => const Color(0xFF00201C),
+      AppButtonVariant.accent => Colors.white,
       AppButtonVariant.outline => AppColors.textPrimary,
       AppButtonVariant.ghost => AppColors.textPrimary,
       _ => Colors.white,
@@ -88,6 +90,8 @@ class _AppButtonState extends State<AppButton> {
       AppButtonVariant.primary => AppColors.primary,
       AppButtonVariant.accent => AppColors.accent,
       AppButtonVariant.gold => AppColors.gold,
+      AppButtonVariant.blue => AppColors.blue,
+      AppButtonVariant.green => AppColors.green,
       AppButtonVariant.danger => AppColors.danger,
       _ => null,
     };

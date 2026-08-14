@@ -45,6 +45,9 @@ class GameUiState {
   /// Set while a play is in flight so the card can't be double-tapped.
   final String? pendingCardId;
 
+  /// Number of cards the local player was just forced to draw (screen 11).
+  final int? penaltyDraw;
+
   const GameUiState({
     this.game,
     this.turnSecondsLeft = AppConfig.turnTimerSeconds,
@@ -55,6 +58,7 @@ class GameUiState {
     this.isSyncing = true,
     this.unoCalledBy = const {},
     this.pendingCardId,
+    this.penaltyDraw,
   });
 
   GameUiState copyWith({
@@ -67,9 +71,11 @@ class GameUiState {
     bool? isSyncing,
     Set<String>? unoCalledBy,
     String? pendingCardId,
+    int? penaltyDraw,
     bool clearError = false,
     bool clearPending = false,
     bool clearResult = false,
+    bool clearPenalty = false,
   }) =>
       GameUiState(
         game: game ?? this.game,
@@ -81,6 +87,7 @@ class GameUiState {
         isSyncing: isSyncing ?? this.isSyncing,
         unoCalledBy: unoCalledBy ?? this.unoCalledBy,
         pendingCardId: clearPending ? null : (pendingCardId ?? this.pendingCardId),
+        penaltyDraw: clearPenalty ? null : (penaltyDraw ?? this.penaltyDraw),
       );
 
   bool get isFinished => result != null || (game?.isFinished ?? false);
@@ -143,9 +150,19 @@ class GameController extends StateNotifier<GameUiState> {
 
     sub(SocketEvents.playerDrewCard, (p) {
       final userId = J.strOrNull(p['userId']);
-      if (userId == null || userId == _myId) return;
-      final name = state.game?.playerInfo(userId).username ?? 'Player';
       final count = J.int_(p['count'], 1);
+
+      // The server sends the payload without `userId` to the drawer itself.
+      if (userId == null) {
+        // 2+ cards means a +2 / +4 penalty rather than a normal draw.
+        if (count >= 2) {
+          state = state.copyWith(penaltyDraw: count);
+        }
+        return;
+      }
+
+      if (userId == _myId) return;
+      final name = state.game?.playerInfo(userId).username ?? 'Player';
       _pushToast(userId, name, 'drew $count card${count == 1 ? '' : 's'}');
     });
 
@@ -292,6 +309,8 @@ class GameController extends StateNotifier<GameUiState> {
   void declineRematch() => _socket.emit(SocketEvents.rematchDecline);
 
   void clearError() => state = state.copyWith(clearError: true);
+
+  void clearPenalty() => state = state.copyWith(clearPenalty: true);
 
   void reset() {
     _turnTimer?.cancel();

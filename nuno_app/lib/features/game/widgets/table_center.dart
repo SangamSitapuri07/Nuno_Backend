@@ -9,7 +9,8 @@ import '../../../data/models/enums.dart';
 import '../../../data/models/game_card.dart';
 import 'playing_card.dart';
 
-/// Draw pile + discard pile + active-colour indicator + direction arrows.
+/// Centre of the table: rotating direction ring, draw pile, discard pile and
+/// the "YOUR TURN" banner from screen 8.
 class TableCenter extends StatelessWidget {
   final GameCard? topCard;
   final CardColor currentColor;
@@ -17,6 +18,7 @@ class TableCenter extends StatelessWidget {
   final GameDirection direction;
   final bool canDraw;
   final VoidCallback onDraw;
+  final bool showYourTurn;
 
   const TableCenter({
     super.key,
@@ -26,109 +28,93 @@ class TableCenter extends StatelessWidget {
     required this.direction,
     required this.canDraw,
     required this.onDraw,
+    this.showYourTurn = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Direction ring behind the piles.
-        _DirectionRing(direction: direction, color: currentColor),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        if (showYourTurn) ...[
+          const _YourTurnBanner(),
+          const SizedBox(height: AppDimens.sm),
+        ],
+        Stack(
+          alignment: Alignment.center,
           children: [
-            // ── Draw pile ────────────────────────────────
-            Column(
+            _DirectionRing(direction: direction, color: currentColor),
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
+                // Draw pile
+                Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Depth shadows.
-                    Positioned(
-                      left: 4,
-                      top: 4,
-                      child: Opacity(
-                        opacity: 0.5,
-                        child: CardBackView(
-                          width: AppDimens.tableCardWidth * 0.92,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned(
+                          left: 3,
+                          top: 3,
+                          child: Opacity(
+                            opacity: 0.6,
+                            child: CardBackView(
+                              width: AppDimens.tableCardWidth * 0.9,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 2,
-                      top: 2,
-                      child: Opacity(
-                        opacity: 0.75,
-                        child: CardBackView(
-                          width: AppDimens.tableCardWidth * 0.92,
+                        CardBackView(
+                          width: AppDimens.tableCardWidth * 0.9,
+                          isHighlighted: canDraw,
+                          onTap: canDraw ? onDraw : null,
                         ),
-                      ),
+                      ],
                     ),
-                    CardBackView(
-                      width: AppDimens.tableCardWidth * 0.92,
-                      isHighlighted: canDraw,
-                      onTap: canDraw ? onDraw : null,
+                    const SizedBox(height: 4),
+                    Text(
+                      '$drawPileCount',
+                      style: AppTextStyles.caption.copyWith(fontSize: 9),
                     ),
                   ],
                 ),
-                const SizedBox(height: AppDimens.sm),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.sm,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    borderRadius: AppDimens.brPill,
-                  ),
-                  child: Text(
-                    '$drawPileCount left',
-                    style: AppTextStyles.caption.copyWith(fontSize: 10),
-                  ),
-                ),
-              ],
-            ),
 
-            const SizedBox(width: AppDimens.xl),
+                const SizedBox(width: AppDimens.lg),
 
-            // ── Discard pile ─────────────────────────────
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 320),
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: Tween(begin: 0.7, end: 1.0).animate(
-                      CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOutBack,
-                      ),
-                    ),
-                    child: FadeTransition(opacity: animation, child: child),
-                  ),
-                  child: topCard == null
-                      ? _EmptyDiscardSlot(
-                          key: const ValueKey('empty'),
-                        )
-                      : Transform.rotate(
-                          key: ValueKey(topCard!.cardId),
-                          angle: -0.06,
-                          child: PlayingCardView(
-                            card: topCard!,
-                            width: AppDimens.tableCardWidth,
-                            // Show the chosen colour for played wilds.
-                            overrideColor: topCard!.color.isWild &&
-                                    !currentColor.isWild
-                                ? currentColor
-                                : null,
+                // Discard pile
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder: (child, animation) => ScaleTransition(
+                        scale: Tween(begin: 0.75, end: 1.0).animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutBack,
                           ),
                         ),
+                        child: FadeTransition(opacity: animation, child: child),
+                      ),
+                      child: topCard == null
+                          ? const _EmptySlot(key: ValueKey('empty'))
+                          : Transform.rotate(
+                              key: ValueKey(topCard!.cardId),
+                              angle: -0.05,
+                              child: PlayingCardView(
+                                card: topCard!,
+                                width: AppDimens.tableCardWidth,
+                                overrideColor: topCard!.color.isWild &&
+                                        !currentColor.isWild
+                                    ? currentColor
+                                    : null,
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 4),
+                    _ColorDot(color: currentColor),
+                  ],
                 ),
-                const SizedBox(height: AppDimens.sm),
-                _ActiveColorPill(color: currentColor),
               ],
             ),
           ],
@@ -138,8 +124,50 @@ class TableCenter extends StatelessWidget {
   }
 }
 
-class _EmptyDiscardSlot extends StatelessWidget {
-  const _EmptyDiscardSlot({super.key});
+class _YourTurnBanner extends StatefulWidget {
+  const _YourTurnBanner();
+
+  @override
+  State<_YourTurnBanner> createState() => _YourTurnBannerState();
+}
+
+class _YourTurnBannerState extends State<_YourTurnBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween(begin: 0.65, end: 1.0).animate(_c),
+      child: Text(
+        'YOUR TURN',
+        style: AppTextStyles.h4.copyWith(
+          color: const Color(0xFF7CFFA8),
+          letterSpacing: 2,
+          fontSize: 13,
+          shadows: [
+            Shadow(
+              color: AppColors.green.withValues(alpha: 0.9),
+              blurRadius: 14,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptySlot extends StatelessWidget {
+  const _EmptySlot({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -147,61 +175,39 @@ class _EmptyDiscardSlot extends StatelessWidget {
       width: AppDimens.tableCardWidth,
       height: AppDimens.tableCardHeight,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.2),
+        color: Colors.black.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(AppDimens.tableCardWidth * 0.14),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
-          width: 1.5,
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
       ),
     );
   }
 }
 
-class _ActiveColorPill extends StatelessWidget {
+class _ColorDot extends StatelessWidget {
   final CardColor color;
 
-  const _ActiveColorPill({required this.color});
+  const _ColorDot({required this.color});
 
   @override
   Widget build(BuildContext context) {
     final swatch = AppColors.forCardColor(color.wire);
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.md,
-        vertical: 4,
-      ),
+      duration: const Duration(milliseconds: 280),
+      width: 34,
+      height: 6,
       decoration: BoxDecoration(
-        color: swatch.withValues(alpha: 0.22),
+        color: swatch,
         borderRadius: AppDimens.brPill,
-        border: Border.all(color: swatch, width: 1.4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(color: swatch, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            color.isWild ? 'ANY' : color.label.toUpperCase(),
-            style: AppTextStyles.caption.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 10,
-            ),
-          ),
+        boxShadow: [
+          BoxShadow(color: swatch.withValues(alpha: 0.7), blurRadius: 8),
         ],
       ),
     );
   }
 }
 
-/// Rotating dashed ring indicating play direction.
+/// Rotating dashed ring showing play direction.
 class _DirectionRing extends StatefulWidget {
   final GameDirection direction;
   final CardColor color;
@@ -214,30 +220,30 @@ class _DirectionRing extends StatefulWidget {
 
 class _DirectionRingState extends State<_DirectionRing>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
+  late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 12),
+    duration: const Duration(seconds: 14),
   )..repeat();
 
   @override
   void dispose() {
-    _controller.dispose();
+    _c.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final swatch = AppColors.forCardColor(widget.color.wire);
-    final sign =
-        widget.direction == GameDirection.clockwise ? 1.0 : -1.0;
+    final sign = widget.direction == GameDirection.clockwise ? 1.0 : -1.0;
 
     return AnimatedBuilder(
-      animation: _controller,
+      animation: _c,
       builder: (context, _) => Transform.rotate(
-        angle: _controller.value * 2 * math.pi * sign,
+        angle: _c.value * 2 * math.pi * sign,
         child: CustomPaint(
-          size: const Size(230, 230),
-          painter: _RingPainter(color: swatch),
+          size: const Size(190, 150),
+          painter: _RingPainter(
+            color: AppColors.forCardColor(widget.color.wire),
+          ),
         ),
       ),
     );
@@ -251,26 +257,21 @@ class _RingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final centre = size.center(Offset.zero);
-    final radius = size.width / 2;
+    final rect = Rect.fromCenter(
+      center: size.center(Offset.zero),
+      width: size.width,
+      height: size.height,
+    );
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
+      ..strokeWidth = 2
       ..strokeCap = StrokeCap.round
-      ..color = color.withValues(alpha: 0.30);
+      ..color = color.withValues(alpha: 0.28);
 
-    // Dashed circle: 16 arcs.
-    const segments = 16;
-    const sweep = (2 * math.pi / segments) * 0.55;
+    const segments = 20;
+    const sweep = (2 * math.pi / segments) * 0.5;
     for (var i = 0; i < segments; i++) {
-      final start = (2 * math.pi / segments) * i;
-      canvas.drawArc(
-        Rect.fromCircle(center: centre, radius: radius),
-        start,
-        sweep,
-        false,
-        paint,
-      );
+      canvas.drawArc(rect, (2 * math.pi / segments) * i, sweep, false, paint);
     }
   }
 

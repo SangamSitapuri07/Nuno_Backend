@@ -10,7 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/widgets/app_background.dart';
+import '../../core/widgets/titled_panel.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
@@ -145,7 +145,13 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 
     if (widget.embedded) return content;
 
-    return Scaffold(body: AppBackground(child: content));
+    return PanelScreen(
+      title: 'Friends',
+      onBack: () => context.pop(),
+      maxWidth: 640,
+      padding: EdgeInsets.zero,
+      child: SizedBox(height: 262, child: content),
+    );
   }
 }
 
@@ -197,7 +203,7 @@ class _FriendsTab extends ConsumerWidget {
               AppDimens.xl,
               0,
               AppDimens.xl,
-              AppDimens.bottomNavHeight + AppDimens.xl,
+              AppDimens.bottomNavHeight,
             ),
             itemCount: sorted.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppDimens.md),
@@ -371,7 +377,7 @@ class _RequestsTab extends ConsumerWidget {
             AppDimens.xl,
             0,
             AppDimens.xl,
-            AppDimens.bottomNavHeight + AppDimens.xl,
+            AppDimens.bottomNavHeight,
           ),
           itemCount: list.length,
           separatorBuilder: (_, __) => const SizedBox(height: AppDimens.md),
@@ -547,7 +553,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
                         AppDimens.xl,
                         0,
                         AppDimens.xl,
-                        AppDimens.bottomNavHeight + AppDimens.xl,
+                        AppDimens.bottomNavHeight,
                       ),
                       itemCount: _results.length,
                       separatorBuilder: (_, __) =>

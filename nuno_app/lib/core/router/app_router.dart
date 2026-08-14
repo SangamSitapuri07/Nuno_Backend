@@ -10,11 +10,19 @@ import '../../features/auth/splash_screen.dart';
 import '../../features/friends/friends_screen.dart';
 import '../../features/game/game_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/home/play_menu_screen.dart';
 import '../../features/leaderboard/leaderboard_screen.dart';
+import '../../features/lobby/create_room_screen.dart';
+import '../../features/lobby/join_room_screen.dart';
 import '../../features/lobby/lobby_screen.dart';
 import '../../features/matchmaking/matchmaking_screen.dart';
+import '../../features/profile/achievements_screen.dart';
+import '../../features/profile/match_history_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/settings/notifications_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/settings/tutorial_screen.dart';
+import '../../features/store/daily_rewards_screen.dart';
 import '../../features/store/store_screen.dart';
 
 class AppRoutes {
@@ -23,15 +31,26 @@ class AppRoutes {
   static const splash = '/';
   static const login = '/login';
   static const register = '/register';
+
   static const home = '/home';
+  static const playMenu = '/play';
+  static const createRoom = '/play/create';
+  static const joinRoom = '/play/join';
+  static const matchHistory = '/play/history';
+
   static const matchmaking = '/matchmaking';
   static const lobby = '/lobby';
   static const game = '/game';
+
   static const friends = '/friends';
   static const leaderboard = '/leaderboard';
   static const store = '/store';
+  static const dailyRewards = '/store/daily';
   static const profile = '/profile';
+  static const achievements = '/profile/achievements';
   static const settings = '/settings';
+  static const notifications = '/notifications';
+  static const tutorial = '/tutorial';
 }
 
 /// Rebuilds GoRouter's redirect whenever auth status flips.
@@ -55,19 +74,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final auth = ref.read(authControllerProvider);
       final loc = state.matchedLocation;
 
-      // Hold on the splash until the session is resolved.
       if (auth.status == AuthStatus.unknown) {
         return loc == AppRoutes.splash ? null : AppRoutes.splash;
       }
 
-      final isAuthRoute =
-          loc == AppRoutes.login || loc == AppRoutes.register;
+      final isAuthRoute = loc == AppRoutes.login || loc == AppRoutes.register;
 
-      if (!auth.isLoggedIn) {
-        return isAuthRoute ? null : AppRoutes.login;
-      }
-
-      // Signed in: keep them out of splash/auth screens.
+      if (!auth.isLoggedIn) return isAuthRoute ? null : AppRoutes.login;
       if (isAuthRoute || loc == AppRoutes.splash) return AppRoutes.home;
 
       return null;
@@ -79,54 +92,89 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.login,
-        pageBuilder: (_, state) =>
-            _fade(state, const LoginScreen()),
+        pageBuilder: (_, s) => _fade(s, const LoginScreen()),
       ),
       GoRoute(
         path: AppRoutes.register,
-        pageBuilder: (_, state) =>
-            _slide(state, const RegisterScreen()),
+        pageBuilder: (_, s) => _slide(s, const RegisterScreen()),
       ),
+
+      // ── Main shell ────────────────────────────────
       GoRoute(
         path: AppRoutes.home,
-        pageBuilder: (_, state) => _fade(state, const HomeShell()),
+        pageBuilder: (_, s) => _fade(s, const HomeShell()),
+      ),
+
+      // ── Play flow ─────────────────────────────────
+      GoRoute(
+        path: AppRoutes.playMenu,
+        pageBuilder: (_, s) => _slide(s, const PlayMenuScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.createRoom,
+        pageBuilder: (_, s) => _slide(s, const CreateRoomScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.joinRoom,
+        pageBuilder: (_, s) => _slide(s, const JoinRoomScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.matchHistory,
+        pageBuilder: (_, s) => _slide(s, const MatchHistoryScreen()),
       ),
       GoRoute(
         path: AppRoutes.matchmaking,
-        pageBuilder: (_, state) {
-          final mode = state.extra is GameMode
-              ? state.extra as GameMode
-              : GameMode.casual;
-          return _fade(state, MatchmakingScreen(mode: mode));
+        pageBuilder: (_, s) {
+          final mode =
+              s.extra is GameMode ? s.extra as GameMode : GameMode.casual;
+          return _fade(s, MatchmakingScreen(mode: mode));
         },
       ),
       GoRoute(
         path: AppRoutes.lobby,
-        pageBuilder: (_, state) => _slide(state, const LobbyScreen()),
+        pageBuilder: (_, s) => _slide(s, const LobbyScreen()),
       ),
       GoRoute(
         path: AppRoutes.game,
-        pageBuilder: (_, state) => _fade(state, const GameScreen()),
+        pageBuilder: (_, s) => _fade(s, const GameScreen()),
       ),
+
+      // ── Standalone destinations ───────────────────
       GoRoute(
         path: AppRoutes.friends,
-        pageBuilder: (_, state) => _slide(state, const FriendsScreen()),
+        pageBuilder: (_, s) => _slide(s, const FriendsScreen()),
       ),
       GoRoute(
         path: AppRoutes.leaderboard,
-        pageBuilder: (_, state) => _slide(state, const LeaderboardScreen()),
+        pageBuilder: (_, s) => _slide(s, const LeaderboardScreen()),
       ),
       GoRoute(
         path: AppRoutes.store,
-        pageBuilder: (_, state) => _slide(state, const StoreScreen()),
+        pageBuilder: (_, s) => _slide(s, const StoreScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.dailyRewards,
+        pageBuilder: (_, s) => _slide(s, const DailyRewardsScreen()),
       ),
       GoRoute(
         path: AppRoutes.profile,
-        pageBuilder: (_, state) => _slide(state, const ProfileScreen()),
+        pageBuilder: (_, s) => _slide(s, const ProfileScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.achievements,
+        pageBuilder: (_, s) => _slide(s, const AchievementsScreen()),
       ),
       GoRoute(
         path: AppRoutes.settings,
-        pageBuilder: (_, state) => _slide(state, const SettingsScreen()),
+        pageBuilder: (_, s) => _slide(s, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        pageBuilder: (_, s) => _slide(s, const NotificationsScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.tutorial,
+        pageBuilder: (_, s) => _slide(s, const TutorialScreen()),
       ),
     ],
   );
@@ -136,25 +184,21 @@ CustomTransitionPage _fade(GoRouterState state, Widget child) =>
     CustomTransitionPage(
       key: state.pageKey,
       child: child,
-      transitionDuration: const Duration(milliseconds: 240),
-      transitionsBuilder: (_, animation, __, child) =>
-          FadeTransition(opacity: animation, child: child),
+      transitionDuration: const Duration(milliseconds: 220),
+      transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
     );
 
 CustomTransitionPage _slide(GoRouterState state, Widget child) =>
     CustomTransitionPage(
       key: state.pageKey,
       child: child,
-      transitionDuration: const Duration(milliseconds: 280),
-      transitionsBuilder: (_, animation, __, child) {
-        final curved =
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      transitionDuration: const Duration(milliseconds: 260),
+      transitionsBuilder: (_, a, __, c) {
+        final curved = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
         return SlideTransition(
-          position: Tween(
-            begin: const Offset(0, 0.035),
-            end: Offset.zero,
-          ).animate(curved),
-          child: FadeTransition(opacity: curved, child: child),
+          position: Tween(begin: const Offset(0.03, 0), end: Offset.zero)
+              .animate(curved),
+          child: FadeTransition(opacity: curved, child: c),
         );
       },
     );

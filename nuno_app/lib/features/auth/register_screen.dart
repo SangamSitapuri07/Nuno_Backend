@@ -4,13 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_dimens.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_background.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/app_text_field.dart';
+import '../../core/widgets/titled_panel.dart';
 import 'auth_controller.dart';
 
+/// Landscape registration: two form columns inside a titled panel.
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -59,55 +59,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: AppBackground(
-        child: SafeArea(
+    return PanelScreen(
+      title: 'Create Account',
+      onBack: () => context.pop(),
+      maxWidth: 640,
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Header ────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.lg,
-                  vertical: AppDimens.sm,
-                ),
-                child: Row(
-                  children: [
-                    AppIconButton(
-                      icon: Icons.arrow_back_rounded,
-                      onPressed: () => context.pop(),
-                    ),
-                    const SizedBox(width: AppDimens.md),
-                    Text('Create account', style: AppTextStyles.h3),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppDimens.xxl,
-                    AppDimens.lg,
-                    AppDimens.xxl,
-                    AppDimens.xxl,
-                  ),
-                  child: Form(
-                    key: _formKey,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'Join the table',
-                          style: AppTextStyles.h1,
-                        ),
-                        const SizedBox(height: AppDimens.xs),
-                        Text(
-                          'Pick a name, climb the ranks and beat your friends.',
-                          style: AppTextStyles.bodySm,
-                        ),
-
-                        const SizedBox(height: AppDimens.xxxl),
-
                         AppTextField(
                           controller: _username,
                           label: 'Username',
@@ -117,8 +84,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           validator: Validators.username,
                           enabled: !auth.isBusy,
                         ),
-                        const SizedBox(height: AppDimens.xl),
-
+                        const SizedBox(height: AppDimens.md),
                         AppTextField(
                           controller: _email,
                           label: 'Email',
@@ -128,12 +94,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           validator: Validators.email,
                           enabled: !auth.isBusy,
                         ),
-                        const SizedBox(height: AppDimens.xl),
-
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppDimens.lg),
+                  Expanded(
+                    child: Column(
+                      children: [
                         AppTextField(
                           controller: _password,
                           label: 'Password',
-                          hint: 'Create a strong password',
+                          hint: 'Strong password',
                           icon: Icons.lock_outline_rounded,
                           obscure: true,
                           validator: Validators.password,
@@ -141,14 +112,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               setState(() => _passwordValue = v),
                           enabled: !auth.isBusy,
                         ),
-                        PasswordStrengthHints(password: _passwordValue),
-
-                        const SizedBox(height: AppDimens.xl),
-
+                        const SizedBox(height: AppDimens.md),
                         AppTextField(
                           controller: _confirm,
                           label: 'Confirm password',
-                          hint: 'Repeat your password',
+                          hint: 'Repeat password',
                           icon: Icons.lock_reset_rounded,
                           obscure: true,
                           textInputAction: TextInputAction.done,
@@ -158,31 +126,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           onSubmitted: (_) => _submit(),
                           enabled: !auth.isBusy,
                         ),
-
-                        const SizedBox(height: AppDimens.xxxl),
-
-                        AppButton(
-                          label: 'CREATE ACCOUNT',
-                          icon: Icons.rocket_launch_rounded,
-                          isLoading: auth.isBusy,
-                          onPressed: auth.isBusy ? null : _submit,
-                        ),
-
-                        const SizedBox(height: AppDimens.lg),
-
-                        Center(
-                          child: TextButton(
-                            onPressed:
-                                auth.isBusy ? null : () => context.pop(),
-                            child: Text(
-                              'I already have an account',
-                              style: AppTextStyles.body,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
+                ],
+              ),
+              PasswordStrengthHints(password: _passwordValue),
+              const SizedBox(height: AppDimens.lg),
+              SizedBox(
+                width: 260,
+                child: AppButton(
+                  label: 'CREATE ACCOUNT',
+                  icon: Icons.rocket_launch_rounded,
+                  variant: AppButtonVariant.gold,
+                  isLoading: auth.isBusy,
+                  onPressed: auth.isBusy ? null : _submit,
                 ),
               ),
             ],

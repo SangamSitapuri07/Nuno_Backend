@@ -17,10 +17,17 @@ void main() {
     ),
   );
 
+  // The reference design is landscape-only.
   SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
+
+  // Full-bleed game canvas.
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.immersiveSticky,
+    overlays: [],
+  );
 
   runApp(const ProviderScope(child: NunoApp()));
 }

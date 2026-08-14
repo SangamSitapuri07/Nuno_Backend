@@ -6,7 +6,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_background.dart';
+import '../../core/widgets/titled_panel.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
@@ -125,7 +125,14 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     );
 
     if (widget.embedded) return content;
-    return Scaffold(body: AppBackground(child: content));
+
+    return PanelScreen(
+      title: 'Leaderboard',
+      onBack: () => context.pop(),
+      maxWidth: 640,
+      padding: EdgeInsets.zero,
+      child: SizedBox(height: 262, child: content),
+    );
   }
 }
 
@@ -239,7 +246,7 @@ class _LeaderboardList extends ConsumerWidget {
               AppDimens.xl,
               0,
               AppDimens.xl,
-              AppDimens.bottomNavHeight + AppDimens.xl,
+              AppDimens.bottomNavHeight,
             ),
             children: [
               if (podium.length >= 3) ...[

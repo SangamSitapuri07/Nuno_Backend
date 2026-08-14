@@ -31,15 +31,16 @@ class AppDimens {
   static const BorderRadius brPill =
       BorderRadius.all(Radius.circular(radiusPill));
 
-  // Screen padding
+  // Screen padding (landscape keeps vertical space tight)
   static const EdgeInsets screenPadding =
-      EdgeInsets.symmetric(horizontal: xl, vertical: lg);
+      EdgeInsets.symmetric(horizontal: xl, vertical: md);
 
   // Component sizes
-  static const double buttonHeight = 54;
+  static const double buttonHeight = 46;
   static const double inputHeight = 56;
-  static const double appBarHeight = 60;
-  static const double bottomNavHeight = 72;
+  static const double appBarHeight = 52;
+  static const double bottomNavHeight = 62;
+  static const double panelHeaderHeight = 34;
   static const double avatarSm = 32;
   static const double avatarMd = 44;
   static const double avatarLg = 64;
@@ -47,9 +48,12 @@ class AppDimens {
 
   // Playing card geometry (aspect ratio 2:3)
   static const double cardAspectRatio = 0.68;
-  static const double handCardWidth = 78;
+
+  // Landscape: the hand sits in a short strip, so cards are compact.
+  static const double handCardWidth = 54;
   static const double handCardHeight = handCardWidth / cardAspectRatio;
-  static const double tableCardWidth = 88;
+  static const double tableCardWidth = 60;
   static const double tableCardHeight = tableCardWidth / cardAspectRatio;
-  static const double miniCardWidth = 30;
+  static const double opponentCardWidth = 22;
+  static const double miniCardWidth = 22;
 }

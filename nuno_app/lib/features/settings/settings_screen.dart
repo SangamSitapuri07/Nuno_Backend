@@ -5,13 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/app_background.dart';
-import '../../core/widgets/app_button.dart';
-import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/side_nav.dart';
+import '../../core/widgets/titled_panel.dart';
 import '../../data/models/user_models.dart';
 
 final settingsProvider =
@@ -27,8 +27,8 @@ class SettingsNotifier extends AsyncNotifier<PlayerSettings> {
     return ref.read(userRepositoryProvider).getSettings();
   }
 
-  /// Optimistically applies the change, then persists it (debounced so slider
-  /// drags don't hammer PUT /api/v1/settings).
+  /// Applies optimistically, then persists (debounced so slider drags don't
+  /// hammer PUT /api/v1/settings).
   void update(PlayerSettings next, Map<String, dynamic> patch) {
     state = AsyncData(next);
     _debounce?.cancel();
@@ -36,7 +36,6 @@ class SettingsNotifier extends AsyncNotifier<PlayerSettings> {
       try {
         await ref.read(userRepositoryProvider).updateSettings(patch);
       } catch (_) {
-        // Reload the server truth if the write failed.
         state = await AsyncValue.guard(
           () => ref.read(userRepositoryProvider).getSettings(),
         );
@@ -45,226 +44,85 @@ class SettingsNotifier extends AsyncNotifier<PlayerSettings> {
   }
 }
 
-/// Audio, gameplay and account settings backed by PlayerSettings.
-class SettingsScreen extends ConsumerWidget {
+/// Screen 25 — Settings, with the reference's left sidebar:
+/// General · Audio · Controls · Notifications · Privacy.
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  int _section = 0;
+
+  static const _items = [
+    SideNavItem(Icons.tune_rounded, 'General'),
+    SideNavItem(Icons.volume_up_rounded, 'Audio'),
+    SideNavItem(Icons.gamepad_rounded, 'Controls'),
+    SideNavItem(Icons.notifications_rounded, 'Notifications'),
+    SideNavItem(Icons.shield_rounded, 'Privacy'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
 
-    return Scaffold(
-      body: AppBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppDimens.lg,
-                  AppDimens.sm,
-                  AppDimens.lg,
-                  AppDimens.md,
+    return PanelScreen(
+      title: 'Settings',
+      onBack: () => context.pop(),
+      maxWidth: 640,
+      padding: EdgeInsets.zero,
+      child: SizedBox(
+        height: 260,
+        child: Padding(
+          padding: const EdgeInsets.all(AppDimens.md),
+          child: settings.when(
+            loading: () => const LoadingView(),
+            error: (e, _) => ErrorStateView(
+              message: e.toString(),
+              onRetry: () => ref.invalidate(settingsProvider),
+            ),
+            data: (s) => Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SideNav(
+                  items: _items,
+                  index: _section,
+                  onChanged: (i) => setState(() => _section = i),
                 ),
-                child: Row(
-                  children: [
-                    AppIconButton(
-                      icon: Icons.arrow_back_rounded,
-                      onPressed: () => context.pop(),
-                    ),
-                    const SizedBox(width: AppDimens.md),
-                    Text('Settings', style: AppTextStyles.h2),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: settings.when(
-                  loading: () => const LoadingView(),
-                  error: (e, _) => ErrorStateView(
-                    message: e.toString(),
-                    onRetry: () => ref.invalidate(settingsProvider),
-                  ),
-                  data: (s) => ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimens.xl,
-                      0,
-                      AppDimens.xl,
-                      AppDimens.xxxl,
-                    ),
-                    children: [
-                      // ── Audio ─────────────────────────
-                      const SectionHeader(
-                        title: 'Audio',
-                        icon: Icons.volume_up_rounded,
-                      ),
-                      AppPanel(
-                        child: Column(
-                          children: [
-                            _VolumeSlider(
-                              label: 'Music',
-                              icon: Icons.music_note_rounded,
-                              value: s.musicVolume,
-                              onChanged: (v) => notifier.update(
-                                s.copyWith(musicVolume: v),
-                                {'musicVolume': v},
-                              ),
-                            ),
-                            const Divider(height: AppDimens.xxl),
-                            _VolumeSlider(
-                              label: 'Sound effects',
-                              icon: Icons.graphic_eq_rounded,
-                              value: s.soundVolume,
-                              onChanged: (v) => notifier.update(
-                                s.copyWith(soundVolume: v),
-                                {'soundVolume': v},
-                              ),
-                            ),
-                            const Divider(height: AppDimens.xxl),
-                            _VolumeSlider(
-                              label: 'Voice chat',
-                              icon: Icons.mic_rounded,
-                              value: s.voiceVolume,
-                              onChanged: (v) => notifier.update(
-                                s.copyWith(voiceVolume: v),
-                                {'voiceVolume': v},
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: AppDimens.xxl),
-
-                      // ── Gameplay ──────────────────────
-                      const SectionHeader(
-                        title: 'Gameplay',
-                        icon: Icons.sports_esports_rounded,
-                      ),
-                      AppPanel(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.lg,
-                          vertical: AppDimens.xs,
-                        ),
-                        child: Column(
-                          children: [
-                            _SettingSwitch(
-                              label: 'Push to talk',
-                              description:
-                                  'Hold a button to speak instead of open mic',
-                              icon: Icons.record_voice_over_rounded,
-                              value: s.pushToTalk,
-                              onChanged: (v) => notifier.update(
-                                s.copyWith(pushToTalk: v),
-                                {'pushToTalk': v},
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            _SettingSwitch(
-                              label: 'Notifications',
-                              description:
-                                  'Friend requests, invites and match alerts',
-                              icon: Icons.notifications_rounded,
-                              value: s.notifications,
-                              onChanged: (v) => notifier.update(
-                                s.copyWith(notifications: v),
-                                {'notifications': v},
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            _SettingSwitch(
-                              label: 'Dark mode',
-                              description: 'Use the dark table theme',
-                              icon: Icons.dark_mode_rounded,
-                              value: s.darkMode,
-                              onChanged: (v) => notifier.update(
-                                s.copyWith(darkMode: v),
-                                {'darkMode': v},
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: AppDimens.xxl),
-
-                      // ── Language ──────────────────────
-                      const SectionHeader(
-                        title: 'Language',
-                        icon: Icons.language_rounded,
-                      ),
-                      AppPanel(
-                        child: Wrap(
-                          spacing: AppDimens.sm,
-                          runSpacing: AppDimens.sm,
-                          children: [
-                            for (final entry in _languages.entries)
-                              GestureDetector(
-                                onTap: () => notifier.update(
-                                  s.copyWith(language: entry.key),
-                                  {'language': entry.key},
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppDimens.lg,
-                                    vertical: AppDimens.sm,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: s.language == entry.key
-                                        ? AppColors.primaryGradient
-                                        : null,
-                                    color: s.language == entry.key
-                                        ? null
-                                        : AppColors.background,
-                                    borderRadius: AppDimens.brPill,
-                                    border: Border.all(
-                                      color: s.language == entry.key
-                                          ? Colors.transparent
-                                          : AppColors.surfaceStroke,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    entry.value,
-                                    style: AppTextStyles.body.copyWith(
-                                      color: s.language == entry.key
-                                          ? Colors.white
-                                          : AppColors.textSecondary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: AppDimens.xxl),
-
-                      // ── About ─────────────────────────
-                      const SectionHeader(
-                        title: 'About',
-                        icon: Icons.info_outline_rounded,
-                      ),
-                      AppPanel(
-                        child: Column(
-                          children: [
-                            _InfoRow(label: 'Version', value: '1.0.0'),
-                            const SizedBox(height: AppDimens.md),
-                            _InfoRow(label: 'Game', value: 'Nuno'),
-                          ],
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: AppDimens.md),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: switch (_section) {
+                      1 => _AudioSection(settings: s, notifier: notifier),
+                      2 => _ControlsSection(settings: s, notifier: notifier),
+                      3 => _NotificationsSection(
+                          settings: s, notifier: notifier),
+                      4 => const _PrivacySection(),
+                      _ => _GeneralSection(settings: s, notifier: notifier),
+                    },
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  static const Map<String, String> _languages = {
+// ── Sections ──────────────────────────────────────────────────
+
+class _GeneralSection extends StatelessWidget {
+  final PlayerSettings settings;
+  final SettingsNotifier notifier;
+
+  const _GeneralSection({required this.settings, required this.notifier});
+
+  static const _languages = {
     'en': 'English',
     'es': 'Español',
     'fr': 'Français',
@@ -272,7 +130,268 @@ class SettingsScreen extends ConsumerWidget {
     'pt': 'Português',
     'hi': 'हिन्दी',
   };
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('LANGUAGE', style: AppTextStyles.label),
+        const SizedBox(height: AppDimens.sm),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final e in _languages.entries)
+              GestureDetector(
+                onTap: () => notifier.update(
+                  settings.copyWith(language: e.key),
+                  {'language': e.key},
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.md,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: settings.language == e.key
+                        ? AppColors.blue
+                        : AppColors.surfaceHigh,
+                    borderRadius: AppDimens.brPill,
+                    border: Border.all(
+                      color: settings.language == e.key
+                          ? AppColors.blue
+                          : AppColors.surfaceStroke,
+                    ),
+                  ),
+                  child: Text(
+                    e.value,
+                    style: AppTextStyles.body.copyWith(
+                      fontSize: 11,
+                      color: settings.language == e.key
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.lg),
+        _SettingRow(
+          label: 'Dark mode',
+          value: settings.darkMode,
+          onChanged: (v) => notifier.update(
+            settings.copyWith(darkMode: v),
+            {'darkMode': v},
+          ),
+        ),
+        const SizedBox(height: AppDimens.lg),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Tutorial',
+                  style: AppTextStyles.body.copyWith(fontSize: 12)),
+            ),
+            TextButton(
+              onPressed: () => context.push(AppRoutes.tutorial),
+              child: Text(
+                'How to play',
+                style: AppTextStyles.bodySm.copyWith(color: AppColors.blue),
+              ),
+            ),
+          ],
+        ),
+        const Divider(height: AppDimens.xl),
+        Row(
+          children: [
+            Expanded(
+              child:
+                  Text('Version', style: AppTextStyles.body.copyWith(fontSize: 12)),
+            ),
+            Text('1.0.0', style: AppTextStyles.bodySm),
+          ],
+        ),
+      ],
+    );
+  }
 }
+
+class _AudioSection extends StatelessWidget {
+  final PlayerSettings settings;
+  final SettingsNotifier notifier;
+
+  const _AudioSection({required this.settings, required this.notifier});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _VolumeSlider(
+          label: 'Music',
+          icon: Icons.music_note_rounded,
+          value: settings.musicVolume,
+          onChanged: (v) => notifier.update(
+            settings.copyWith(musicVolume: v),
+            {'musicVolume': v},
+          ),
+        ),
+        _VolumeSlider(
+          label: 'SFX',
+          icon: Icons.graphic_eq_rounded,
+          value: settings.soundVolume,
+          onChanged: (v) => notifier.update(
+            settings.copyWith(soundVolume: v),
+            {'soundVolume': v},
+          ),
+        ),
+        _VolumeSlider(
+          label: 'Voice chat',
+          icon: Icons.mic_rounded,
+          value: settings.voiceVolume,
+          onChanged: (v) => notifier.update(
+            settings.copyWith(voiceVolume: v),
+            {'voiceVolume': v},
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ControlsSection extends StatelessWidget {
+  final PlayerSettings settings;
+  final SettingsNotifier notifier;
+
+  const _ControlsSection({required this.settings, required this.notifier});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _SettingRow(
+          label: 'Push to talk',
+          description: 'Hold a button to speak',
+          value: settings.pushToTalk,
+          onChanged: (v) => notifier.update(
+            settings.copyWith(pushToTalk: v),
+            {'pushToTalk': v},
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NotificationsSection extends StatelessWidget {
+  final PlayerSettings settings;
+  final SettingsNotifier notifier;
+
+  const _NotificationsSection({
+    required this.settings,
+    required this.notifier,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _SettingRow(
+          label: 'Push notifications',
+          description: 'Invites, requests and match alerts',
+          value: settings.notifications,
+          onChanged: (v) => notifier.update(
+            settings.copyWith(notifications: v),
+            {'notifications': v},
+          ),
+        ),
+        const SizedBox(height: AppDimens.md),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Inbox',
+                  style: AppTextStyles.body.copyWith(fontSize: 12)),
+            ),
+            TextButton(
+              onPressed: () => context.push(AppRoutes.notifications),
+              child: Text(
+                'View all',
+                style: AppTextStyles.bodySm.copyWith(color: AppColors.blue),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PrivacySection extends ConsumerWidget {
+  const _PrivacySection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('BLOCKED PLAYERS', style: AppTextStyles.label),
+        const SizedBox(height: AppDimens.sm),
+        FutureBuilder<List<String>>(
+          future: ref.read(socialRepositoryProvider).getBlockedPlayers(),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const SkeletonBox(height: 40);
+            }
+            final blocked = snap.data ?? const [];
+            if (blocked.isEmpty) {
+              return Text(
+                'You have not blocked anyone.',
+                style: AppTextStyles.bodySm,
+              );
+            }
+            return Column(
+              children: [
+                for (final id in blocked)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            id,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                AppTextStyles.body.copyWith(fontSize: 11),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await ref
+                                .read(socialRepositoryProvider)
+                                .unblockPlayer(id);
+                            if (context.mounted) {
+                              AppSnack.show(context, 'Unblocked');
+                            }
+                          },
+                          child: Text(
+                            'Unblock',
+                            style: AppTextStyles.caption
+                                .copyWith(color: AppColors.blue),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ── Shared controls ───────────────────────────────────────────
 
 class _VolumeSlider extends StatelessWidget {
   final String label;
@@ -289,85 +408,74 @@ class _VolumeSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: AppColors.textSecondary),
-            const SizedBox(width: AppDimens.sm),
-            Expanded(child: Text(label, style: AppTextStyles.body)),
-            Text(
-              '$value',
-              style: AppTextStyles.body.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppColors.accent,
-              ),
-            ),
-          ],
+        Icon(icon, size: 15, color: AppColors.textSecondary),
+        const SizedBox(width: AppDimens.sm),
+        SizedBox(
+          width: 74,
+          child: Text(label, style: AppTextStyles.body.copyWith(fontSize: 12)),
         ),
-        Slider(
-          value: value.toDouble(),
-          min: 0,
-          max: 100,
-          divisions: 20,
-          onChanged: (v) => onChanged(v.round()),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(trackHeight: 4),
+            child: Slider(
+              value: value.toDouble(),
+              min: 0,
+              max: 100,
+              divisions: 20,
+              onChanged: (v) => onChanged(v.round()),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 28,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.right,
+            style: AppTextStyles.caption.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
-class _SettingSwitch extends StatelessWidget {
+class _SettingRow extends StatelessWidget {
   final String label;
-  final String description;
-  final IconData icon;
+  final String? description;
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  const _SettingSwitch({
+  const _SettingRow({
     required this.label,
-    required this.description,
-    required this.icon,
+    this.description,
     required this.value,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppDimens.md),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.textSecondary),
-          const SizedBox(width: AppDimens.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppTextStyles.body),
-                Text(description, style: AppTextStyles.caption),
-              ],
-            ),
-          ),
-          Switch(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(label, style: AppTextStyles.body)),
-        Text(value, style: AppTextStyles.bodySm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: AppTextStyles.body.copyWith(fontSize: 12)),
+              if (description != null)
+                Text(description!,
+                    style: AppTextStyles.caption.copyWith(fontSize: 9)),
+            ],
+          ),
+        ),
+        Transform.scale(
+          scale: 0.8,
+          child: Switch(value: value, onChanged: onChanged),
+        ),
       ],
     );
   }
