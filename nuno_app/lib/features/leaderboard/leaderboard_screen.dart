@@ -52,62 +52,64 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
       bottom: false,
       child: Column(
         children: [
+          // ── One compact band: title, my rank, tabs ──
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppDimens.lg,
-              AppDimens.sm,
-              AppDimens.lg,
               AppDimens.md,
+              AppDimens.sm,
+              AppDimens.md,
+              AppDimens.sm,
             ),
             child: Row(
               children: [
                 if (!widget.embedded) ...[
                   AppIconButton(
                     icon: Icons.arrow_back_rounded,
+                    size: 34,
                     onPressed: () => context.pop(),
                   ),
-                  const SizedBox(width: AppDimens.md),
+                  const SizedBox(width: AppDimens.sm),
                 ],
-                Expanded(child: Text('Leaderboard', style: AppTextStyles.h2)),
+                // The rank card takes only the width it needs.
+                if (myRank != null)
+                  Flexible(child: _MyRankCard(rank: myRank))
+                else
+                  Expanded(
+                    child: Text('Leaderboard', style: AppTextStyles.h3),
+                  ),
+                const SizedBox(width: AppDimens.sm),
+                // Tabs sit beside it rather than on their own full-width row.
+                SizedBox(
+                  width: 190,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: AppDimens.brMd,
+                      border: Border.all(color: AppColors.surfaceStroke),
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: TabBar(
+                      controller: _tabs,
+                      indicator: const BoxDecoration(
+                        gradient: AppColors.blueGradient,
+                        borderRadius: AppDimens.brSm,
+                      ),
+                      dividerColor: Colors.transparent,
+                      labelPadding: EdgeInsets.zero,
+                      labelStyle: AppTextStyles.body.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      tabs: const [
+                        Tab(text: 'Global', height: 30),
+                        Tab(text: 'Friends', height: 30),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-
-          // ── My rank summary ─────────────────────────
-          if (myRank != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
-              child: _MyRankCard(rank: myRank),
-            ),
-
-          const SizedBox(height: AppDimens.lg),
-
-          // ── Tabs ────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: AppDimens.brMd,
-                border: Border.all(color: AppColors.surfaceStroke),
-              ),
-              padding: const EdgeInsets.all(4),
-              child: TabBar(
-                controller: _tabs,
-                indicator: const BoxDecoration(
-                  gradient: AppColors.blueGradient,
-                  borderRadius: AppDimens.brSm,
-                ),
-                dividerColor: Colors.transparent,
-                tabs: const [
-                  Tab(text: 'Global', height: 38),
-                  Tab(text: 'Friends', height: 38),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: AppDimens.lg),
 
           Expanded(
             child: TabBarView(
@@ -149,50 +151,54 @@ class _MyRankCard extends ConsumerWidget {
     final tierColor = AppColors.forTier(rank.tier.wire);
 
     return AppPanel(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.sm,
+        vertical: 5,
+      ),
       gradient: LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          tierColor.withValues(alpha: 0.20),
+          tierColor.withValues(alpha: 0.22),
           AppColors.surface,
         ],
       ),
       borderColor: tierColor.withValues(alpha: 0.45),
+      // Only as wide as its contents, so it no longer stretches the row.
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ArtImage(Art.tierShield(rank.tier.wire), height: 50),
-          const SizedBox(width: AppDimens.md),
-          Column(
-            children: [
-              Text('#${rank.globalRank ?? '-'}',
-                  style: AppTextStyles.h2.copyWith(color: tierColor)),
-              Text('RANK', style: AppTextStyles.caption),
-            ],
-          ),
-          const SizedBox(width: AppDimens.lg),
-          Container(width: 1, height: 38, color: AppColors.surfaceStroke),
-          const SizedBox(width: AppDimens.lg),
+          ArtImage(Art.tierShield(rank.tier.wire), height: 38),
+          const SizedBox(width: 6),
           PlayerAvatar(
             username: profile?.username ?? 'P',
             avatarUrl: profile?.avatarUrl,
-            size: 40,
+            size: 32,
           ),
-          const SizedBox(width: AppDimens.md),
-          Expanded(
+          const SizedBox(width: 6),
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   profile?.username ?? 'You',
-                  style: AppTextStyles.h4,
+                  style: AppTextStyles.h4.copyWith(fontSize: 14),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '${rank.tier.label} ${rank.division} · ${rank.rating}',
-                  style: AppTextStyles.caption.copyWith(color: tierColor),
+                  style: AppTextStyles.caption
+                      .copyWith(color: tierColor, fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
+          ),
+          const SizedBox(width: AppDimens.sm),
+          Text(
+            '#${rank.globalRank ?? '-'}',
+            style: AppTextStyles.h3.copyWith(color: tierColor, fontSize: 18),
           ),
         ],
       ),
@@ -218,7 +224,7 @@ class _LeaderboardList extends ConsumerWidget {
 
     return async.when(
       loading: () => ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+        padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
         itemCount: 8,
         itemBuilder: (_, __) => const Padding(
           padding: EdgeInsets.only(bottom: AppDimens.md),
@@ -247,19 +253,19 @@ class _LeaderboardList extends ConsumerWidget {
           onRefresh: () async => ref.invalidate(provider),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
-              AppDimens.xl,
+              AppDimens.md,
               0,
-              AppDimens.xl,
+              AppDimens.md,
               AppDimens.sm,
             ),
             children: [
               if (podium.length >= 3) ...[
                 _Podium(entries: podium),
-                const SizedBox(height: AppDimens.xl),
+                const SizedBox(height: AppDimens.md),
               ],
               for (final entry in (podium.length >= 3 ? rest : entries))
                 Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimens.md),
+                  padding: const EdgeInsets.only(bottom: 5),
                   child: _LeaderboardRow(
                     entry: entry,
                     isMe: entry.userId == myId,
@@ -288,11 +294,11 @@ class _Podium extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(child: _PodiumPillar(entry: second, place: 2, height: 78)),
+        Expanded(child: _PodiumPillar(entry: second, place: 2, height: 54)),
         const SizedBox(width: AppDimens.sm),
-        Expanded(child: _PodiumPillar(entry: first, place: 1, height: 104)),
+        Expanded(child: _PodiumPillar(entry: first, place: 1, height: 74)),
         const SizedBox(width: AppDimens.sm),
-        Expanded(child: _PodiumPillar(entry: third, place: 3, height: 62)),
+        Expanded(child: _PodiumPillar(entry: third, place: 3, height: 44)),
       ],
     );
   }
@@ -326,7 +332,7 @@ class _PodiumPillar extends StatelessWidget {
         PlayerAvatar(
           username: entry.username,
           avatarUrl: entry.avatarUrl,
-          size: place == 1 ? 60 : 48,
+          size: place == 1 ? 48 : 40,
           ringColor: _color,
         ),
         const SizedBox(height: AppDimens.sm),
@@ -385,28 +391,27 @@ class _LeaderboardRow extends StatelessWidget {
 
     return AppPanel(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.md,
-        vertical: AppDimens.md,
+        horizontal: AppDimens.sm,
+        vertical: 6,
       ),
       color: isMe ? AppColors.primary.withValues(alpha: 0.12) : null,
       borderColor: isMe ? AppColors.primary.withValues(alpha: 0.5) : null,
       child: Row(
         children: [
           SizedBox(
-            width: 32,
+            width: 26,
             child: Text(
               '${entry.rank}',
               textAlign: TextAlign.center,
               style: AppTextStyles.h4.copyWith(color: AppColors.textSecondary),
             ),
           ),
-          const SizedBox(width: AppDimens.sm),
           PlayerAvatar(
             username: entry.username,
             avatarUrl: entry.avatarUrl,
-            size: 38,
+            size: 32,
           ),
-          const SizedBox(width: AppDimens.md),
+          const SizedBox(width: AppDimens.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
