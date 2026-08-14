@@ -75,6 +75,8 @@ class HomeScreen extends ConsumerWidget {
               final panelWidth = (w * 0.29).clamp(200.0, 320.0);
               // Header shrinks on short canvases so the stage keeps room.
               final headerHeight = (h * 0.19).clamp(46.0, 66.0);
+              // PLAY is pinned bottom-right; the panel takes the rest.
+              final playHeight = (h * 0.27).clamp(64.0, 116.0);
 
               return Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -140,13 +142,19 @@ class HomeScreen extends ConsumerWidget {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  // Podium takes the space the chest leaves.
+                                  // Podium takes the space the chest leaves,
+                                  // nudged down so it clears the header.
                                   Expanded(
                                     flex: 7,
-                                    child: _FloatingAsset(
-                                      asset: Art.cardPodium,
-                                      onTap: () =>
-                                          context.push(AppRoutes.playMenu),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: AppDimens.xxl,
+                                      ),
+                                      child: _FloatingAsset(
+                                        asset: Art.cardPodium,
+                                        onTap: () =>
+                                            context.push(AppRoutes.playMenu),
+                                      ),
                                     ),
                                   ),
                                   Expanded(
@@ -168,23 +176,26 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Right column
+                          // Right column: friends fills from the top down to
+                          // PLAY, which sits bottom-right.
                           SizedBox(
                             width: panelWidth,
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Expanded(child: FriendsPanel()),
-                                SizedBox(
-                                  height: (h * 0.26).clamp(56.0, 104.0),
+                                Expanded(
                                   child: Padding(
                                     padding: const EdgeInsets.only(
-                                      top: AppDimens.sm,
-                                      bottom: AppDimens.xs,
+                                      bottom: AppDimens.sm,
                                     ),
-                                    child: _PlayButton(
-                                      onTap: () =>
-                                          context.push(AppRoutes.playMenu),
-                                    ),
+                                    child: const FriendsPanel(),
+                                  ),
+                                ),
+                                SizedBox(
+                                  height: playHeight,
+                                  child: _PlayButton(
+                                    onTap: () =>
+                                        context.push(AppRoutes.playMenu),
                                   ),
                                 ),
                               ],
