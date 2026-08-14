@@ -25,8 +25,8 @@ class CurrencyPill extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.md,
-          vertical: 5,
+          horizontal: AppDimens.lg,
+          vertical: 8,
         ),
         decoration: BoxDecoration(
           color: AppColors.backgroundAlt,
@@ -41,7 +41,12 @@ class CurrencyPill extends StatelessWidget {
               icon: Icons.monetization_on_rounded,
               value: coins,
             ),
-            const SizedBox(width: AppDimens.md),
+            Container(
+              width: 1,
+              height: 16,
+              margin: const EdgeInsets.symmetric(horizontal: AppDimens.md),
+              color: AppColors.surfaceStroke,
+            ),
             _Amount(
               color: AppColors.gem,
               icon: Icons.diamond_rounded,
@@ -70,12 +75,12 @@ class _Amount extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        Icon(icon, size: 19, color: color),
         const SizedBox(width: 5),
         Text(
           Formatters.compact(value),
           style: AppTextStyles.body.copyWith(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
           ),

@@ -24,7 +24,7 @@ class PlayMenuScreen extends ConsumerWidget {
         crossAxisCount: 2,
         mainAxisSpacing: AppDimens.md,
         crossAxisSpacing: AppDimens.md,
-        childAspectRatio: 2.5,
+        childAspectRatio: 2.2,
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _MenuTile(
@@ -113,13 +113,13 @@ class _MenuTileState extends State<_MenuTile> {
           child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: AppDimens.brSm,
                 ),
-                child: Icon(widget.icon, color: Colors.white, size: 20),
+                child: Icon(widget.icon, color: Colors.white, size: 26),
               ),
               const SizedBox(width: AppDimens.md),
               Expanded(
@@ -129,9 +129,9 @@ class _MenuTileState extends State<_MenuTile> {
                   children: [
                     Text(
                       widget.title,
-                      style: AppTextStyles.h4.copyWith(
+                      style: AppTextStyles.h3.copyWith(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: 18,
                         letterSpacing: 0.4,
                       ),
                     ),
@@ -140,9 +140,9 @@ class _MenuTileState extends State<_MenuTile> {
                       widget.subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption.copyWith(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 10,
+                      style: AppTextStyles.bodySm.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 12,
                       ),
                     ),
                   ],

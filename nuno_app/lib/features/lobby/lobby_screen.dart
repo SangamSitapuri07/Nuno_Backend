@@ -54,7 +54,7 @@ class LobbyScreen extends ConsumerWidget {
       },
       child: PanelScreen(
         title: 'Room Lobby',
-        maxWidth: 720,
+        maxWidth: 860,
         onBack: () {
           controller.leave();
           context.go(AppRoutes.home);
@@ -108,7 +108,7 @@ class _LobbyBody extends StatelessWidget {
       children: [
         // ── Left: code + card art ──────────────────
         SizedBox(
-          width: 190,
+          width: 260,
           child: Column(
             children: [
               Text('ROOM CODE', style: AppTextStyles.label),
@@ -134,7 +134,7 @@ class _LobbyBody extends StatelessWidget {
                     children: [
                       Text(
                         room.roomCode,
-                        style: AppTextStyles.h3.copyWith(letterSpacing: 3),
+                        style: AppTextStyles.h1.copyWith(letterSpacing: 6),
                       ),
                       const SizedBox(width: AppDimens.sm),
                       const Icon(Icons.copy_rounded,
@@ -150,7 +150,7 @@ class _LobbyBody extends StatelessWidget {
                   color: CardColor.red,
                   value: CardValue.eight,
                 ),
-                width: 74,
+                width: 104,
               ),
               const SizedBox(height: AppDimens.sm),
               if (state.isCountingDown)
@@ -165,7 +165,13 @@ class _LobbyBody extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(width: AppDimens.lg),
+        // Vertical divider, as in the concept render.
+        Container(
+          width: 1,
+          height: 200,
+          margin: const EdgeInsets.symmetric(horizontal: AppDimens.lg),
+          color: AppColors.surfaceStroke,
+        ),
 
         // ── Right: players + actions ───────────────
         Expanded(
@@ -179,7 +185,7 @@ class _LobbyBody extends StatelessWidget {
               ),
               const SizedBox(height: AppDimens.sm),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 176),
+                constraints: const BoxConstraints(maxHeight: 220),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -211,7 +217,7 @@ class _LobbyBody extends StatelessWidget {
                   Expanded(
                     child: AppButton(
                       label: 'INVITE FRIEND',
-                      size: AppButtonSize.small,
+                      size: AppButtonSize.medium,
                       variant: AppButtonVariant.ghost,
                       onPressed: () => InviteFriendsSheet.show(
                         context,
@@ -228,7 +234,7 @@ class _LobbyBody extends StatelessWidget {
                 label: isHost
                     ? 'START GAME'
                     : (isReady ? 'NOT READY' : 'READY UP'),
-                size: AppButtonSize.small,
+                size: AppButtonSize.medium,
                 variant: AppButtonVariant.gold,
                 onPressed: () => controller.setReady(!isReady),
               ),
@@ -257,7 +263,7 @@ class _PlayerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (player == null) {
       return Container(
-        height: 34,
+        height: 44,
         padding: const EdgeInsets.symmetric(horizontal: AppDimens.sm),
         decoration: BoxDecoration(
           color: AppColors.surfaceHigh.withValues(alpha: 0.4),
@@ -280,7 +286,7 @@ class _PlayerRow extends StatelessWidget {
 
     final p = player!;
     return Container(
-      height: 34,
+      height: 44,
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.sm),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh,
@@ -296,7 +302,7 @@ class _PlayerRow extends StatelessWidget {
           PlayerAvatar(
             username: p.username,
             avatarUrl: p.avatarUrl,
-            size: 22,
+            size: 30,
           ),
           const SizedBox(width: AppDimens.sm),
           Expanded(
@@ -304,7 +310,7 @@ class _PlayerRow extends StatelessWidget {
               isMe ? '${p.username} (You)' : p.username,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body.copyWith(fontSize: 12),
+              style: AppTextStyles.body.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
           if (p.isHost)
@@ -323,7 +329,7 @@ class _PlayerRow extends StatelessWidget {
               p.isReady
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked_rounded,
-              size: 15,
+              size: 22,
               color: p.isReady ? AppColors.green : AppColors.textMuted,
             ),
         ],

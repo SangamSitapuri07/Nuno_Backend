@@ -206,20 +206,26 @@ class _Item extends StatelessWidget {
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.lg,
-                    vertical: 4,
+                    horizontal: AppDimens.xxl,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.blue.withValues(alpha: 0.22)
-                        : Colors.transparent,
+                    color: isActive ? AppColors.blue : Colors.transparent,
                     borderRadius: AppDimens.brPill,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: AppColors.blue.withValues(alpha: 0.45),
+                              blurRadius: 14,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Icon(
                     isActive ? spec.active : spec.inactive,
-                    size: 19,
+                    size: 24,
                     color:
-                        isActive ? AppColors.blue : AppColors.textMuted,
+                        isActive ? Colors.white : AppColors.textMuted,
                   ),
                 ),
                 if (badge > 0)
@@ -257,8 +263,8 @@ class _Item extends StatelessWidget {
             Text(
               spec.label,
               style: AppTextStyles.caption.copyWith(
-                fontSize: 9,
-                color: isActive ? AppColors.blue : AppColors.textMuted,
+                fontSize: 12,
+                color: isActive ? Colors.white : AppColors.textMuted,
                 fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
               ),
             ),

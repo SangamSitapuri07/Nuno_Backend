@@ -40,7 +40,8 @@ class HomeScreen extends ConsumerWidget {
                 PlayerAvatar(
                   username: profile?.username ?? 'P',
                   avatarUrl: profile?.avatarUrl,
-                  size: 38,
+                  size: 46,
+                  level: profile?.level,
                   onTap: () => onNavigate?.call(4),
                 ),
                 const SizedBox(width: AppDimens.sm),
@@ -50,14 +51,11 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     Text(
                       profile?.username ?? 'Player',
-                      style: AppTextStyles.body.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
+                      style: AppTextStyles.h4.copyWith(fontSize: 17),
                     ),
                     Text(
                       'Lv. ${profile?.level ?? 1}',
-                      style: AppTextStyles.caption.copyWith(fontSize: 10),
+                      style: AppTextStyles.bodySm.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -113,7 +111,7 @@ class _PlayButtonState extends State<_PlayButton>
 
   @override
   Widget build(BuildContext context) {
-    final width = (MediaQuery.sizeOf(context).width * 0.42).clamp(260.0, 420.0);
+    final width = (MediaQuery.sizeOf(context).width * 0.56).clamp(320.0, 560.0);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -137,19 +135,19 @@ class _PlayButtonState extends State<_PlayButton>
                 // Card peeking out from behind the right edge, as in the
                 // reference's home screen.
                 Positioned(
-                  right: -14,
+                  right: -34,
                   child: Transform.rotate(
-                    angle: 0.22,
+                    angle: 0.14,
                     child: Container(
-                      width: 42,
-                      height: 62,
+                      width: 74,
+                      height: 108,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [Color(0xFF3B2E8F), Color(0xFF221A5C)],
                         ),
-                        borderRadius: BorderRadius.circular(7),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.55),
                           width: 2,
@@ -170,20 +168,26 @@ class _PlayButtonState extends State<_PlayButton>
                   width: width,
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppDimens.xxl,
-                    vertical: AppDimens.lg,
+                    vertical: AppDimens.xl,
                   ),
                   decoration: BoxDecoration(
                     gradient: AppColors.playGradient,
-                    borderRadius: AppDimens.brXl,
+                    borderRadius: BorderRadius.circular(38),
+                    // Bright neon rim, as in the concept render.
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.30),
-                      width: 2,
+                      color: const Color(0xFFFF6B70),
+                      width: 3,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.55),
+                        color: AppColors.primary.withValues(alpha: 0.75),
                         blurRadius: glow,
-                        spreadRadius: 1,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                        blurRadius: glow * 2.4,
+                        spreadRadius: 8,
                       ),
                     ],
                   ),
@@ -197,18 +201,14 @@ class _PlayButtonState extends State<_PlayButton>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
+                color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  width: 2,
-                ),
               ),
               child: const Icon(Icons.play_arrow_rounded,
-                  color: Colors.white, size: 28),
+                  color: AppColors.primary, size: 36),
             ),
             const SizedBox(width: AppDimens.lg),
             Column(
@@ -219,13 +219,13 @@ class _PlayButtonState extends State<_PlayButton>
                   'PLAY',
                   style: AppTextStyles.h1.copyWith(
                     color: Colors.white,
-                    fontSize: 34,
+                    fontSize: 46,
                     letterSpacing: 1.5,
                   ),
                 ),
                 Text(
                   'Quick Match',
-                  style: AppTextStyles.bodySm.copyWith(
+                  style: AppTextStyles.h4.copyWith(
                     color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),

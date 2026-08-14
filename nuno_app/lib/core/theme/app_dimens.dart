@@ -39,7 +39,7 @@ class AppDimens {
   static const double buttonHeight = 46;
   static const double inputHeight = 56;
   static const double appBarHeight = 52;
-  static const double bottomNavHeight = 62;
+  static const double bottomNavHeight = 74;
   static const double panelHeaderHeight = 34;
   static const double avatarSm = 32;
   static const double avatarMd = 44;
