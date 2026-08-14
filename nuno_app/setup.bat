@@ -39,7 +39,12 @@ call flutter analyze
 
 echo.
 echo === Setup complete ===
+echo --- Patching Android manifest ---
+if exist android\app\src\main\AndroidManifest.xml (
+  powershell -ExecutionPolicy Bypass -File "%~dp0fix_android.ps1"
+)
 echo.
+
 echo The app defaults to the hosted backend, so just run:
 echo   flutter run
 echo.
