@@ -154,10 +154,15 @@ class LobbyController extends StateNotifier<LobbyState> {
       if (p['reachable'] == true || !state.isConnecting) return;
       if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
       _settled();
+      // The transport's own reason is included: "connection refused" and a
+      // TLS or DNS failure need very different fixes, and hiding that turns
+      // every report into guesswork.
+      final detail = J.str(p['detail']).trim();
       state = state.copyWith(
         isConnecting: false,
-        error: 'Cannot reach the game server. Check your internet connection, '
-            'then try again.',
+        error: 'Cannot reach the game server at ${AppConfig.socketUrl}. '
+            'Check your internet connection, then try again.'
+            '${detail.isEmpty ? '' : '\n\n($detail)'}',
       );
     });
 

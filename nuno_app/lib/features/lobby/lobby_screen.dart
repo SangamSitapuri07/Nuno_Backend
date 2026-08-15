@@ -351,10 +351,22 @@ class _PlayerRow extends StatelessWidget {
 
 /// Live transport state, so the lobby spinner can say what it is waiting on
 /// instead of showing an identical message for every stage.
+/// `onStateChanged` is a broadcast stream, so a listener that subscribes after
+/// the socket has already settled receives nothing until the *next* change.
+/// The lobby usually opens in exactly that position, which made the spinner
+/// report "Connecting to the server..." while the socket was authenticated.
+/// Seeding with the current value keeps the label honest.
 final socketStateProvider = StreamProvider<SocketConnectionState>((ref) {
   final socket = ref.watch(socketServiceProvider);
-  return socket.onStateChanged;
+  return socket.onStateChanged.startWith(socket.state);
 });
+
+extension _StartWith<T> on Stream<T> {
+  Stream<T> startWith(T value) async* {
+    yield value;
+    yield* this;
+  }
+}
 
 /// Spinner that names the current stage. A silent spinner is impossible to
 /// diagnose from a screenshot, which is exactly how "stuck on Setting up the
