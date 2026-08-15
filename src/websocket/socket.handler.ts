@@ -6,6 +6,8 @@ import { initializeRoomHandlers } from '../rooms/room.handler';
 import { initializeGameHandlers } from '../gameplay/game.handler';
 import { initializeVoiceHandlers } from '../voice/voice.handler';
 import friendsService from '../friends/friends.service';
+import roomService from '../rooms/room.service';
+import redisClient from '../config/redis';
 import { SOCKET_EVENTS } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -210,7 +212,30 @@ export const initializeSocketHandlers = (io: Server): void => {
 
       if (socket.userId) {
         const isOffline = await removeSocketSession(socket, io);
+
         if (isOffline) {
+          // The player has no sockets left anywhere, so any lobby they were
+          // sitting in must release them. Without this the `player:room:` key
+          // outlives the connection and every later Create Room / Join Room
+          // fails with ALREADY_IN_ROOM until the key's one-hour TTL expires.
+          //
+          // A match in progress is deliberately left alone: game.handler owns
+          // that lifecycle and supports reconnecting into a running game.
+          try {
+            const inMatch = await redisClient.get(`match:player:${socket.userId}`);
+            if (!inMatch) {
+              const room = await roomService.leaveRoom(socket.userId);
+              if (room) {
+                io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to release room on disconnect', {
+              userId: socket.userId,
+              error,
+            });
+          }
+
           await friendsService.broadcastUserStatus(io, socket.userId, 'OFFLINE');
         }
       } else {

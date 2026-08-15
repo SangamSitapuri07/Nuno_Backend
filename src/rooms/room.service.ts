@@ -24,7 +24,7 @@ export class RoomService {
     input: CreateRoomInput
   ): Promise<Room> {
     // Check if player already in room
-    const existingRoom = await redisClient.get(`player:room:${userId}`);
+    const existingRoom = await this.resolveActiveRoom(userId);
     if (existingRoom) {
       throw { code: 'ALREADY_IN_ROOM', message: 'Already in a room.', status: 400 };
     }
@@ -78,7 +78,7 @@ export class RoomService {
     input: JoinRoomInput
   ): Promise<Room> {
     // Check if player already in room
-    const existingRoom = await redisClient.get(`player:room:${userId}`);
+    const existingRoom = await this.resolveActiveRoom(userId);
     if (existingRoom) {
       throw { code: 'PLAYER_ALREADY_IN_ROOM', message: 'Already in a room.', status: 400 };
     }
@@ -247,6 +247,33 @@ export class RoomService {
   // ─────────────────────────────────────────
   // SAVE ROOM
   // ─────────────────────────────────────────
+
+  /**
+   * Returns the room the player is genuinely still in, clearing the pointer
+   * when it has gone stale.
+   *
+   * `player:room:<id>` used to be able to outlive the room it names — the room
+   * is destroyed when the last player leaves, and a disconnect never released
+   * the pointer at all. With shared state that dangling key persists across
+   * restarts, and the player is locked out of creating or joining anything
+   * until its TTL lapses. Verifying the target still exists (and still lists
+   * the player) makes the lock self-healing.
+   */
+  private async resolveActiveRoom(userId: string): Promise<string | null> {
+    const roomId = await redisClient.get(`player:room:${userId}`);
+    if (!roomId) return null;
+
+    const room = await this.getRoom(roomId);
+    const stillListed = room?.players.some((p) => p.userId === userId);
+
+    if (!room || !stillListed) {
+      await redisClient.del(`player:room:${userId}`);
+      logger.info('Cleared a stale room pointer', { userId, roomId });
+      return null;
+    }
+
+    return roomId;
+  }
 
   async saveRoom(room: Room): Promise<void> {
     await redisClient.set(
