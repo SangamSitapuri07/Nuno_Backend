@@ -110,6 +110,11 @@ class SocketEvents {
   // System
   static const error = 'error';
   static const updateRequired = 'update.required';
+
+  /// Client-side only: emitted by SocketService, never sent by the backend.
+  /// Payload `{ reachable: bool, attempts: int, detail: String }`, so screens
+  /// can distinguish "the host is unreachable" from "the server is slow".
+  static const reachability = 'client.reachability';
 }
 
 /// Quick-chat presets sent via `chat.quick`.

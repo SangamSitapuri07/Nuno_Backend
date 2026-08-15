@@ -42,6 +42,15 @@ class SocketService {
   /// One refresh attempt per connection, reset once a handshake succeeds.
   bool _refreshAttempted = false;
 
+  /// Consecutive transport-level connect failures, reset on a real connect.
+  int _connectFailures = 0;
+  String? _lastConnectError;
+
+  /// Socket.IO reconnects on a 1s base delay, so this is a few seconds of
+  /// failures — long enough to ride out a blip, short enough that a phone
+  /// that simply cannot reach the host says so instead of spinning.
+  static const int _failuresBeforeReporting = 4;
+
   SocketService(this._tokenStorage);
 
   // ── Public surface ──────────────────────────────────────────
@@ -167,6 +176,9 @@ class SocketService {
     _socket!
       ..onConnect((_) async {
         debugPrint('[socket] connected');
+        _connectFailures = 0;
+        _lastConnectError = null;
+        _dispatch(SocketEvents.reachability, {'reachable': true});
         _setState(SocketConnectionState.connected);
         await _authenticate();
       })
@@ -177,6 +189,20 @@ class SocketService {
       ..onConnectError((e) {
         debugPrint('[socket] connect_error: $e');
         _setState(SocketConnectionState.disconnected);
+
+        // Socket.IO retries silently forever. Left alone that is
+        // indistinguishable from a slow server, so the caller sits on a
+        // spinner with no idea the transport is failing. Report it once the
+        // retries stop looking like an ordinary cold start.
+        _connectFailures++;
+        _lastConnectError = e?.toString();
+        if (_connectFailures == _failuresBeforeReporting) {
+          _dispatch(SocketEvents.reachability, {
+            'reachable': false,
+            'attempts': _connectFailures,
+            'detail': _lastConnectError ?? 'connection refused',
+          });
+        }
       })
       ..onError((e) => debugPrint('[socket] error: $e'));
 

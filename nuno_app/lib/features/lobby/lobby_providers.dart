@@ -147,6 +147,20 @@ class LobbyController extends StateNotifier<LobbyState> {
       _appendMessage(ChatMessage.fromJson(p));
     });
 
+    // The transport cannot reach the host at all. Waiting out the full
+    // watchdog here tells the user nothing, so fail immediately with the
+    // reason instead of holding the spinner.
+    sub(SocketEvents.reachability, (p) {
+      if (p['reachable'] == true || !state.isConnecting) return;
+      if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
+      _settled();
+      state = state.copyWith(
+        isConnecting: false,
+        error: 'Cannot reach the game server. Check your internet connection, '
+            'then try again.',
+      );
+    });
+
     sub(SocketEvents.error, (p) {
       if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
       _settled();
@@ -182,6 +196,11 @@ class LobbyController extends StateNotifier<LobbyState> {
 
     // Must outlast the socket's own handshake budget, otherwise a cold start
     // trips this before the connection has had its full chance to land.
+    //
+    // An unreachable host no longer has to wait this out: connect failures
+    // surface through `client.reachability` within a few seconds. This is
+    // only the backstop for a server that accepts the connection and then
+    // goes quiet.
     final budget = AppConfig.connectTimeout + const Duration(seconds: 15);
 
     _pendingTimeout = Timer(budget, () {
@@ -206,11 +225,20 @@ class LobbyController extends StateNotifier<LobbyState> {
     _awaitedEvent = null;
   }
 
+  /// The last create/join, replayed by [retryLast]. Both are idempotent
+  /// server-side, so repeating one cannot strand the player in a room.
+  void Function()? _lastRequest;
+
   void createRoom({
     GameMode mode = GameMode.private,
     int maxPlayers = 4,
     bool voiceEnabled = true,
   }) {
+    _lastRequest = () => createRoom(
+          mode: mode,
+          maxPlayers: maxPlayers,
+          voiceEnabled: voiceEnabled,
+        );
     state = const LobbyState(isConnecting: true);
     _awaitRoom(SocketEvents.roomCreate);
     _socket.emit(SocketEvents.roomCreate, {
@@ -221,9 +249,18 @@ class LobbyController extends StateNotifier<LobbyState> {
   }
 
   void joinRoom(String roomCode) {
+    _lastRequest = () => joinRoom(roomCode);
     state = const LobbyState(isConnecting: true);
     _awaitRoom(SocketEvents.roomJoin);
     _socket.emit(SocketEvents.roomJoin, {'roomCode': roomCode});
+  }
+
+  /// Re-runs the last create/join after a failure.
+  void retryLast() {
+    // Reconnect first: the usual failure is a transport that never came up,
+    // and connect() is a no-op on a live socket.
+    _socket.connect();
+    _lastRequest?.call();
   }
 
   void setReady(bool isReady) {
@@ -262,6 +299,13 @@ class LobbyController extends StateNotifier<LobbyState> {
     if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
     _settled();
     state = const LobbyState();
+  }
+
+  /// Full teardown, including the retry target. Used when leaving the lobby
+  /// for good rather than retrying inside it.
+  void clear() {
+    _lastRequest = null;
+    reset();
   }
 
   @override

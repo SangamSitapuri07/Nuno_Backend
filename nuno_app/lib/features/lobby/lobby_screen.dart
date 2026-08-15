@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -14,6 +15,7 @@ import '../../core/widgets/titled_panel.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/game_card.dart';
 import '../../data/models/room_models.dart';
+import '../../services/socket_service.dart';
 import '../auth/auth_controller.dart';
 import '../game/widgets/playing_card.dart';
 import 'lobby_providers.dart';
@@ -50,6 +52,7 @@ class LobbyScreen extends ConsumerWidget {
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         controller.leave();
+        controller.clear();
         context.go(AppRoutes.home);
       },
       child: PanelScreen(
@@ -57,6 +60,7 @@ class LobbyScreen extends ConsumerWidget {
         maxWidth: 860,
         onBack: () {
           controller.leave();
+          controller.clear();
           context.go(AppRoutes.home);
         },
         child: room == null
@@ -67,15 +71,18 @@ class LobbyScreen extends ConsumerWidget {
                         icon: Icons.meeting_room_outlined,
                         title: 'Could not join',
                         message: state.error,
-                        actionLabel: 'Back',
+                        // Retrying in place beats sending the user home: the
+                        // usual cause is a server still waking up, and the
+                        // create/join request is now safe to repeat.
+                        actionLabel: 'Try again',
                         onAction: () {
-                          // Clear the failed attempt, otherwise its error is
-                          // still in state the next time the lobby opens.
                           controller.reset();
-                          context.go(AppRoutes.home);
+                          controller.retryLast();
                         },
                       )
-                    : const LoadingView(label: 'Setting up the room...'),
+                    : _ConnectingView(
+                        state: ref.watch(socketStateProvider).valueOrNull,
+                      ),
               )
             : _LobbyBody(
                 room: room,
@@ -338,5 +345,35 @@ class _PlayerRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+
+/// Live transport state, so the lobby spinner can say what it is waiting on
+/// instead of showing an identical message for every stage.
+final socketStateProvider = StreamProvider<SocketConnectionState>((ref) {
+  final socket = ref.watch(socketServiceProvider);
+  return socket.onStateChanged;
+});
+
+/// Spinner that names the current stage. A silent spinner is impossible to
+/// diagnose from a screenshot, which is exactly how "stuck on Setting up the
+/// room..." kept getting reported without a cause.
+class _ConnectingView extends StatelessWidget {
+  final SocketConnectionState? state;
+
+  const _ConnectingView({this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (state) {
+      SocketConnectionState.disconnected ||
+      null =>
+        'Connecting to the server...',
+      SocketConnectionState.connecting => 'Connecting to the server...',
+      SocketConnectionState.connected => 'Signing in...',
+      SocketConnectionState.authenticated => 'Setting up the room...',
+    };
+    return LoadingView(label: label);
   }
 }
