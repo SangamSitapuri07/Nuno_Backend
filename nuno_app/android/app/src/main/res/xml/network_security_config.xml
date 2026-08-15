@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The hosted backend is https, so cleartext is not required for it. It stays
+  enabled because pointing the app at a local backend over plain http is a
+  normal part of development, for example by passing an API_BASE_URL of
+  http://192.168.1.5:3000 to flutter run.
+
+  Without this, Android silently blocks that request and the failure looks
+  identical to the server being unreachable.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
