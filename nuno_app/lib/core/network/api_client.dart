@@ -17,6 +17,11 @@ class ApiClient {
   final Dio _dio;
   final TokenStorage _tokenStorage;
 
+  /// Invoked after a refresh mints a new access token. The socket holds its
+  /// own copy from the handshake, so without this it keeps presenting the
+  /// expired one and every reconnect is rejected.
+  final Future<void> Function()? onTokenRefreshed;
+
   /// Invoked when refreshing fails and the user must log in again.
   final Future<void> Function()? onSessionExpired;
 
@@ -26,6 +31,7 @@ class ApiClient {
     required TokenStorage tokenStorage,
     Dio? dio,
     this.onSessionExpired,
+    this.onTokenRefreshed,
   })  : _tokenStorage = tokenStorage,
         _dio = dio ??
             Dio(
@@ -154,6 +160,7 @@ class ApiClient {
               accessToken: access,
               refreshToken: refresh,
             );
+            await onTokenRefreshed?.call();
             completer.complete(access);
             return;
           }

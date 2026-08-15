@@ -138,21 +138,45 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // changes and reconnects for as long as the shell is mounted.
     ref.watch(socketBootstrapProvider);
 
-    return Scaffold(
-      extendBody: true,
-      body: Listener(
+    // The tabs are an IndexedStack, not routes, so the system back gesture
+    // would otherwise leave the app from a sub-tab instead of returning Home.
+    return PopScope(
+      canPop: _isHome,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_isHome) _go(0);
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: Listener(
         // Any touch reveals the bar and restarts the idle countdown.
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => _revealNav(),
         child: DecoratedBox(
           decoration: const BoxDecoration(color: AppColors.background),
-          child: IndexedStack(
-            index: _index,
+          child: Stack(
             children: [
-              HomeScreen(onNavigate: _go, navIndex: _index),
-              const LeaderboardScreen(embedded: true),
-              const StoreScreen(embedded: true),
-              const ProfileScreen(embedded: true),
+              IndexedStack(
+                index: _index,
+                children: [
+                  HomeScreen(onNavigate: _go, navIndex: _index),
+                  const LeaderboardScreen(embedded: true),
+                  const StoreScreen(embedded: true),
+                  const ProfileScreen(embedded: true),
+                ],
+              ),
+
+              // The embedded tabs render without PanelScreen's chrome, so the
+              // shell supplies the only way back to Home. It floats above the
+              // tab rather than taking a row of its height, which these
+              // full-bleed landscape panels have no room to give up.
+              if (!_isHome)
+                Positioned(
+                  left: AppDimens.md,
+                  top: AppDimens.md,
+                  child: SafeArea(
+                    child: _BackButton(onTap: () => _go(0)),
+                  ),
+                ),
             ],
           ),
         ),
@@ -177,6 +201,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

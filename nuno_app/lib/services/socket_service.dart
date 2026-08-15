@@ -34,6 +34,11 @@ class SocketService {
 
   SocketConnectionState _state = SocketConnectionState.disconnected;
 
+  /// Called when the server rejects the handshake token. Wired to the REST
+  /// client's refresh so an expired access token recovers without the user
+  /// having to sign in again.
+  Future<void> Function()? onAuthRejected;
+
   SocketService(this._tokenStorage);
 
   // ── Public surface ──────────────────────────────────────────
@@ -181,6 +186,17 @@ class SocketService {
         message: (map['message'] ?? 'Something went wrong.').toString(),
       );
       debugPrint('[socket] ← error ${err.code}: ${err.message}');
+
+      // A rejected handshake leaves emits queued behind `isAuthenticated`
+      // with nothing left to release them, so treat it as a hard failure
+      // rather than a passing error the caller may ignore.
+      if (err.code == 'TOKEN_EXPIRED' || err.code == 'AUTH_FAILED') {
+        _authTimeout?.cancel();
+        _authTimeout = null;
+        _pendingEmits.clear();
+        onAuthRejected?.call();
+      }
+
       _errorController.add(err);
       _dispatch(SocketEvents.error, data);
     });
