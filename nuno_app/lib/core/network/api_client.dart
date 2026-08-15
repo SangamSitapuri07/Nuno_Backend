@@ -20,7 +20,10 @@ class ApiClient {
   /// Invoked after a refresh mints a new access token. The socket holds its
   /// own copy from the handshake, so without this it keeps presenting the
   /// expired one and every reconnect is rejected.
-  final Future<void> Function()? onTokenRefreshed;
+  ///
+  /// Assigned after construction (see sessionLinkProvider) because the socket
+  /// and this client each need a reference to the other.
+  Future<void> Function()? onTokenRefreshed;
 
   /// Invoked when refreshing fails and the user must log in again.
   final Future<void> Function()? onSessionExpired;
@@ -31,7 +34,6 @@ class ApiClient {
     required TokenStorage tokenStorage,
     Dio? dio,
     this.onSessionExpired,
-    this.onTokenRefreshed,
   })  : _tokenStorage = tokenStorage,
         _dio = dio ??
             Dio(
@@ -125,6 +127,18 @@ class ApiClient {
     }
 
     throw ApiException.fromResponse(body, status);
+  }
+
+  /// Renews the session on demand, for callers outside a request — the socket
+  /// uses this when the server rejects its handshake token. Returns whether a
+  /// usable access token is now stored.
+  Future<bool> refreshSession() async {
+    final token = await _refreshToken();
+    if (token == null) {
+      await onSessionExpired?.call();
+      return false;
+    }
+    return true;
   }
 
   /// Refreshes the access token. Concurrent callers share one in-flight call.

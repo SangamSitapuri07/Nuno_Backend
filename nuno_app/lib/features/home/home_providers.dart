@@ -165,6 +165,10 @@ final socketBootstrapProvider = Provider<void>((ref) {
   final isLoggedIn = ref.watch(authControllerProvider).isLoggedIn;
   final socket = ref.watch(socketServiceProvider);
 
+  // Must be resolved before the socket connects, otherwise a token refreshed
+  // mid-session never reaches the handshake.
+  ref.watch(sessionLinkProvider);
+
   if (isLoggedIn) {
     socket.connect();
   } else {

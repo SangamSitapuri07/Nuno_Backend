@@ -22,12 +22,6 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       await storage.clear();
       ref.read(sessionExpiredProvider.notifier).state++;
     },
-    onTokenRefreshed: () async {
-      // Re-run the handshake with the fresh token. The socket captured the
-      // old one when it connected, so it would otherwise keep failing auth
-      // and silently queue every gameplay emit behind it.
-      await ref.read(socketServiceProvider).reauthenticate();
-    },
   );
 });
 
@@ -37,21 +31,30 @@ final sessionExpiredProvider = StateProvider<int>((ref) => 0);
 /// Long-lived Socket.IO connection.
 final socketServiceProvider = Provider<SocketService>((ref) {
   final service = SocketService(ref.watch(tokenStorageProvider));
-
-  // A rejected handshake means the stored access token has aged out. Driving
-  // a REST call through the client triggers its refresh interceptor, which
-  // then calls back into reauthenticate(). Read lazily: apiClientProvider
-  // depends on this provider, so resolving it eagerly here would cycle.
-  service.onAuthRejected = () async {
-    try {
-      await ref.read(apiClientProvider).get('/profile');
-    } catch (_) {
-      // Refresh failed; onSessionExpired has already routed to login.
-    }
-  };
-
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Ties the REST session to the socket session.
+///
+/// The two halves need each other — a refreshed token has to reach the
+/// socket, and a handshake the server rejects has to trigger a refresh — but
+/// wiring that inside either provider would make them mutually dependent and
+/// Riverpod cannot infer a type through a cycle. Keeping the callbacks here
+/// leaves both providers standalone.
+final sessionLinkProvider = Provider<void>((ref) {
+  final api = ref.watch(apiClientProvider);
+  final socket = ref.watch(socketServiceProvider);
+
+  // A renewed access token is useless to a socket still presenting the copy
+  // it captured when it connected.
+  api.onTokenRefreshed = socket.reauthenticate;
+
+  // Conversely, a rejected handshake means the stored token has aged out;
+  // renewing it re-runs the handshake through the callback above.
+  socket.onAuthRejected = () async {
+    await api.refreshSession();
+  };
 });
 
 // ── Repositories ──────────────────────────────────────────────

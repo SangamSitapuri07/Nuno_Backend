@@ -39,6 +39,9 @@ class SocketService {
   /// having to sign in again.
   Future<void> Function()? onAuthRejected;
 
+  /// One refresh attempt per connection, reset once a handshake succeeds.
+  bool _refreshAttempted = false;
+
   SocketService(this._tokenStorage);
 
   // ── Public surface ──────────────────────────────────────────
@@ -172,6 +175,7 @@ class SocketService {
       debugPrint('[socket] authenticated');
       _authTimeout?.cancel();
       _authTimeout = null;
+      _refreshAttempted = false;
       _setState(SocketConnectionState.authenticated);
       _dispatch(SocketEvents.authenticated, data);
       _flushPending();
@@ -194,7 +198,14 @@ class SocketService {
         _authTimeout?.cancel();
         _authTimeout = null;
         _pendingEmits.clear();
-        onAuthRejected?.call();
+
+        // Renewing re-runs the handshake, so a token the server keeps
+        // refusing would otherwise loop. One attempt per connection is
+        // enough: a second rejection means the session is genuinely dead.
+        if (!_refreshAttempted && onAuthRejected != null) {
+          _refreshAttempted = true;
+          onAuthRejected!();
+        }
       }
 
       _errorController.add(err);
