@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/json.dart';
@@ -84,7 +85,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     }
 
     sub(SocketEvents.roomCreated, (p) {
-      _pendingTimeout?.cancel();
+      _settled();
       final room = GameRoom.fromJson(J.map(p['room']));
       state = state.copyWith(
         room: room,
@@ -95,7 +96,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     });
 
     sub(SocketEvents.roomJoined, (p) {
-      _pendingTimeout?.cancel();
+      _settled();
       state = state.copyWith(
         room: GameRoom.fromJson(J.map(p['room'])),
         isConnecting: false,
@@ -147,7 +148,8 @@ class LobbyController extends StateNotifier<LobbyState> {
     });
 
     sub(SocketEvents.error, (p) {
-      _pendingTimeout?.cancel();
+      if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
+      _settled();
       state = state.copyWith(
         error: J.str(p['message'], 'Something went wrong.'),
         isConnecting: false,
@@ -169,10 +171,27 @@ class LobbyController extends StateNotifier<LobbyState> {
   /// cannot sit on its loading state indefinitely.
   Timer? _pendingTimeout;
 
-  void _awaitRoom() {
+  /// The request this controller is currently waiting on, so a watchdog that
+  /// fires can withdraw it from the socket's queue instead of letting it land
+  /// unobserved and block every later attempt.
+  String? _awaitedEvent;
+
+  void _awaitRoom(String event) {
+    _awaitedEvent = event;
     _pendingTimeout?.cancel();
-    _pendingTimeout = Timer(const Duration(seconds: 45), () {
+
+    // Must outlast the socket's own handshake budget, otherwise a cold start
+    // trips this before the connection has had its full chance to land.
+    final budget = AppConfig.connectTimeout + const Duration(seconds: 15);
+
+    _pendingTimeout = Timer(budget, () {
       if (state.room != null || !state.isConnecting) return;
+
+      // Withdraw the queued request. If it were left in place it would fire
+      // on the next successful handshake and create an orphaned room.
+      _socket.cancelPending(event);
+      _awaitedEvent = null;
+
       state = state.copyWith(
         isConnecting: false,
         error: 'The server did not respond. It may still be waking up — '
@@ -181,13 +200,19 @@ class LobbyController extends StateNotifier<LobbyState> {
     });
   }
 
+  void _settled() {
+    _pendingTimeout?.cancel();
+    _pendingTimeout = null;
+    _awaitedEvent = null;
+  }
+
   void createRoom({
     GameMode mode = GameMode.private,
     int maxPlayers = 4,
     bool voiceEnabled = true,
   }) {
     state = const LobbyState(isConnecting: true);
-    _awaitRoom();
+    _awaitRoom(SocketEvents.roomCreate);
     _socket.emit(SocketEvents.roomCreate, {
       'gameMode': mode.wire,
       'maxPlayers': maxPlayers,
@@ -197,7 +222,7 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   void joinRoom(String roomCode) {
     state = const LobbyState(isConnecting: true);
-    _awaitRoom();
+    _awaitRoom(SocketEvents.roomJoin);
     _socket.emit(SocketEvents.roomJoin, {'roomCode': roomCode});
   }
 
@@ -210,6 +235,8 @@ class LobbyController extends StateNotifier<LobbyState> {
   }
 
   void leave() {
+    if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
+    _settled();
     _socket.emit(SocketEvents.roomLeave);
     state = const LobbyState();
   }
@@ -231,7 +258,11 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   void clearError() => state = state.copyWith(clearError: true);
 
-  void reset() => state = const LobbyState();
+  void reset() {
+    if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
+    _settled();
+    state = const LobbyState();
+  }
 
   @override
   void dispose() {

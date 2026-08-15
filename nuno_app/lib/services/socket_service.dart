@@ -112,6 +112,16 @@ class SocketService {
     _pendingEmits.add((event: event, payload: payload));
   }
 
+  /// Drops queued copies of [event] that a caller has given up waiting on.
+  ///
+  /// Without this a `room.create` that timed out on the client still fires the
+  /// moment the handshake lands, creating a room nobody is watching. The next
+  /// attempt then collides with it, which is what made "Create Room" fail
+  /// permanently after one slow start.
+  void cancelPending(String event) {
+    _pendingEmits.removeWhere((e) => e.event == event);
+  }
+
   void _flushPending() {
     if (_pendingEmits.isEmpty || _socket == null) return;
     final queued = List.of(_pendingEmits);

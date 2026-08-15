@@ -23,9 +23,27 @@ export class RoomService {
     socketId: string,
     input: CreateRoomInput
   ): Promise<Room> {
-    // Check if player already in room
+    // A lobby the player is still sitting in is returned as-is rather than
+    // refused. The client retries `room.create` whenever its own watchdog
+    // fires or the socket reconnects, and the first attempt often did reach
+    // the server — answering ALREADY_IN_ROOM to that retry left the player
+    // permanently locked out of a room they already own.
     const existingRoom = await this.resolveActiveRoom(userId);
     if (existingRoom) {
+      const current = await this.getRoom(existingRoom);
+      if (current && current.status === RoomStatus.WAITING) {
+        // Refresh the socket id so events still reach the live connection.
+        const me = current.players.find((p) => p.userId === userId);
+        if (me) me.socketId = socketId;
+        await this.saveRoom(current);
+
+        logger.info('Returned the room the player is already in', {
+          roomId: current.roomId,
+          userId,
+        });
+        return current;
+      }
+
       throw { code: 'ALREADY_IN_ROOM', message: 'Already in a room.', status: 400 };
     }
 
@@ -77,16 +95,36 @@ export class RoomService {
     socketId: string,
     input: JoinRoomInput
   ): Promise<Room> {
-    // Check if player already in room
-    const existingRoom = await this.resolveActiveRoom(userId);
-    if (existingRoom) {
-      throw { code: 'PLAYER_ALREADY_IN_ROOM', message: 'Already in a room.', status: 400 };
-    }
-
-    // Get room by code
+    // Resolve the code first, so we can tell "already in THIS room" (a retry
+    // or a reconnect resync, which must succeed) apart from "already in a
+    // different room" (a genuine conflict).
     const roomId = await redisClient.get(`room:code:${input.roomCode}`);
     if (!roomId) {
       throw { code: 'ROOM_NOT_FOUND', message: 'Room not found.', status: 404 };
+    }
+
+    const existingRoom = await this.resolveActiveRoom(userId);
+    if (existingRoom) {
+      if (existingRoom === roomId) {
+        const current = await this.getRoom(roomId);
+        if (current) {
+          const me = current.players.find((p) => p.userId === userId);
+          if (me) me.socketId = socketId;
+          await this.saveRoom(current);
+
+          logger.info('Player re-joined the room they were already in', {
+            roomId,
+            userId,
+          });
+          return current;
+        }
+      } else {
+        throw {
+          code: 'PLAYER_ALREADY_IN_ROOM',
+          message: 'Already in a room.',
+          status: 400,
+        };
+      }
     }
 
     const room = await this.getRoom(roomId);
