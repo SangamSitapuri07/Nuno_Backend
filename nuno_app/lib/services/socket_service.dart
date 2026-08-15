@@ -51,6 +51,24 @@ class SocketService {
   /// that simply cannot reach the host says so instead of spinning.
   static const int _failuresBeforeReporting = 4;
 
+  /// Rolling record of what the transport actually did, shown in the lobby's
+  /// diagnostics panel. Reading this off the screen is far easier than
+  /// fishing `[socket]` lines out of a phone's logcat.
+  final List<String> _trace = [];
+  final _traceController = StreamController<List<String>>.broadcast();
+
+  /// Most recent transport events, oldest first.
+  List<String> get trace => List.unmodifiable(_trace);
+  Stream<List<String>> get onTrace => _traceController.stream;
+
+  void _trace_(String line) {
+    final stamp = DateTime.now().toIso8601String().substring(11, 19);
+    _trace.add('$stamp  $line');
+    if (_trace.length > 40) _trace.removeAt(0);
+    debugPrint('[socket] $line');
+    if (!_traceController.isClosed) _traceController.add(trace);
+  }
+
   SocketService(this._tokenStorage);
 
   // ── Public surface ──────────────────────────────────────────
@@ -149,6 +167,7 @@ class SocketService {
       return;
     }
 
+    _trace_('connecting to ${AppConfig.socketUrl} ...');
     _setState(SocketConnectionState.connecting);
 
     // Replacing the socket instance invalidates all previous bindings.
@@ -175,7 +194,7 @@ class SocketService {
 
     _socket!
       ..onConnect((_) async {
-        debugPrint('[socket] connected');
+        _trace_('transport connected to ${AppConfig.socketUrl}');
         _connectFailures = 0;
         _lastConnectError = null;
         _dispatch(SocketEvents.reachability, {'reachable': true});
@@ -183,11 +202,11 @@ class SocketService {
         await _authenticate();
       })
       ..onDisconnect((reason) {
-        debugPrint('[socket] disconnected: $reason');
+        _trace_('disconnected: $reason');
         _setState(SocketConnectionState.disconnected);
       })
       ..onConnectError((e) {
-        debugPrint('[socket] connect_error: $e');
+        _trace_('connect_error: $e');
         _setState(SocketConnectionState.disconnected);
 
         // Socket.IO retries silently forever. Left alone that is
@@ -204,11 +223,11 @@ class SocketService {
           });
         }
       })
-      ..onError((e) => debugPrint('[socket] error: $e'));
+      ..onError((e) => _trace_('transport error: $e'));
 
     // Auth ack from the server.
     _socket!.on(SocketEvents.authenticated, (data) {
-      debugPrint('[socket] authenticated');
+      _trace_('handshake accepted (authenticated)');
       _authTimeout?.cancel();
       _authTimeout = null;
       _refreshAttempted = false;
@@ -225,7 +244,7 @@ class SocketService {
         code: (map['code'] ?? 'SERVER_ERROR').toString(),
         message: (map['message'] ?? 'Something went wrong.').toString(),
       );
-      debugPrint('[socket] ← error ${err.code}: ${err.message}');
+      _trace_('server error ${err.code}: ${err.message}');
 
       // A rejected handshake leaves emits queued behind `isAuthenticated`
       // with nothing left to release them, so treat it as a hard failure
@@ -268,7 +287,7 @@ class SocketService {
       // Surfacing this matters: every gameplay emit is queued until the
       // handshake lands, so a silent return strands the caller on its
       // loading state with nothing to react to.
-      debugPrint('[socket] no token — cannot authenticate');
+      _trace_('no access token stored - cannot authenticate');
       _failHandshake(
         'AUTH_REQUIRED',
         'Your session has expired. Please sign in again.',
@@ -279,13 +298,14 @@ class SocketService {
     _authTimeout?.cancel();
     _authTimeout = Timer(AppConfig.connectTimeout, () {
       if (isAuthenticated) return;
-      debugPrint('[socket] handshake timed out');
+      _trace_('handshake timed out after ${AppConfig.connectTimeout.inSeconds}s');
       _failHandshake(
         'AUTH_TIMEOUT',
         'Could not reach the server. Check your connection and try again.',
       );
     });
 
+    _trace_('sending handshake (socket:authenticate)');
     _socket?.emit(SocketEvents.authenticate, {'token': token});
   }
 
@@ -319,6 +339,7 @@ class SocketService {
       await c.close();
     }
     _controllers.clear();
+    await _traceController.close();
     await _authedController.close();
     await _stateController.close();
     await _errorController.close();

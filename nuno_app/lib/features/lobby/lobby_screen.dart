@@ -64,24 +64,42 @@ class LobbyScreen extends ConsumerWidget {
           context.go(AppRoutes.home);
         },
         child: room == null
-            ? SizedBox(
-                height: 180,
+            ? SingleChildScrollView(
                 child: state.error != null && !state.isConnecting
-                    ? EmptyState(
-                        icon: Icons.meeting_room_outlined,
-                        title: 'Could not join',
-                        message: state.error,
-                        // Retrying in place beats sending the user home: the
-                        // usual cause is a server still waking up, and the
-                        // create/join request is now safe to repeat.
-                        actionLabel: 'Try again',
-                        onAction: () {
-                          controller.reset();
-                          controller.retryLast();
-                        },
+                    ? Column(
+                        children: [
+                          EmptyState(
+                            icon: Icons.meeting_room_outlined,
+                            title: 'Could not join',
+                            message: state.error,
+                            // Retrying in place beats sending the user home:
+                            // the usual cause is a server still waking up,
+                            // and the request is now safe to repeat.
+                            actionLabel: 'Try again',
+                            onAction: () {
+                              controller.reset();
+                              controller.retryLast();
+                            },
+                          ),
+                          // The transport log is most useful precisely when
+                          // something failed, so keep it on this screen too.
+                          _TracePanel(
+                            trace:
+                                ref.watch(socketTraceProvider).valueOrNull ??
+                                    const [],
+                          ),
+                          const SizedBox(height: AppDimens.lg),
+                        ],
                       )
-                    : _ConnectingView(
-                        state: ref.watch(socketStateProvider).valueOrNull,
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppDimens.xxxl,
+                        ),
+                        child: _ConnectingView(
+                          state: ref.watch(socketStateProvider).valueOrNull,
+                          trace: ref.watch(socketTraceProvider).valueOrNull ??
+                              const [],
+                        ),
                       ),
               )
             : _LobbyBody(
@@ -361,6 +379,12 @@ final socketStateProvider = StreamProvider<SocketConnectionState>((ref) {
   return socket.onStateChanged.startWith(socket.state);
 });
 
+/// Live transport trace, seeded with whatever has already been recorded.
+final socketTraceProvider = StreamProvider<List<String>>((ref) {
+  final socket = ref.watch(socketServiceProvider);
+  return socket.onTrace.startWith(socket.trace);
+});
+
 extension _StartWith<T> on Stream<T> {
   Stream<T> startWith(T value) async* {
     yield value;
@@ -373,8 +397,9 @@ extension _StartWith<T> on Stream<T> {
 /// room..." kept getting reported without a cause.
 class _ConnectingView extends StatelessWidget {
   final SocketConnectionState? state;
+  final List<String> trace;
 
-  const _ConnectingView({this.state});
+  const _ConnectingView({this.state, this.trace = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -386,6 +411,57 @@ class _ConnectingView extends StatelessWidget {
       SocketConnectionState.connected => 'Signing in...',
       SocketConnectionState.authenticated => 'Setting up the room...',
     };
-    return LoadingView(label: label);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        LoadingView(label: label),
+        if (trace.isNotEmpty) ...[
+          const SizedBox(height: AppDimens.lg),
+          _TracePanel(trace: trace),
+        ],
+      ],
+    );
+  }
+}
+
+/// Shows what the transport actually did. A spinner alone gives the player -
+/// and anyone debugging a report - nothing to go on.
+class _TracePanel extends StatelessWidget {
+  final List<String> trace;
+
+  const _TracePanel({required this.trace});
+
+  @override
+  Widget build(BuildContext context) {
+    if (trace.isEmpty) return const SizedBox.shrink();
+    final recent = trace.length > 6 ? trace.sublist(trace.length - 6) : trace;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 520),
+      padding: const EdgeInsets.all(AppDimens.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppDimens.brSm,
+        border: Border.all(color: AppColors.surfaceStroke),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final line in recent)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                line,
+                style: AppTextStyles.bodySm.copyWith(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
