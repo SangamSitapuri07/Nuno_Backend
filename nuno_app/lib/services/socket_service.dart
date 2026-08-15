@@ -165,6 +165,8 @@ class SocketService {
     // Auth ack from the server.
     _socket!.on(SocketEvents.authenticated, (data) {
       debugPrint('[socket] authenticated');
+      _authTimeout?.cancel();
+      _authTimeout = null;
       _setState(SocketConnectionState.authenticated);
       _dispatch(SocketEvents.authenticated, data);
       _flushPending();
@@ -191,19 +193,57 @@ class SocketService {
     _socket!.connect();
   }
 
+  /// Guards against a handshake that is accepted at the transport level but
+  /// never acknowledged, which would otherwise leave queued emits parked
+  /// forever behind `isAuthenticated`.
+  Timer? _authTimeout;
+
   Future<void> _authenticate() async {
     final token = await _tokenStorage.readAccessToken();
+
     if (token == null || token.isEmpty) {
-      debugPrint('[socket] no token — skipping authenticate');
+      // Surfacing this matters: every gameplay emit is queued until the
+      // handshake lands, so a silent return strands the caller on its
+      // loading state with nothing to react to.
+      debugPrint('[socket] no token — cannot authenticate');
+      _failHandshake(
+        'AUTH_REQUIRED',
+        'Your session has expired. Please sign in again.',
+      );
       return;
     }
+
+    _authTimeout?.cancel();
+    _authTimeout = Timer(AppConfig.connectTimeout, () {
+      if (isAuthenticated) return;
+      debugPrint('[socket] handshake timed out');
+      _failHandshake(
+        'AUTH_TIMEOUT',
+        'Could not reach the server. Check your connection and try again.',
+      );
+    });
+
     _socket?.emit(SocketEvents.authenticate, {'token': token});
+  }
+
+  /// Drops anything waiting on the handshake and tells listeners why, so a
+  /// screen blocked on a queued emit can stop waiting.
+  void _failHandshake(String code, String message) {
+    _authTimeout?.cancel();
+    _authTimeout = null;
+    _pendingEmits.clear();
+    if (!_errorController.isClosed) {
+      _errorController.add(SocketError(code: code, message: message));
+    }
+    _dispatch(SocketEvents.error, {'code': code, 'message': message});
   }
 
   /// Re-authenticate after a token refresh.
   Future<void> reauthenticate() => _authenticate();
 
   void disconnect() {
+    _authTimeout?.cancel();
+    _authTimeout = null;
     _socket?.dispose();
     _socket = null;
     _registered.clear();

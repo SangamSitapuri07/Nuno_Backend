@@ -84,6 +84,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     }
 
     sub(SocketEvents.roomCreated, (p) {
+      _pendingTimeout?.cancel();
       final room = GameRoom.fromJson(J.map(p['room']));
       state = state.copyWith(
         room: room,
@@ -94,6 +95,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     });
 
     sub(SocketEvents.roomJoined, (p) {
+      _pendingTimeout?.cancel();
       state = state.copyWith(
         room: GameRoom.fromJson(J.map(p['room'])),
         isConnecting: false,
@@ -145,6 +147,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     });
 
     sub(SocketEvents.error, (p) {
+      _pendingTimeout?.cancel();
       state = state.copyWith(
         error: J.str(p['message'], 'Something went wrong.'),
         isConnecting: false,
@@ -162,12 +165,29 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   // ── Actions ─────────────────────────────────────────────────
 
+  /// Fails the pending create/join if the server never answers, so the screen
+  /// cannot sit on its loading state indefinitely.
+  Timer? _pendingTimeout;
+
+  void _awaitRoom() {
+    _pendingTimeout?.cancel();
+    _pendingTimeout = Timer(const Duration(seconds: 45), () {
+      if (state.room != null || !state.isConnecting) return;
+      state = state.copyWith(
+        isConnecting: false,
+        error: 'The server did not respond. It may still be waking up — '
+            'please try again.',
+      );
+    });
+  }
+
   void createRoom({
     GameMode mode = GameMode.private,
     int maxPlayers = 4,
     bool voiceEnabled = true,
   }) {
     state = const LobbyState(isConnecting: true);
+    _awaitRoom();
     _socket.emit(SocketEvents.roomCreate, {
       'gameMode': mode.wire,
       'maxPlayers': maxPlayers,
@@ -177,6 +197,7 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   void joinRoom(String roomCode) {
     state = const LobbyState(isConnecting: true);
+    _awaitRoom();
     _socket.emit(SocketEvents.roomJoin, {'roomCode': roomCode});
   }
 
@@ -214,6 +235,7 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   @override
   void dispose() {
+    _pendingTimeout?.cancel();
     for (final s in _subs) {
       s.cancel();
     }

@@ -68,7 +68,12 @@ class LobbyScreen extends ConsumerWidget {
                         title: 'Could not join',
                         message: state.error,
                         actionLabel: 'Back',
-                        onAction: () => context.go(AppRoutes.home),
+                        onAction: () {
+                          // Clear the failed attempt, otherwise its error is
+                          // still in state the next time the lobby opens.
+                          controller.reset();
+                          context.go(AppRoutes.home);
+                        },
                       )
                     : const LoadingView(label: 'Setting up the room...'),
               )
