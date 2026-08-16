@@ -1,7 +1,10 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,6 +17,29 @@ bool get _isMobile =>
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Render overflow as nothing rather than the yellow-and-black striped bar.
+  //
+  // The stripes are a debug-build affordance, but they paint over whatever
+  // sits beneath them, so a few pixels of overflow can hide an entire control
+  // and make the screen look broken. Individual overflows are still reported
+  // in the console, so they are not being silenced - only their painting.
+  if (kDebugMode) {
+    RenderErrorBox.backgroundColor = const Color(0x00000000);
+    RenderErrorBox.textStyle = ui.TextStyle(color: const Color(0x00000000));
+
+    final defaultOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final text = details.exceptionAsString();
+      if (text.contains('A RenderFlex overflowed') ||
+          text.contains('overflowed by')) {
+        // Log it, but do not let the framework paint the striped banner.
+        debugPrint('[layout] ${text.split('\n').first}');
+        return;
+      }
+      defaultOnError?.call(details);
+    };
+  }
 
   if (_isMobile) {
     SystemChrome.setSystemUIOverlayStyle(

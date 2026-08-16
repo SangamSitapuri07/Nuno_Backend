@@ -309,6 +309,10 @@ class LobbyController extends StateNotifier<LobbyState> {
     _socket.emit(SocketEvents.roomReady, {'isReady': isReady});
   }
 
+  /// Host-only. The server re-checks ownership and readiness, so this is a
+  /// request rather than an assertion.
+  void startMatch() => _socket.emit(SocketEvents.roomStart);
+
   void kick(String targetUserId) {
     _socket.emit(SocketEvents.roomKick, {'targetUserId': targetUserId});
   }
@@ -316,6 +320,10 @@ class LobbyController extends StateNotifier<LobbyState> {
   void leave() {
     if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
     _settled();
+    // Belt and braces: the game screen releases the mic on dispose, but
+    // leaving from the lobby never went through that path, so a voice
+    // session started earlier could outlive the room.
+    _ref.read(voiceServiceProvider).leave();
     _socket.emit(SocketEvents.roomLeave);
     state = const LobbyState();
   }

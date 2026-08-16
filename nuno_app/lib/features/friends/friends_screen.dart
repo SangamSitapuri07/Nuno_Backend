@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/router/app_router.dart';
 import '../lobby/lobby_providers.dart';
+import 'widgets/direct_message_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -304,9 +305,21 @@ class _FriendTile extends ConsumerWidget {
           children: [
             Text(friend.username, style: AppTextStyles.h3),
             const SizedBox(height: AppDimens.xl),
-            // Only offered when they are not already in a joinable room, in
-            // which case the tile shows JOIN instead.
-            if (!friend.isJoinable)
+            // Direct message. Available whatever their status - unlike an
+            // invite, a message keeps until they next open the app.
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_rounded,
+                  color: AppColors.blue),
+              title: Text('Send a message', style: AppTextStyles.body),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                DirectMessageSheet.show(context, friend: friend);
+              },
+            ),
+            // Offered only when the invite could actually be acted on: a
+            // joinable friend shows JOIN on the tile instead, and an offline
+            // or in-match friend would never see it.
+            if (!friend.isJoinable && friend.isInvitable)
               ListTile(
                 leading: const Icon(Icons.videogame_asset_rounded,
                     color: AppColors.green),
@@ -321,6 +334,21 @@ class _FriendTile extends ConsumerWidget {
                     context.push(AppRoutes.lobby);
                   }
                 },
+              )
+            else if (!friend.isJoinable)
+              ListTile(
+                enabled: false,
+                leading: const Icon(Icons.videogame_asset_rounded,
+                    color: AppColors.textMuted),
+                title: Text(
+                  'Invite to play',
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textMuted),
+                ),
+                subtitle: Text(
+                  friend.username + ' is ' + friend.status.label.toLowerCase(),
+                  style: AppTextStyles.caption,
+                ),
               ),
             ListTile(
               leading: const Icon(Icons.person_remove_rounded,

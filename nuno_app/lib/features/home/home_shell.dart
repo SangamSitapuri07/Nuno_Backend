@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
 import '../../core/router/app_router.dart';
+import 'widgets/invite_dialog.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -29,30 +28,13 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
-  /// On Home the bar hides after a moment of inactivity and returns on a
-  /// tap. On every other tab it stays hidden — the back button is the way
-  /// out, which is what most mobile games do.
-  bool _navVisible = true;
-  Timer? _hideTimer;
-
-  static const _idleBeforeHide = Duration(milliseconds: 2500);
-
+  /// The bar is permanent on Home and hidden on every other tab, where the
+  /// back button is the way out.
+  ///
+  /// It used to auto-hide on Home after a couple of seconds, which meant the
+  /// main navigation vanished while the player was still looking at it and
+  /// had to be summoned back by tapping blank space.
   bool get _isHome => _index == 0;
-
-  void _scheduleHide() {
-    _hideTimer?.cancel();
-    if (!_isHome) return;
-    _hideTimer = Timer(_idleBeforeHide, () {
-      if (mounted && _isHome) setState(() => _navVisible = false);
-    });
-  }
-
-  /// Only Home responds to taps by revealing the bar.
-  void _revealNav() {
-    if (!_isHome) return;
-    if (!_navVisible) setState(() => _navVisible = true);
-    _scheduleHide();
-  }
 
   static const _tabs = [
     _TabSpec(Icons.home_rounded, Icons.home_rounded, 'HOME'),
@@ -66,46 +48,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _listenForInvites();
-      _scheduleHide();
     });
   }
 
   void _listenForInvites() {
     final socket = ref.read(socketServiceProvider);
 
-    socket.on(SocketEvents.inviteReceived).listen((payload) {
+    socket.on(SocketEvents.inviteReceived).listen((payload) async {
       if (!mounted) return;
       final from = payload['fromUsername']?.toString() ?? 'A friend';
       final roomCode = payload['roomCode']?.toString();
       if (roomCode == null) return;
 
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 8),
-            content: Row(
-              children: [
-                const Icon(Icons.mail_rounded, color: AppColors.gold, size: 18),
-                const SizedBox(width: AppDimens.md),
-                Expanded(
-                  child: Text(
-                    '$from invited you to a room',
-                    style: AppTextStyles.body.copyWith(fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-            action: SnackBarAction(
-              label: 'JOIN',
-              textColor: AppColors.gold,
-              onPressed: () {
-                socket.emit(SocketEvents.inviteAccept, {'roomCode': roomCode});
-                context.push(AppRoutes.lobby);
-              },
-            ),
-          ),
-        );
+      // A modal card rather than a snack bar: an invite is a decision with a
+      // deadline, and the snack bar version was easy to miss entirely.
+      final accepted = await InviteDialog.show(
+        context,
+        fromUsername: from,
+        roomCode: roomCode,
+      );
+      if (!accepted || !mounted) return;
+
+      socket.emit(SocketEvents.inviteAccept, {'roomCode': roomCode});
+      if (mounted) context.push(AppRoutes.lobby);
     });
 
     socket.on(SocketEvents.gameStarted).listen((_) {
@@ -118,17 +83,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   void _go(int i) {
     HapticFeedback.selectionClick();
-    setState(() {
-      _index = i;
-      // Visible on Home, hidden everywhere else.
-      _navVisible = i == 0;
-    });
-    _scheduleHide();
+    setState(() => _index = i);
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
     super.dispose();
   }
 
@@ -147,11 +106,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       },
       child: Scaffold(
         extendBody: true,
-        body: Listener(
-        // Any touch reveals the bar and restarts the idle countdown.
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => _revealNav(),
-        child: DecoratedBox(
+        body: DecoratedBox(
           decoration: const BoxDecoration(color: AppColors.background),
           child: Stack(
             children: [
@@ -171,28 +126,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               // full-bleed landscape panels have no room to give up.
               if (!_isHome)
                 Positioned(
-                  left: AppDimens.md,
-                  top: AppDimens.md,
+                  left: 0,
+                  top: 0,
                   child: SafeArea(
-                    child: _BackButton(onTap: () => _go(0)),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 6, top: 6),
+                      child: _BackButton(onTap: () => _go(0)),
+                    ),
                   ),
                 ),
             ],
           ),
         ),
-      ),
-      // Slides out of view when idle instead of occupying layout space.
-      // While hidden it also ignores pointers, so the Listener above (and
-      // the handle drawn inside _BottomBar) is what brings it back.
+      // Always present on Home; slides away on the other tabs, which are
+      // full-bleed panels with their own back button.
       bottomNavigationBar: IgnorePointer(
-        ignoring: !_navVisible || !_isHome,
+        ignoring: !_isHome,
         child: AnimatedSlide(
-          offset: (_navVisible && _isHome) ? Offset.zero : const Offset(0, 1),
-          duration: const Duration(milliseconds: 120),
+          offset: _isHome ? Offset.zero : const Offset(0, 1),
+          duration: const Duration(milliseconds: 140),
           curve: Curves.easeOutCubic,
           child: AnimatedOpacity(
-            opacity: (_navVisible && _isHome) ? 1 : 0,
-            duration: const Duration(milliseconds: 100),
+            opacity: _isHome ? 1 : 0,
+            duration: const Duration(milliseconds: 120),
             child: _BottomBar(
               index: _index,
               tabs: _tabs,

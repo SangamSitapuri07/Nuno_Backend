@@ -47,6 +47,16 @@ class Friend extends Equatable {
   bool get isJoinable =>
       status == PlayerOnlineStatus.inLobby && (roomCode?.isNotEmpty ?? false);
 
+  /// Whether it makes sense to invite them to a room.
+  ///
+  /// An offline player will never see the invite, and one already in a match
+  /// cannot accept it, so offering the action in those states just produces
+  /// an invite that silently goes nowhere.
+  bool get isInvitable =>
+      status == PlayerOnlineStatus.online ||
+      status == PlayerOnlineStatus.away ||
+      status == PlayerOnlineStatus.inLobby;
+
   @override
   List<Object?> get props => [userId, status, roomCode];
 }

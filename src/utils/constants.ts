@@ -20,6 +20,7 @@ export const SOCKET_EVENTS = {
   ROOM_HOST_CHANGED: 'room.hostChanged',
   ROOM_COUNTDOWN: 'room.countdown',
   ROOM_COUNTDOWN_CANCELLED: 'room.countdownCancelled',
+  ROOM_START: 'room.start',
 
   // Game
   GAME_STARTED: 'game.started',

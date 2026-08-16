@@ -27,16 +27,16 @@ class GameTopLeft extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const UnoLogo(width: 76),
+            const UnoLogo(width: 56),
             const SizedBox(width: AppDimens.sm),
             Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.md,
-                vertical: AppDimens.sm,
+                horizontal: AppDimens.sm,
+                vertical: 4,
               ),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.42),
-                borderRadius: AppDimens.brMd,
+                color: Colors.black.withValues(alpha: 0.30),
+                borderRadius: AppDimens.brSm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,7 +48,7 @@ class GameTopLeft extends StatelessWidget {
                         'Room Code: ',
                         style: AppTextStyles.bodySm.copyWith(
                           color: Colors.white70,
-                          fontSize: 12,
+                          fontSize: 10,
                         ),
                       ),
                       Text(
@@ -56,7 +56,7 @@ class GameTopLeft extends StatelessWidget {
                         style: AppTextStyles.body.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -68,7 +68,7 @@ class GameTopLeft extends StatelessWidget {
                         'Mode: ',
                         style: AppTextStyles.bodySm.copyWith(
                           color: Colors.white70,
-                          fontSize: 12,
+                          fontSize: 10,
                         ),
                       ),
                       Text(
@@ -76,7 +76,7 @@ class GameTopLeft extends StatelessWidget {
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.gold,
                           fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -92,11 +92,11 @@ class GameTopLeft extends StatelessWidget {
         // Ping chip
         Container(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.md,
-            vertical: 5,
+            horizontal: AppDimens.sm,
+            vertical: 3,
           ),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.42),
+            color: Colors.black.withValues(alpha: 0.30),
             borderRadius: AppDimens.brPill,
           ),
           child: Row(
@@ -104,14 +104,14 @@ class GameTopLeft extends StatelessWidget {
             children: [
               Icon(
                 Icons.wifi_rounded,
-                size: 14,
+                size: 11,
                 color: pingMs < 100 ? AppColors.green : AppColors.warning,
               ),
               const SizedBox(width: 5),
               Text(
                 '$pingMs' 'ms',
                 style: AppTextStyles.body.copyWith(
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: pingMs < 100 ? AppColors.green : AppColors.warning,
                 ),
@@ -195,7 +195,7 @@ class GameTopRight extends StatelessWidget {
             child: Text(
               'LEAVE ROOM',
               style: AppTextStyles.button.copyWith(
-                fontSize: 13,
+                fontSize: 11,
                 color: Colors.white,
               ),
             ),
@@ -217,13 +217,17 @@ class _RoundButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40,
-        height: 40,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
+          // A translucent tint instead of a near-opaque black disc: the
+          // dark circles read as heavy blobs against the table art and
+          // took more room than the icons needed.
+          color: Colors.white.withValues(alpha: 0.10),
           shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
         ),
-        child: Icon(icon, size: 19, color: Colors.white),
+        child: Icon(icon, size: 16, color: Colors.white),
       ),
     );
   }
@@ -345,7 +349,7 @@ class CurrentCardChip extends StatelessWidget {
                   style: AppTextStyles.body.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
-                    fontSize: 12,
+                    fontSize: 10,
                   ),
                 ),
               ),
@@ -355,7 +359,7 @@ class CurrentCardChip extends StatelessWidget {
                 style: AppTextStyles.body.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 13,
+                  fontSize: 11,
                 ),
               ),
             ],

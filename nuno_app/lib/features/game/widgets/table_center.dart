@@ -16,6 +16,7 @@ class TableCenter extends StatelessWidget {
   final GameDirection direction;
   final bool canDraw;
   final VoidCallback onDraw;
+  final Key? drawPileKey;
 
   const TableCenter({
     super.key,
@@ -25,6 +26,7 @@ class TableCenter extends StatelessWidget {
     required this.direction,
     required this.canDraw,
     required this.onDraw,
+    this.drawPileKey,
   });
 
   @override
@@ -58,7 +60,12 @@ class TableCenter extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _DrawPile(count: drawPileCount, canDraw: canDraw, onDraw: onDraw),
+              _DrawPile(
+                key: drawPileKey,
+                count: drawPileCount,
+                canDraw: canDraw,
+                onDraw: onDraw,
+              ),
               const SizedBox(width: AppDimens.xl),
               _DiscardPile(topCard: topCard, currentColor: currentColor),
             ],
@@ -75,6 +82,7 @@ class _DrawPile extends StatelessWidget {
   final VoidCallback onDraw;
 
   const _DrawPile({
+    super.key,
     required this.count,
     required this.canDraw,
     required this.onDraw,

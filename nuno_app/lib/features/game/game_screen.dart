@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
+import '../../services/voice_service.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -16,6 +17,7 @@ import '../../data/models/game_state.dart';
 import '../auth/auth_controller.dart';
 import 'game_providers.dart';
 import 'widgets/card_action_popup.dart';
+import 'widgets/draw_flight.dart';
 import 'widgets/exit_confirm_dialog.dart';
 import 'widgets/game_chat_sheet.dart';
 import 'widgets/game_hud.dart';
@@ -23,6 +25,7 @@ import 'widgets/game_over_screen.dart';
 import 'widgets/opponent_seat.dart';
 import 'widgets/player_hand.dart';
 import 'widgets/quick_chat_sheet.dart';
+import 'widgets/shuffle_intro.dart';
 import 'widgets/table_center.dart';
 import 'widgets/table_overlays.dart';
 import 'widgets/table_toasts.dart';
@@ -45,20 +48,31 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   bool _micOn = false;
   bool _soundOn = true;
   bool _voiceStarting = false;
+  bool _introDone = false;
+
+  /// Captured while the widget is alive.
+  ///
+  /// Reading a provider inside dispose() is not safe - the element is already
+  /// being torn down - so the call was silently skipped and the microphone
+  /// stayed live after leaving the table, which is why audio kept coming
+  /// through back in the lobby.
+  VoiceService? _voice;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _voice = ref.read(voiceServiceProvider);
       ref.read(gameControllerProvider.notifier).requestSync();
     });
   }
 
   @override
   void dispose() {
-    // Release the microphone when leaving the table; the service is shared,
-    // so a stale session would keep the mic hot on the next screen.
-    ref.read(voiceServiceProvider).leave();
+    // Fire and forget: dispose cannot await, but leave() tears down the peer
+    // connections and stops the local track immediately.
+    _voice?.leave();
     super.dispose();
   }
 
@@ -184,21 +198,35 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         backgroundColor: const Color(0xFF0A0618),
         body: ArtBackground(
           asset: Art.bgTable,
-          child: SafeArea(
-            child: game == null
-                ? const LoadingView(label: 'Joining the table...')
-                : _Table(
-                    state: state,
-                    game: game,
-                    myId: myId,
-                    isMyTurn: isMyTurn,
-                    micOn: _micOn,
-                    soundOn: _soundOn,
-                    onToggleMic: () => _toggleMic(game.roomId),
-                    onToggleSound: _toggleSound,
-                    onPlayCard: _playCard,
-                    onExit: _confirmExit,
+          child: Stack(
+            children: [
+              SafeArea(
+                child: game == null
+                    ? const LoadingView(label: 'Joining the table...')
+                    : _Table(
+                        state: state,
+                        game: game,
+                        myId: myId,
+                        isMyTurn: isMyTurn,
+                        micOn: _micOn,
+                        soundOn: _soundOn,
+                        onToggleMic: () => _toggleMic(game.roomId),
+                        onToggleSound: _toggleSound,
+                        onPlayCard: _playCard,
+                        onExit: _confirmExit,
+                      ),
+              ),
+
+              // Shuffle-and-deal flourish over the first moment of the match.
+              if (!_introDone)
+                Positioned.fill(
+                  child: ShuffleIntro(
+                    onComplete: () {
+                      if (mounted) setState(() => _introDone = true);
+                    },
                   ),
+                ),
+            ],
           ),
         ),
       ),
@@ -231,6 +259,17 @@ class _Table extends ConsumerWidget {
     required this.onExit,
   });
 
+  /// Anchors for the draw animation.
+  static final GlobalKey drawPileKey = GlobalKey();
+  static final GlobalKey handKey = GlobalKey();
+
+  /// Centre of a keyed widget in global coordinates, or null if unmounted.
+  static Offset? _globalCentre(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(box.size.center(Offset.zero));
+  }
+
   static const _ringColors = [
     AppColors.blue,
     AppColors.green,
@@ -255,14 +294,30 @@ class _Table extends ConsumerWidget {
       children: [
         // ── Centre piles ─────────────────────────────
         Align(
-          alignment: const Alignment(0, -0.10),
+          // Nudged down: at -0.10 the discard pile met the top seat's card
+          // fan, so the two overlapped on a short landscape viewport.
+          alignment: const Alignment(0, 0.06),
           child: TableCenter(
             topCard: game.topCard,
             currentColor: game.currentColor,
             drawPileCount: game.drawPileCount,
             direction: game.direction,
             canDraw: isMyTurn && state.pendingCardId == null,
-            onDraw: controller.drawCard,
+            drawPileKey: drawPileKey,
+            onDraw: () {
+              // Fly a card from the pile into the hand before the state
+              // update lands, so the new card has a visible origin.
+              final from = _globalCentre(drawPileKey);
+              final to = _globalCentre(handKey);
+              if (from != null && to != null) {
+                DrawFlight.play(
+                  context,
+                  from: from - const Offset(31, 46),
+                  to: to - const Offset(31, 46),
+                );
+              }
+              controller.drawCard();
+            },
           ),
         ),
 
@@ -271,7 +326,7 @@ class _Table extends ConsumerWidget {
           Align(
             alignment: const Alignment(0, -1),
             child: Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 2),
               child: OpponentSeat(
                 player: seats.top!,
                 placement: SeatPlacement.top,
@@ -454,6 +509,7 @@ class _Table extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.only(bottom: 2),
             child: PlayerHand(
+              key: handKey,
               cards: game.myHand,
               isPlayable: game.isCardPlayable,
               isMyTurn: isMyTurn && state.pendingCardId == null,

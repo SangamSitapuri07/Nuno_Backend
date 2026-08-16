@@ -27,6 +27,7 @@ class SocketEvents {
   static const roomHostChanged = 'room.hostChanged';
   static const roomCountdown = 'room.countdown';
   static const roomCountdownCancelled = 'room.countdownCancelled';
+  static const roomStart = 'room.start';
   static const roomReady = 'room.ready';
   static const roomKick = 'room.kick';
   static const roomKicked = 'room.kicked';

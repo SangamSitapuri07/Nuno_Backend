@@ -110,7 +110,7 @@ class _Identity extends StatelessWidget {
                       ]
                     : null,
               ),
-              child: PlayerAvatar(username: player.username, size: 46),
+              child: PlayerAvatar(username: player.username, size: 34),
             ),
 
             // Level badge, top-right on the ring.
@@ -226,20 +226,20 @@ class _CardFan extends StatelessWidget {
     final visible = count.clamp(0, 7);
     if (visible == 0) return const SizedBox.shrink();
 
-    const cardW = 26.0;
+    const cardW = 19.0;
     final cardH = cardW / 0.68;
-    const step = 11.0;
-    const spread = 0.10;
+    const step = 8.0;
+    const spread = 0.08;
 
     final isSide =
         placement == SeatPlacement.left || placement == SeatPlacement.right;
 
-    final width = cardW + step * (visible - 1) + 10;
-    final height = cardH + 16;
+    final width = cardW + step * (visible - 1) + 8;
+    final height = cardH + 10;
 
     return SizedBox(
       width: isSide ? width * 0.92 : width,
-      height: height + 14,
+      height: height + 10,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,

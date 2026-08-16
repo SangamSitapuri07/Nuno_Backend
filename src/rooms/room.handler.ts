@@ -113,18 +113,75 @@ export const initializeRoomHandlers = (
 
       if (!room) return;
 
+      // Readiness no longer starts the match on its own. The host presses
+      // START, which is the convention players expect and which stops a
+      // match beginning the instant the last person happens to tap ready.
       io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
-
-      if (room.players.length >= 2 && roomService.isAllReady(room)) {
-        room.status = RoomStatus.COUNTDOWN;
-        await roomService.saveRoom(room);
-        startCountdown(io, room.roomId);
-      }
 
     } catch (error: any) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         code: error.code || 'SERVER_ERROR',
         message: error.message || 'Failed to update ready status.',
+      });
+    }
+  });
+
+  // ═══ START MATCH (host only) ═══
+  socket.on(SOCKET_EVENTS.ROOM_START, async () => {
+    try {
+      const room = await roomService.getPlayerRoom(socket.userId);
+      if (!room) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'ROOM_NOT_FOUND',
+          message: 'You are not in a room.',
+        });
+        return;
+      }
+
+      if (room.hostId !== socket.userId) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'HOST_ONLY_ACTION',
+          message: 'Only the host can start the match.',
+        });
+        return;
+      }
+
+      if (room.players.length < 2) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'NOT_ENOUGH_PLAYERS',
+          message: 'At least 2 players are needed to start.',
+        });
+        return;
+      }
+
+      // The host is counted as ready implicitly - they are the one starting -
+      // so only the guests must have confirmed.
+      const guestsReady = room.players
+        .filter((p) => p.userId !== room.hostId)
+        .every((p) => p.isReady);
+
+      if (!guestsReady) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'PLAYERS_NOT_READY',
+          message: 'Every player must be ready first.',
+        });
+        return;
+      }
+
+      if (room.status === RoomStatus.COUNTDOWN ||
+          room.status === RoomStatus.IN_GAME) {
+        return;
+      }
+
+      room.status = RoomStatus.COUNTDOWN;
+      await roomService.saveRoom(room);
+      io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+      startCountdown(io, room.roomId);
+
+    } catch (error: any) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        code: error.code || 'SERVER_ERROR',
+        message: error.message || 'Failed to start the match.',
       });
     }
   });
@@ -178,7 +235,14 @@ const startCountdown = (io: Server, roomId: string): void => {
       return;
     }
 
-    if (!roomService.isAllReady(room)) {
+    // Mirrors the START check: the host is implicitly ready, so only the
+    // guests are required to still be confirmed. Using isAllReady() here
+    // would cancel instantly, because the host never marks themselves ready.
+    const guestsReady = room.players
+      .filter((p) => p.userId !== room.hostId)
+      .every((p) => p.isReady);
+
+    if (!guestsReady) {
       clearInterval(interval);
       io.to(roomId).emit(SOCKET_EVENTS.ROOM_COUNTDOWN_CANCELLED, {
         reason: 'Player unreadied.',

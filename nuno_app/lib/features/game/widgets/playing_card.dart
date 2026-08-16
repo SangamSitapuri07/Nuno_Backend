@@ -37,9 +37,27 @@ class PlayingCardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final swatch = AppColors.forCardColor(_color.wire);
+
+    // A flat fill looks like coloured paper. Real cards have a slight
+    // vertical shade across the ink, so the body is a soft gradient of the
+    // suit colour rather than one tone.
     final body = _isWildFace
         ? const _WildQuadrants()
-        : ColoredBox(color: AppColors.forCardColor(_color.wire));
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color.lerp(swatch, Colors.white, 0.16)!,
+                  swatch,
+                  Color.lerp(swatch, Colors.black, 0.20)!,
+                ],
+                stops: const [0, 0.55, 1],
+              ),
+            ),
+          );
 
     Widget face = Container(
       width: width,
@@ -86,6 +104,25 @@ class PlayingCardView extends StatelessWidget {
             // Centre symbol.
             Center(child: _CenterSymbol(card: card, color: _color, width: width)),
 
+            // Gloss: a soft diagonal highlight over the top-left, which is
+            // what sells these as printed stock rather than flat shapes.
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.22),
+                      Colors.white.withValues(alpha: 0.05),
+                      Colors.transparent,
+                    ],
+                    stops: const [0, 0.35, 0.62],
+                  ),
+                ),
+              ),
+            ),
+
             // Top-left corner glyph.
             Positioned(
               top: width * 0.04,
@@ -108,15 +145,24 @@ class PlayingCardView extends StatelessWidget {
     );
 
     if (!isPlayable) {
-      face = Opacity(
-        opacity: 0.45,
-        child: ColorFiltered(
-          colorFilter: const ColorFilter.mode(
-            Color(0xFF4A4A5A),
-            BlendMode.saturation,
+      // Unplayable cards stay fully opaque and in colour. Fading and
+      // desaturating them made most of the hand look like empty slots and
+      // hid which cards were even held. A dark scrim reads as "not now"
+      // while leaving the card perfectly legible.
+      face = Stack(
+        children: [
+          face,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  borderRadius: BorderRadius.circular(width * 0.13),
+                ),
+              ),
+            ),
           ),
-          child: face,
-        ),
+        ],
       );
     }
 

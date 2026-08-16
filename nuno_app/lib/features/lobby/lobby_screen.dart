@@ -133,13 +133,26 @@ class _LobbyBody extends StatelessWidget {
         ? false
         : (room.playerById(myId!)?.isReady ?? false);
 
-    return Row(
+    // The host is implicitly ready - they are the one pressing START - so
+    // only the guests need to have confirmed. This mirrors the server check
+    // in room.handler.ts, so the button is never enabled for a request the
+    // server would refuse.
+    final guestsReady = room.players
+        .where((p) => p.userId != room.hostId)
+        .every((p) => p.isReady);
+    final canStart = room.players.length >= 2 && guestsReady;
+
+    // Scrollable: a short landscape viewport plus the system inset left the
+    // action row 134px past the bottom edge on the reporter's device.
+    return SingleChildScrollView(
+      child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Left: code + card art ──────────────────
         SizedBox(
-          width: 260,
+          width: 210,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text('ROOM CODE', style: AppTextStyles.label),
               const SizedBox(height: AppDimens.xs),
@@ -164,7 +177,7 @@ class _LobbyBody extends StatelessWidget {
                     children: [
                       Text(
                         room.roomCode,
-                        style: AppTextStyles.h1.copyWith(letterSpacing: 6),
+                        style: AppTextStyles.h2.copyWith(letterSpacing: 4),
                       ),
                       const SizedBox(width: AppDimens.sm),
                       const Icon(Icons.copy_rounded,
@@ -173,14 +186,14 @@ class _LobbyBody extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: AppDimens.lg),
+              const SizedBox(height: AppDimens.sm),
               const PlayingCardView(
                 card: GameCard(
                   cardId: 'preview',
                   color: CardColor.red,
                   value: CardValue.eight,
                 ),
-                width: 104,
+                width: 78,
               ),
               const SizedBox(height: AppDimens.sm),
               if (state.isCountingDown)
@@ -198,8 +211,8 @@ class _LobbyBody extends StatelessWidget {
         // Vertical divider, as in the concept render.
         Container(
           width: 1,
-          height: 200,
-          margin: const EdgeInsets.symmetric(horizontal: AppDimens.lg),
+          height: 170,
+          margin: const EdgeInsets.symmetric(horizontal: AppDimens.md),
           color: AppColors.surfaceStroke,
         ),
 
@@ -215,7 +228,7 @@ class _LobbyBody extends StatelessWidget {
               ),
               const SizedBox(height: AppDimens.sm),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 220),
+                constraints: const BoxConstraints(maxHeight: 158),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -241,14 +254,17 @@ class _LobbyBody extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: AppDimens.md),
-              Center(
-                child: Column(
-                  children: [
-                    ArtButton(
-                      asset: Art.btnInvite,
-                      fallbackLabel: 'INVITE',
-                      width: 190,
+              const SizedBox(height: AppDimens.sm),
+              // Side by side rather than stacked: two 190px buttons in a
+              // column overflowed the panel on a phone in landscape.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: _LobbyAction(
+                      label: 'INVITE',
+                      color: AppColors.blue,
+                      icon: Icons.person_add_alt_1_rounded,
                       onTap: () => InviteFriendsSheet.show(
                         context,
                         onInvite: controller.invite,
@@ -256,20 +272,52 @@ class _LobbyBody extends StatelessWidget {
                             room.players.map((p) => p.userId).toSet(),
                       ),
                     ),
-                    const SizedBox(height: AppDimens.xs),
-                    ArtButton(
-                      asset: isHost ? Art.btnStart : Art.btnReady,
-                      fallbackLabel: isHost ? 'START' : 'READY',
-                      width: 190,
-                      onTap: () => controller.setReady(!isReady),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: AppDimens.sm),
+                  Expanded(
+                    child: isHost
+                        // Only the host can start, as in every other lobby
+                        // players will have used.
+                        ? _LobbyAction(
+                            label: state.isCountingDown
+                                ? 'STARTING'
+                                : 'START',
+                            color: AppColors.green,
+                            icon: Icons.play_arrow_rounded,
+                            enabled: canStart && !state.isCountingDown,
+                            onTap: controller.startMatch,
+                          )
+                        : _LobbyAction(
+                            label: isReady ? 'READY' : 'NOT READY',
+                            color: isReady
+                                ? AppColors.green
+                                : AppColors.surfaceHigh,
+                            icon: isReady
+                                ? Icons.check_circle_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            onTap: () => controller.setReady(!isReady),
+                          ),
+                  ),
+                ],
               ),
+              if (isHost && !canStart) ...[
+                const SizedBox(height: 4),
+                Text(
+                  room.players.length < 2
+                      ? 'Waiting for another player'
+                      : 'Waiting for everyone to be ready',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -461,6 +509,61 @@ class _TracePanel extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Compact lobby action button. Replaces the art buttons here, which were
+/// fixed at 190px and could not shrink to fit the panel.
+class _LobbyAction extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _LobbyAction({
+    required this.label,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: Material(
+        color: color,
+        borderRadius: AppDimens.brSm,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: SizedBox(
+            height: 38,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 15, color: Colors.white),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.label.copyWith(
+                      color: Colors.white,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

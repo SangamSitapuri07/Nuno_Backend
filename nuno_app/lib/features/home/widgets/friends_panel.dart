@@ -316,9 +316,20 @@ class _FriendRow extends ConsumerWidget {
                 return;
               }
 
-              // Opening the friends list was a dead end - the plus button
-              // implies "play with them". Create a room and send the invite
-              // as soon as it has a code.
+              // An offline friend can never receive the invite, so say so
+              // instead of opening a room they will never join.
+              if (!friend.isInvitable) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${friend.username} is ${friend.status.label.toLowerCase()}',
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
+
               ref
                   .read(lobbyControllerProvider.notifier)
                   .inviteToNewRoom(friend.userId);
@@ -334,13 +345,17 @@ class _FriendRow extends ConsumerWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: online ? AppColors.green : AppColors.surfaceHigh,
+                color: (friend.isJoinable || friend.isInvitable)
+                    ? AppColors.green
+                    : AppColors.surfaceHigh,
                 borderRadius: AppDimens.brSm,
               ),
               child: Icon(
                 friend.isJoinable ? Icons.login_rounded : Icons.add_rounded,
                 size: 18,
-                color: online ? Colors.white : AppColors.textMuted,
+                color: (friend.isJoinable || friend.isInvitable)
+                    ? Colors.white
+                    : AppColors.textMuted,
               ),
             ),
           ),
