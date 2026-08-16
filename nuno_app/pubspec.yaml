@@ -30,7 +30,12 @@ dependencies:
   # Voice chat. The backend already relays offer/answer/ICE (src/voice/), but
   # nothing on this side produced or consumed audio, so the mic button only
   # ever toggled its own icon.
-  flutter_webrtc: ^0.12.5
+  # 1.x compiles against API 36. The 0.12.x line was built against API 31,
+  # which fails the AAR metadata check the moment any modern androidx
+  # dependency is pulled in ("requires ... compile against version 34 or
+  # later"), and the plugin's own compileSdk is not something an app can
+  # override.
+  flutter_webrtc: ^1.6.0
   permission_handler: ^11.3.1
 
   # Storage

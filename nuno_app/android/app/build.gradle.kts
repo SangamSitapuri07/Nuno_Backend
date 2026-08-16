@@ -6,7 +6,12 @@ plugins {
 
 android {
     namespace = "com.nuno.nuno_app"
-    compileSdk = flutter.compileSdkVersion
+    // Pinned rather than taking flutter.compileSdkVersion. Modern androidx
+    // artifacts pulled in by the plugins declare they must be compiled
+    // against API 34+, and when the toolchain default is lower the build
+    // fails in checkDebugAarMetadata with a list of dependency complaints
+    // that never names the real cause.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
