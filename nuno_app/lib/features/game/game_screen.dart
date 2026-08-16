@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/providers.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -41,8 +42,9 @@ class GameScreen extends ConsumerStatefulWidget {
 
 class _GameScreenState extends ConsumerState<GameScreen> {
   bool _resultShown = false;
-  bool _micOn = true;
+  bool _micOn = false;
   bool _soundOn = true;
+  bool _voiceStarting = false;
 
   @override
   void initState() {
@@ -50,6 +52,56 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(gameControllerProvider.notifier).requestSync();
     });
+  }
+
+  @override
+  void dispose() {
+    // Release the microphone when leaving the table; the service is shared,
+    // so a stale session would keep the mic hot on the next screen.
+    ref.read(voiceServiceProvider).leave();
+    super.dispose();
+  }
+
+  /// Mic starts off and joining is explicit, because the first tap is what
+  /// triggers the runtime permission prompt.
+  Future<void> _toggleMic(String roomId) async {
+    final voice = ref.read(voiceServiceProvider);
+
+    if (_micOn) {
+      voice.setMuted(true);
+      setState(() => _micOn = false);
+      return;
+    }
+
+    if (_voiceStarting) return;
+    setState(() => _voiceStarting = true);
+
+    final ok = voice.isActive ? true : await voice.join(roomId);
+    if (!mounted) return;
+
+    if (!ok) {
+      setState(() {
+        _voiceStarting = false;
+        _micOn = false;
+      });
+      AppSnack.error(
+        context,
+        'Microphone permission is required for voice chat.',
+      );
+      return;
+    }
+
+    voice.setMuted(false);
+    setState(() {
+      _voiceStarting = false;
+      _micOn = true;
+    });
+  }
+
+  void _toggleSound() {
+    final next = !_soundOn;
+    ref.read(voiceServiceProvider).setSpeakerEnabled(next);
+    setState(() => _soundOn = next);
   }
 
   Future<void> _playCard(GameCard card) async {
@@ -142,8 +194,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     isMyTurn: isMyTurn,
                     micOn: _micOn,
                     soundOn: _soundOn,
-                    onToggleMic: () => setState(() => _micOn = !_micOn),
-                    onToggleSound: () => setState(() => _soundOn = !_soundOn),
+                    onToggleMic: () => _toggleMic(game.roomId),
+                    onToggleSound: _toggleSound,
                     onPlayCard: _playCard,
                     onExit: _confirmExit,
                   ),

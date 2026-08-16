@@ -27,6 +27,12 @@ dependencies:
   # is simply never completed.
   socket_io_client: ^3.1.6
 
+  # Voice chat. The backend already relays offer/answer/ICE (src/voice/), but
+  # nothing on this side produced or consumed audio, so the mic button only
+  # ever toggled its own icon.
+  flutter_webrtc: ^0.12.5
+  permission_handler: ^11.3.1
+
   # Storage
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.2.3

@@ -86,6 +86,8 @@ class SocketEvents {
   static const voiceIceCandidate = 'voice.iceCandidate';
   static const voiceJoined = 'voice.joined';
   static const voiceLeft = 'voice.left';
+  static const voiceUserJoined = 'voice.userJoined';
+  static const voiceMute = 'voice.mute';
 
   // Friends
   static const friendStatusUpdated = 'friend.statusUpdated';

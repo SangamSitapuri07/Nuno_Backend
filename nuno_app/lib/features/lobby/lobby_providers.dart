@@ -87,6 +87,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     sub(SocketEvents.roomCreated, (p) {
       _settled();
       final room = GameRoom.fromJson(J.map(p['room']));
+      _flushInvites(room.roomCode);
       state = state.copyWith(
         room: room,
         isConnecting: false,
@@ -97,8 +98,10 @@ class LobbyController extends StateNotifier<LobbyState> {
 
     sub(SocketEvents.roomJoined, (p) {
       _settled();
+      final joined = GameRoom.fromJson(J.map(p['room']));
+      _flushInvites(joined.roomCode);
       state = state.copyWith(
-        room: GameRoom.fromJson(J.map(p['room'])),
+        room: joined,
         isConnecting: false,
         clearError: true,
       );
@@ -168,6 +171,7 @@ class LobbyController extends StateNotifier<LobbyState> {
 
     sub(SocketEvents.error, (p) {
       if (_awaitedEvent != null) _socket.cancelPending(_awaitedEvent!);
+      _pendingInvites.clear();
       _settled();
       state = state.copyWith(
         error: J.str(p['message'], 'Something went wrong.'),
@@ -233,6 +237,39 @@ class LobbyController extends StateNotifier<LobbyState> {
   /// The last create/join, replayed by [retryLast]. Both are idempotent
   /// server-side, so repeating one cannot strand the player in a room.
   void Function()? _lastRequest;
+
+  /// Friends to invite as soon as a room code exists.
+  ///
+  /// Inviting from outside the lobby means there is usually no room yet, so
+  /// the request is held here and flushed by [_flushInvites] once the server
+  /// answers with a room. Without this the invite would be dropped silently,
+  /// because invite.send requires a code.
+  final List<String> _pendingInvites = [];
+
+  /// Creates a room if needed, then invites [userId] to it.
+  void inviteToNewRoom(String userId) {
+    if (!_pendingInvites.contains(userId)) _pendingInvites.add(userId);
+
+    final code = state.room?.roomCode;
+    if (code != null) {
+      _flushInvites(code);
+      return;
+    }
+    // createRoom is idempotent, so this is safe even if one is already open.
+    createRoom();
+  }
+
+  void _flushInvites(String roomCode) {
+    if (_pendingInvites.isEmpty) return;
+    final targets = List.of(_pendingInvites);
+    _pendingInvites.clear();
+    for (final userId in targets) {
+      _socket.emit(SocketEvents.inviteSend, {
+        'targetUserId': userId,
+        'roomCode': roomCode,
+      });
+    }
+  }
 
   void createRoom({
     GameMode mode = GameMode.private,
@@ -310,6 +347,7 @@ class LobbyController extends StateNotifier<LobbyState> {
   /// for good rather than retrying inside it.
   void clear() {
     _lastRequest = null;
+    _pendingInvites.clear();
     reset();
   }
 

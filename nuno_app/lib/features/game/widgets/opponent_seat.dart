@@ -149,7 +149,7 @@ class _Identity extends StatelessWidget {
                     border: Border.all(color: Colors.white, width: 1.2),
                   ),
                   child: Text(
-                    'UNO',
+                    'NUNO',
                     style: AppTextStyles.caption.copyWith(
                       color: Colors.white,
                       fontSize: 7,

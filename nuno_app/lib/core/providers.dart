@@ -6,6 +6,7 @@ import '../data/repositories/social_repository.dart';
 import '../data/repositories/store_repository.dart';
 import '../data/repositories/user_repository.dart';
 import '../services/socket_service.dart';
+import '../services/voice_service.dart';
 import 'network/api_client.dart';
 import 'storage/token_storage.dart';
 
@@ -31,6 +32,13 @@ final sessionExpiredProvider = StateProvider<int>((ref) => 0);
 /// Long-lived Socket.IO connection.
 final socketServiceProvider = Provider<SocketService>((ref) {
   final service = SocketService(ref.watch(tokenStorageProvider));
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// WebRTC voice chat, driven by the socket's signalling relay.
+final voiceServiceProvider = Provider<VoiceService>((ref) {
+  final service = VoiceService(ref.watch(socketServiceProvider));
   ref.onDispose(service.dispose);
   return service;
 });

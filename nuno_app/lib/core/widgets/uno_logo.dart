@@ -4,18 +4,18 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// The UNO wordmark from the reference: a tilted red oval with thick
-/// white-outlined yellow lettering.
+/// The NUNO wordmark: a tilted red oval with thick white-outlined yellow
+/// lettering.
 class UnoLogo extends StatelessWidget {
   final double width;
   final String text;
 
-  const UnoLogo({super.key, this.width = 260, this.text = 'UNO'});
+  const UnoLogo({super.key, this.width = 260, this.text = 'NUNO'});
 
   @override
   Widget build(BuildContext context) {
     final height = width * 0.52;
-    final fontSize = width * 0.30;
+    final fontSize = width * 0.24;
 
     return Transform.rotate(
       angle: -0.06,

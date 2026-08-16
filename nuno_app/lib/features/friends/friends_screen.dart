@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
 import '../../core/router/app_router.dart';
+import '../lobby/lobby_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -303,6 +304,24 @@ class _FriendTile extends ConsumerWidget {
           children: [
             Text(friend.username, style: AppTextStyles.h3),
             const SizedBox(height: AppDimens.xl),
+            // Only offered when they are not already in a joinable room, in
+            // which case the tile shows JOIN instead.
+            if (!friend.isJoinable)
+              ListTile(
+                leading: const Icon(Icons.videogame_asset_rounded,
+                    color: AppColors.green),
+                title: Text('Invite to play', style: AppTextStyles.body),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  ref
+                      .read(lobbyControllerProvider.notifier)
+                      .inviteToNewRoom(friend.userId);
+                  if (context.mounted) {
+                    AppSnack.show(context, 'Invite sent to ${friend.username}');
+                    context.push(AppRoutes.lobby);
+                  }
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.person_remove_rounded,
                   color: AppColors.danger),

@@ -11,7 +11,16 @@ import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/titled_panel.dart';
 import 'lobby_providers.dart';
 
-/// Screen 6 — Join Room: code display plus an on-screen numeric keypad.
+/// Length of a room code, matching generateRoomCode() in
+/// src/utils/generateId.ts — five characters drawn from A-Z and 0-9.
+const int kRoomCodeLength = 5;
+
+/// Screen 6 — Join Room.
+///
+/// Codes mix letters and digits, so this takes text input rather than the
+/// numeric keypad it used to show: that keypad could only ever produce digits,
+/// and it required six characters when a code is five, so the confirm button
+/// never became enabled.
 class JoinRoomScreen extends ConsumerStatefulWidget {
   const JoinRoomScreen({super.key});
 
@@ -20,31 +29,55 @@ class JoinRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
-  static const _maxLength = 6;
-  String _code = '';
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
 
-  void _tap(String key) {
-    HapticFeedback.selectionClick();
-    if (_code.length >= _maxLength) return;
-    setState(() => _code += key);
+  String get _code => _controller.text;
+  bool get _complete => _code.length == kRoomCodeLength;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() => setState(() {}));
+    // Open the keyboard straight away; the only thing to do here is type.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
 
-  void _backspace() {
-    HapticFeedback.selectionClick();
-    if (_code.isEmpty) return;
-    setState(() => _code = _code.substring(0, _code.length - 1));
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
   }
 
   void _submit() {
-    if (_code.length < _maxLength) return;
+    if (!_complete) return;
+    HapticFeedback.mediumImpact();
     ref.read(lobbyControllerProvider.notifier).joinRoom(_code);
     context.pushReplacement(AppRoutes.lobby);
   }
 
+  Future<void> _paste() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text == null) return;
+
+    // Accept a pasted code with stray spaces or punctuation around it.
+    final cleaned = text
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
+        .padRight(0);
+    if (cleaned.isEmpty) return;
+
+    _controller.text = cleaned.length > kRoomCodeLength
+        ? cleaned.substring(0, kRoomCodeLength)
+        : cleaned;
+    _controller.selection =
+        TextSelection.collapsed(offset: _controller.text.length);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final complete = _code.length == _maxLength;
-
     return PanelScreen(
       title: 'Join Room',
       onBack: () => context.pop(),
@@ -56,64 +89,83 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
           Text('ENTER ROOM CODE', style: AppTextStyles.label),
           const SizedBox(height: AppDimens.sm),
 
-          // Code display.
-          Container(
-            height: 42,
+          // The real (invisible) field sits behind the boxes below, so the
+          // system keyboard — letters included — does the input while the
+          // display stays styled.
+          Stack(
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceHigh,
-              borderRadius: AppDimens.brSm,
-              border: Border.all(
-                color: complete ? AppColors.gold : AppColors.surfaceStroke,
+            children: [
+              Opacity(
+                opacity: 0,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focus,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLength: kRoomCodeLength,
+                  textCapitalization: TextCapitalization.characters,
+                  keyboardType: TextInputType.visiblePassword,
+                  textInputAction: TextInputAction.go,
+                  onSubmitted: (_) => _submit(),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')),
+                    _UpperCaseFormatter(),
+                  ],
+                ),
               ),
-            ),
-            child: Text(
-              _code.isEmpty ? 'Enter 6 character code' : _code,
-              style: _code.isEmpty
-                  ? AppTextStyles.body.copyWith(color: AppColors.textMuted)
-                  : AppTextStyles.h3.copyWith(letterSpacing: 8),
-            ),
+              GestureDetector(
+                onTap: _focus.requestFocus,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var i = 0; i < kRoomCodeLength; i++) ...[
+                      _CodeBox(
+                        character: i < _code.length ? _code[i] : null,
+                        focused: i == _code.length && _focus.hasFocus,
+                      ),
+                      if (i != kRoomCodeLength - 1)
+                        const SizedBox(width: AppDimens.sm),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(height: AppDimens.md),
 
-          // Keypad: 1-9, then backspace / 0 / confirm.
-          for (final row in const [
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-          ])
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppDimens.sm),
-              child: Row(
-                children: [
-                  for (final key in row) ...[
-                    Expanded(child: _Key(label: key, onTap: () => _tap(key))),
-                    if (key != row.last) const SizedBox(width: AppDimens.sm),
-                  ],
-                ],
-              ),
-            ),
+          Text(
+            'Codes are $kRoomCodeLength characters — letters and numbers.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+          ),
+
+          const SizedBox(height: AppDimens.xl),
+
           Row(
             children: [
               Expanded(
-                child: _Key(
-                  icon: Icons.backspace_outlined,
-                  onTap: _backspace,
+                child: TextButton.icon(
+                  onPressed: _paste,
+                  icon: const Icon(Icons.content_paste_rounded, size: 16),
+                  label: const Text('Paste'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                  ),
                 ),
               ),
               const SizedBox(width: AppDimens.sm),
-              Expanded(child: _Key(label: '0', onTap: () => _tap('0'))),
-              const SizedBox(width: AppDimens.sm),
               Expanded(
-                child: complete
-                    ? ArtButton(
-                        asset: Art.btnJoin,
-                        fallbackLabel: 'JOIN',
-                        width: 110,
-                        onTap: _submit,
-                      )
-                    : const _Key(icon: Icons.check_rounded),
+                child: Opacity(
+                  opacity: _complete ? 1 : 0.4,
+                  child: ArtButton(
+                    asset: Art.btnJoin,
+                    fallbackLabel: 'JOIN',
+                    width: 130,
+                    onTap: _complete ? _submit : null,
+                  ),
+                ),
               ),
             ],
           ),
@@ -123,50 +175,49 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
   }
 }
 
-class _Key extends StatelessWidget {
-  final String? label;
-  final IconData? icon;
-  final VoidCallback? onTap;
-  final bool highlight;
+/// Room codes are stored upper-case, so normalise as the user types rather
+/// than relying on the keyboard's shift state.
+class _UpperCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) =>
+      TextEditingValue(
+        text: newValue.text.toUpperCase(),
+        selection: newValue.selection,
+      );
+}
 
-  const _Key({this.label, this.icon, this.onTap, this.highlight = false});
+/// One character cell of the code display.
+class _CodeBox extends StatelessWidget {
+  final String? character;
+  final bool focused;
+
+  const _CodeBox({this.character, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
+    final filled = character != null;
 
-    return Material(
-      color: highlight ? AppColors.gold : AppColors.surfaceHigh,
-      borderRadius: AppDimens.brSm,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          height: 38,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: AppDimens.brSm,
-            border: Border.all(
-              color: highlight ? AppColors.gold : AppColors.surfaceStroke,
-            ),
-          ),
-          child: label != null
-              ? Text(
-                  label!,
-                  style: AppTextStyles.h4.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                )
-              : Icon(
-                  icon,
-                  size: 18,
-                  color: highlight
-                      ? const Color(0xFF3A2600)
-                      : (enabled
-                          ? AppColors.textSecondary
-                          : AppColors.textMuted),
-                ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      width: 46,
+      height: 54,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh,
+        borderRadius: AppDimens.brSm,
+        border: Border.all(
+          color: focused
+              ? AppColors.gold
+              : (filled ? AppColors.primary : AppColors.surfaceStroke),
+          width: focused ? 2 : 1,
         ),
+      ),
+      child: Text(
+        character ?? '',
+        style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary),
       ),
     );
   }

@@ -38,7 +38,7 @@ class PlayingCardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final body = _isWildFace
-        ? const ColoredBox(color: Color(0xFF141414))
+        ? const _WildQuadrants()
         : ColoredBox(color: AppColors.forCardColor(_color.wire));
 
     Widget face = Container(
@@ -47,19 +47,18 @@ class PlayingCardView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(width * 0.13),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isSelected ? 0.55 : 0.38),
-            blurRadius: isSelected ? 20 : 10,
-            offset: Offset(0, isSelected ? 10 : 5),
-          ),
-          if (isSelected)
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.6),
-              blurRadius: 18,
-              spreadRadius: 1,
-            ),
-        ],
+        // No ambient drop shadow: cards in a fanned hand overlap, so every
+        // card cast a dark band onto the one beside it, which read as a
+        // grey edge rather than depth. Only the selected card is lifted.
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  blurRadius: 14,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
       padding: EdgeInsets.all(width * 0.055),
       child: ClipRRect(
@@ -343,19 +342,17 @@ class CardBackView extends StatelessWidget {
       height: _height,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(width * 0.13),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-          if (isHighlighted)
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.55),
-              blurRadius: 18,
-              spreadRadius: 1,
-            ),
-        ],
+        // Matches the card face: no ambient shadow, since stacked backs
+        // otherwise smear a dark edge across each other.
+        boxShadow: isHighlighted
+            ? [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  blurRadius: 18,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(width * 0.13),
@@ -430,6 +427,39 @@ class _PaintedBack extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Body of an unplayed wild card: the four suit colours in quadrants.
+///
+/// The previous near-black fill made a wild look like an empty or
+/// half-loaded card next to the solid coloured ones.
+class _WildQuadrants extends StatelessWidget {
+  const _WildQuadrants();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(child: ColoredBox(color: AppColors.cardRed)),
+              Expanded(child: ColoredBox(color: AppColors.cardBlue)),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(child: ColoredBox(color: AppColors.cardYellow)),
+              Expanded(child: ColoredBox(color: AppColors.cardGreen)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

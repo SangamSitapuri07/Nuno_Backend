@@ -95,27 +95,19 @@ export const initializeVoiceHandlers = (
 
   socket.on(SOCKET_EVENTS.VOICE_OFFER, async (data: {
     targetUserId: string;
-    sdp: string;
+    offer: { sdp: string; type: string };
   }) => {
     try {
-      if (!socket.userId || !data?.targetUserId || !data?.sdp) return;
+      if (!socket.userId || !data?.targetUserId || !data?.offer) return;
 
+      // The personal room already reaches the target on any instance. The
+      // extra local scan that used to follow delivered a second copy, and a
+      // duplicated offer restarts negotiation on the receiving peer.
       io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.VOICE_OFFER, {
         fromUserId: socket.userId,
         fromUsername: socket.username,
-        sdp: data.sdp,
+        offer: data.offer,
       });
-
-      for (const [id, s] of io.sockets.sockets) {
-        if ((s as any).userId === data.targetUserId) {
-          io.to(id).emit(SOCKET_EVENTS.VOICE_OFFER, {
-            fromUserId: socket.userId,
-            fromUsername: socket.username,
-            sdp: data.sdp,
-          });
-          break;
-        }
-      }
 
       logger.info('Voice offer relayed', {
         from: socket.userId,
@@ -133,25 +125,15 @@ export const initializeVoiceHandlers = (
 
   socket.on(SOCKET_EVENTS.VOICE_ANSWER, async (data: {
     targetUserId: string;
-    sdp: string;
+    answer: { sdp: string; type: string };
   }) => {
     try {
-      if (!socket.userId || !data?.targetUserId || !data?.sdp) return;
+      if (!socket.userId || !data?.targetUserId || !data?.answer) return;
 
       io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.VOICE_ANSWER, {
         fromUserId: socket.userId,
-        sdp: data.sdp,
+        answer: data.answer,
       });
-
-      for (const [id, s] of io.sockets.sockets) {
-        if ((s as any).userId === data.targetUserId) {
-          io.to(id).emit(SOCKET_EVENTS.VOICE_ANSWER, {
-            fromUserId: socket.userId,
-            sdp: data.sdp,
-          });
-          break;
-        }
-      }
 
       logger.info('Voice answer relayed', {
         from: socket.userId,
@@ -169,31 +151,15 @@ export const initializeVoiceHandlers = (
 
   socket.on(SOCKET_EVENTS.VOICE_ICE_CANDIDATE, async (data: {
     targetUserId: string;
-    candidate: string;
-    sdpMid: string;
-    sdpMLineIndex: number;
+    candidate: { candidate: string; sdpMid: string; sdpMLineIndex: number };
   }) => {
     try {
-      if (!socket.userId || !data?.targetUserId) return;
+      if (!socket.userId || !data?.targetUserId || !data?.candidate) return;
 
       io.to(`user:${data.targetUserId}`).emit(SOCKET_EVENTS.VOICE_ICE_CANDIDATE, {
         fromUserId: socket.userId,
         candidate: data.candidate,
-        sdpMid: data.sdpMid,
-        sdpMLineIndex: data.sdpMLineIndex,
       });
-
-      for (const [id, s] of io.sockets.sockets) {
-        if ((s as any).userId === data.targetUserId) {
-          io.to(id).emit(SOCKET_EVENTS.VOICE_ICE_CANDIDATE, {
-            fromUserId: socket.userId,
-            candidate: data.candidate,
-            sdpMid: data.sdpMid,
-            sdpMLineIndex: data.sdpMLineIndex,
-          });
-          break;
-        }
-      }
 
     } catch (error) {
       logger.error('ICE candidate error', { error });

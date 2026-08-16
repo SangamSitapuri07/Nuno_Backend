@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/router/app_router.dart';
+import '../../lobby/lobby_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -303,7 +304,7 @@ class _FriendRow extends ConsumerWidget {
               ],
             ),
           ),
-          // Green action: join their room, or invite them to play.
+          // Green action: join their room, or open one and invite them.
           GestureDetector(
             onTap: () {
               if (friend.isJoinable) {
@@ -312,9 +313,22 @@ class _FriendRow extends ConsumerWidget {
                   {'roomCode': friend.roomCode},
                 );
                 context.push(AppRoutes.lobby);
-              } else {
-                context.push(AppRoutes.friends);
+                return;
               }
+
+              // Opening the friends list was a dead end - the plus button
+              // implies "play with them". Create a room and send the invite
+              // as soon as it has a code.
+              ref
+                  .read(lobbyControllerProvider.notifier)
+                  .inviteToNewRoom(friend.userId);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Invite sent to ${friend.username}'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              context.push(AppRoutes.lobby);
             },
             child: Container(
               width: 32,
