@@ -21,7 +21,11 @@ dependencies:
 
   # Networking
   dio: ^5.4.3+1
-  socket_io_client: ^2.0.3+1
+  # v3 is required for a Socket.IO 4.7+ server (the backend runs 4.8.x).
+  # The v2 client only speaks to servers up to 4.6, and the mismatch shows up
+  # as a connect timeout rather than a protocol error, because the handshake
+  # is simply never completed.
+  socket_io_client: ^3.1.6
 
   # Storage
   flutter_secure_storage: ^9.2.2

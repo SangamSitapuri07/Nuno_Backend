@@ -188,10 +188,16 @@ class SocketService {
     _socket = io.io(
       AppConfig.socketUrl,
       io.OptionBuilder()
-          // Start on polling and let Socket.IO upgrade to websocket. Hosted
-          // proxies (Render, Heroku, Cloudflare) frequently reject a direct
-          // websocket handshake, which would strand a websocket-only client.
-          .setTransports(['polling', 'websocket'])
+          // Websocket only, deliberately.
+          //
+          // Outside Flutter Web this client cannot do XHR polling at all: it
+          // is built on dart:io sockets, not dart:html. Listing 'polling'
+          // first means the very first attempt uses a transport that can
+          // never succeed, and because nothing answers, the failure surfaces
+          // as a connect *timeout* instead of an error - which is exactly the
+          // 'transport error timeout' being seen. Render terminates TLS and
+          // supports websockets directly, so there is nothing to fall back to.
+          .setTransports(['websocket'])
           .enableForceNew()
           .enableReconnection()
           .setReconnectionAttempts(999)
