@@ -206,7 +206,7 @@ class LobbyController extends StateNotifier<LobbyState> {
     // surface through `client.reachability` within a few seconds. This is
     // only the backstop for a server that accepts the connection and then
     // goes quiet.
-    final budget = AppConfig.connectTimeout + const Duration(seconds: 15);
+    final budget = AppConfig.socketOverallBudget + const Duration(seconds: 20);
 
     _pendingTimeout = Timer(budget, () {
       if (state.room != null || !state.isConnecting) return;

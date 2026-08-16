@@ -44,6 +44,21 @@ class AppConfig {
   static Duration get receiveTimeout =>
       isRenderFreeTier ? const Duration(seconds: 90) : const Duration(seconds: 20);
 
+  /// Budget for ONE socket connection attempt.
+  ///
+  /// Deliberately much shorter than [connectTimeout]. Socket.IO retries on its
+  /// own, so a long per-attempt timeout does not buy resilience — it only
+  /// delays the first `connect_error`. On a network that silently drops
+  /// packets (no route, captive portal, blocked egress) nothing is reported
+  /// until the attempt expires, so a 90s budget means 90s of a spinner with
+  /// no diagnosis. 15s is far longer than any handshake needs, while still
+  /// allowing several attempts inside a slow cold start.
+  static const Duration socketAttemptTimeout = Duration(seconds: 15);
+
+  /// How long the socket keeps retrying before the lobby gives up.
+  static Duration get socketOverallBudget =>
+      isRenderFreeTier ? const Duration(seconds: 90) : const Duration(seconds: 30);
+
   /// Show a "waking the server" hint if a request outlives this.
   static const Duration coldStartHintAfter = Duration(seconds: 6);
 

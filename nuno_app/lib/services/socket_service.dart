@@ -167,6 +167,17 @@ class SocketService {
       return;
     }
 
+    // An attempt is already running. Socket.IO is retrying it on its own
+    // schedule, so tearing it down and starting over — which is what several
+    // callers here end up doing, since connect() is invoked from auth
+    // bootstrap, the socket bootstrap provider and every retry — resets the
+    // backoff and throws away a connection that was about to land. Two
+    // "connecting" lines with nothing after them is exactly that.
+    if (_state == SocketConnectionState.connecting) {
+      _trace_('connect() ignored - an attempt is already in flight');
+      return;
+    }
+
     _trace_('connecting to ${AppConfig.socketUrl} ...');
     _setState(SocketConnectionState.connecting);
 
@@ -187,7 +198,10 @@ class SocketService {
           .setReconnectionDelay(1000)
           // A sleeping free-tier instance needs a long cold-start budget.
           .setReconnectionDelayMax(AppConfig.isRenderFreeTier ? 15000 : 5000)
-          .setTimeout(AppConfig.connectTimeout.inMilliseconds)
+          // Per ATTEMPT, not overall: Socket.IO reconnects by itself, and a
+          // long value here only postpones the first connect_error on a
+          // network that drops packets silently.
+          .setTimeout(AppConfig.socketAttemptTimeout.inMilliseconds)
           .disableAutoConnect()
           .build(),
     );
@@ -296,9 +310,9 @@ class SocketService {
     }
 
     _authTimeout?.cancel();
-    _authTimeout = Timer(AppConfig.connectTimeout, () {
+    _authTimeout = Timer(AppConfig.socketOverallBudget, () {
       if (isAuthenticated) return;
-      _trace_('handshake timed out after ${AppConfig.connectTimeout.inSeconds}s');
+      _trace_('handshake timed out after ${AppConfig.socketOverallBudget.inSeconds}s');
       _failHandshake(
         'AUTH_TIMEOUT',
         'Could not reach the server. Check your connection and try again.',
