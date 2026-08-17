@@ -65,7 +65,32 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       if (!mounted) return;
       _voice = ref.read(voiceServiceProvider);
       ref.read(gameControllerProvider.notifier).requestSync();
+      _joinVoice();
     });
+  }
+
+  /// Joins the voice channel as soon as the table opens, muted.
+  ///
+  /// Previously the channel was only joined when a player pressed the mic,
+  /// which meant nobody could hear anyone until BOTH sides had pressed it -
+  /// there was no peer connection to carry the audio otherwise. Joining up
+  /// front establishes the connection; the mic button then only controls
+  /// whether the local track is live, so one player unmuting is immediately
+  /// audible to everyone else.
+  Future<void> _joinVoice() async {
+    final game = ref.read(gameControllerProvider).game;
+    final roomId = game?.roomId;
+    if (roomId == null || roomId.isEmpty) return;
+
+    final voice = ref.read(voiceServiceProvider);
+    if (voice.isActive) return;
+
+    final ok = await voice.join(roomId);
+    if (!ok || !mounted) return;
+
+    // Connected but silent until the player opts in.
+    voice.setMuted(true);
+    if (mounted) setState(() => _micOn = false);
   }
 
   @override
@@ -90,6 +115,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (_voiceStarting) return;
     setState(() => _voiceStarting = true);
 
+    // Normally already joined from initState; this covers the case where
+    // that first attempt failed, for example because permission was refused.
     final ok = voice.isActive ? true : await voice.join(roomId);
     if (!mounted) return;
 
@@ -168,6 +195,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final controller = ref.read(gameControllerProvider.notifier);
 
     ref.listen<GameUiState>(gameControllerProvider, (prev, next) {
+      // The initial state usually arrives after the first frame, so the join
+      // attempted in initState may have had no room id to work with yet.
+      if (prev?.game == null && next.game != null) _joinVoice();
+
       if (next.result != null && next.result != prev?.result) {
         _showResult(next.result!, myId);
       }

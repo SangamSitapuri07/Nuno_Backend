@@ -38,6 +38,7 @@ class VoiceService {
 
   bool _active = false;
   bool _muted = false;
+  bool _speakerOn = true;
   String? _roomId;
 
   final _stateController = StreamController<VoiceState>.broadcast();
@@ -85,6 +86,21 @@ class VoiceService {
       return false;
     }
 
+    // Route to the loudspeaker. WebRTC on Android defaults a voice call to
+    // the earpiece, so audio was arriving but was inaudible unless the phone
+    // was held to the ear - which reads exactly like "no sound at all".
+    //
+    // The Android configuration must be applied before the session starts;
+    // it cannot be changed mid-call.
+    try {
+      await Helper.setAndroidAudioConfiguration(
+        AndroidAudioConfiguration.communication,
+      );
+      await Helper.setSpeakerphoneOn(true);
+    } catch (e) {
+      debugPrint('[voice] could not force the speaker: $e');
+    }
+
     _roomId = roomId;
     _active = true;
     _listen();
@@ -123,6 +139,14 @@ class VoiceService {
     _active = false;
     _muted = false;
     _roomId = null;
+
+    try {
+      await Helper.setSpeakerphoneOn(false);
+      await Helper.clearAndroidCommunicationDevice();
+    } catch (_) {
+      // Best effort: the call is over either way.
+    }
+
     _emit();
   }
 
@@ -137,7 +161,11 @@ class VoiceService {
   }
 
   /// Silences everyone else without touching the microphone.
+  ///
+  /// The choice is remembered, because applying it only to the streams that
+  /// exist right now would let a player who connects later be audible again.
   void setSpeakerEnabled(bool enabled) {
+    _speakerOn = enabled;
     for (final stream in _remoteStreams.values) {
       for (final track in stream.getAudioTracks()) {
         track.enabled = enabled;
@@ -271,7 +299,12 @@ class VoiceService {
 
     peer.onTrack = (event) {
       if (event.streams.isEmpty) return;
-      _remoteStreams[userId] = event.streams.first;
+      final stream = event.streams.first;
+      _remoteStreams[userId] = stream;
+      // Honour the current speaker setting for a peer that just arrived.
+      for (final track in stream.getAudioTracks()) {
+        track.enabled = _speakerOn;
+      }
       _emit();
     };
 

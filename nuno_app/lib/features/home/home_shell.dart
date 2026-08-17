@@ -128,11 +128,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 Positioned(
                   left: 0,
                   top: 0,
+                  // Hard against the corner. SafeArea is applied on the left
+                  // only: in landscape the top inset is zero anyway, and
+                  // padding it as well pushed the button visibly inwards.
                   child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 6, top: 6),
-                      child: _BackButton(onTap: () => _go(0)),
-                    ),
+                    top: false,
+                    bottom: false,
+                    right: false,
+                    minimum: const EdgeInsets.only(left: 4, top: 4),
+                    child: _BackButton(onTap: () => _go(0)),
                   ),
                 ),
             ],
@@ -174,22 +178,15 @@ class _BackButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 38,
-        height: 38,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           color: AppColors.surface.withValues(alpha: 0.92),
           shape: BoxShape.circle,
           border: Border.all(color: AppColors.surfaceStroke),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
         ),
         child: const Icon(Icons.arrow_back_rounded,
-            size: 20, color: AppColors.textPrimary),
+            size: 18, color: AppColors.textPrimary),
       ),
     );
   }
