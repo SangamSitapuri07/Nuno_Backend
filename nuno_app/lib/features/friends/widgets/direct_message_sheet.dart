@@ -8,6 +8,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/player_avatar.dart';
+// PlayerOnlineStatus's `label` and `wire` come from an extension, and a Dart
+// extension is only in scope through a direct import of its own library -
+// reaching the enum via social_models.dart is not enough.
+import '../../../data/models/enums.dart';
 import '../../../data/models/social_models.dart';
 import '../../../services/socket_events.dart';
 
@@ -36,7 +40,7 @@ class DirectMessageSheet extends ConsumerStatefulWidget {
 class _DirectMessageSheetState extends ConsumerState<DirectMessageSheet> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
-  final List<_Message> _messages = [];
+  final List<DmMessage> _messages = [];
   StreamSubscription? _sub;
 
   @override
@@ -53,7 +57,7 @@ class _DirectMessageSheetState extends ConsumerState<DirectMessageSheet> {
     _sub = socket.on(SocketEvents.dmReceived).listen((payload) {
       if (payload['fromUserId']?.toString() != widget.friend.userId) return;
       _append(
-        _Message(
+        DmMessage(
           text: payload['message']?.toString() ?? '',
           mine: false,
         ),
@@ -69,7 +73,7 @@ class _DirectMessageSheetState extends ConsumerState<DirectMessageSheet> {
     super.dispose();
   }
 
-  void _append(_Message message) {
+  void _append(DmMessage message) {
     if (!mounted) return;
     setState(() => _messages.add(message));
 
@@ -97,7 +101,7 @@ class _DirectMessageSheetState extends ConsumerState<DirectMessageSheet> {
     });
 
     _controller.clear();
-    _append(_Message(text: text, mine: true));
+    _append(DmMessage(text: text, mine: true));
   }
 
   @override
@@ -227,7 +231,7 @@ class _DirectMessageSheetState extends ConsumerState<DirectMessageSheet> {
 }
 
 class _Bubble extends StatelessWidget {
-  final _Message message;
+  final DmMessage message;
 
   const _Bubble({required this.message});
 
@@ -258,14 +262,15 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-class _Message {
+/// Public because [dmHistoryProvider] names it in its type argument.
+class DmMessage {
   final String text;
   final bool mine;
 
-  const _Message({required this.text, required this.mine});
+  const DmMessage({required this.text, required this.mine});
 }
 
 /// Session-scoped conversation history, keyed by friend id.
-final dmHistoryProvider = Provider<Map<String, List<_Message>>>(
-  (ref) => <String, List<_Message>>{},
+final dmHistoryProvider = Provider<Map<String, List<DmMessage>>>(
+  (ref) => <String, List<DmMessage>>{},
 );
