@@ -337,6 +337,15 @@ export class EconomyService {
       { itemId: 'frame_gold', name: 'Gold Frame', description: 'For the consistent winner', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'frame_epic', name: 'Epic Frame', description: 'Radiant arcane ring', type: 'PROFILE_BANNER', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true },
 
+      // ═══ AVATARS - your portrait ═══
+      //
+      // The default is the generated initials tile, so it has no art entry
+      // and cannot be bought or unequipped.
+      { itemId: 'avatar_warrior', name: 'Warrior', description: 'Steel and nerve', type: 'AVATAR', rarity: 'RARE', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_rogue', name: 'Rogue', description: 'Plays close to the chest', type: 'AVATAR', rarity: 'RARE', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_wizard', name: 'Wizard', description: 'Reads the table', type: 'AVATAR', rarity: 'EPIC', price: 2000, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_queen', name: 'Queen', description: 'Rules every round', type: 'AVATAR', rarity: 'LEGENDARY', price: 3800, currency: 'COINS', imageUrl: null, isAvailable: true },
+
       // ═══ TITLES - shown under your name ═══
       //
       // Text rather than art, so these need no asset and cannot end up

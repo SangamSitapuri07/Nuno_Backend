@@ -76,7 +76,8 @@ class PlayerBadge extends ConsumerWidget {
                 children: [
                   PlayerAvatar(
                     username: username,
-                    avatarUrl: avatarUrl,
+                    // An equipped portrait wins over the account picture.
+                    avatarUrl: cosmetics.avatar ?? avatarUrl,
                     size: 32,
                   ),
                   ArtImage(frame, width: 46),

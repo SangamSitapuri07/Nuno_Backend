@@ -127,7 +127,7 @@ class _IdentitySection extends ConsumerWidget {
             children: [
               PlayerAvatar(
                 username: p.username,
-                avatarUrl: p.avatarUrl,
+                avatarUrl: cosmetics.avatar ?? p.avatarUrl,
                 size: 56,
                 level: p.level,
                 ringColor: tierColor,

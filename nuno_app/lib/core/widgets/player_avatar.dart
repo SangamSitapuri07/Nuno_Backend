@@ -76,14 +76,23 @@ class PlayerAvatar extends StatelessWidget {
               ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: (avatarUrl != null && avatarUrl!.startsWith('http'))
-          ? CachedNetworkImage(
-              imageUrl: avatarUrl!,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => _initialsFallback(initials),
-              errorWidget: (_, __, ___) => _initialsFallback(initials),
-            )
-          : _initialsFallback(initials),
+      child: switch (avatarUrl) {
+        // A bundled portrait bought from the store.
+        final a? when a.startsWith('assets/') => Image.asset(
+            a,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _initialsFallback(initials),
+          ),
+        // A remote picture, if the account ever gets uploads.
+        final a? when a.startsWith('http') => CachedNetworkImage(
+            imageUrl: a,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => _initialsFallback(initials),
+            errorWidget: (_, __, ___) => _initialsFallback(initials),
+          ),
+        // Default: the generated initials tile.
+        _ => _initialsFallback(initials),
+      },
     );
 
     if (status != null || level != null) {

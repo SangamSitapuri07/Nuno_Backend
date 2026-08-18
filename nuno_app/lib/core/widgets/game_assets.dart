@@ -40,6 +40,12 @@ class Art {
   static const skinFire = 'assets/images/skin_fire.png';
   static const skinOcean = 'assets/images/skin_ocean.png';
 
+  // Purchasable avatar portraits. The default remains the initials tile.
+  static const avatarWarrior = 'assets/images/avatar_warrior.png';
+  static const avatarWizard = 'assets/images/avatar_wizard.png';
+  static const avatarRogue = 'assets/images/avatar_rogue.png';
+  static const avatarQueen = 'assets/images/avatar_queen.png';
+
   // Table themes sold in the store. These are the store thumbnails; the
   // in-game background uses the full-bleed bg_* images.
   static const tableGalaxy = 'assets/images/table_galaxy.png';
@@ -138,9 +144,22 @@ class Art {
         'badge_flame' => medalFlame,
         'badge_bolt' => medalBolt,
         'badge_crown' => medalCrown,
+        'avatar_warrior' => avatarWarrior,
+        'avatar_wizard' => avatarWizard,
+        'avatar_rogue' => avatarRogue,
+        'avatar_queen' => avatarQueen,
         _ => itemId.startsWith('emote_')
             ? emote(itemId.substring('emote_'.length))
             : null,
+      };
+
+  /// Portrait art for a store avatar itemId, or null when it is not one.
+  static String? avatar(String itemId) => switch (itemId) {
+        'avatar_warrior' => avatarWarrior,
+        'avatar_wizard' => avatarWizard,
+        'avatar_rogue' => avatarRogue,
+        'avatar_queen' => avatarQueen,
+        _ => null,
       };
 
   /// Medal art for a store badge itemId, or null when it is not a badge.

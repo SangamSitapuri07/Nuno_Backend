@@ -41,6 +41,9 @@ class EquippedCosmetics {
   /// not the store's 'emote_laugh'. The defaults are always available.
   final Set<String> emotes;
 
+  /// Portrait asset, or null to keep the generated initials tile.
+  final String? avatar;
+
   /// Medal shown beside the player's name, or null when none is equipped.
   final String? badge;
 
@@ -52,6 +55,7 @@ class EquippedCosmetics {
     required this.tableTheme,
     required this.avatarFrame,
     required this.emotes,
+    this.avatar,
     this.badge,
     this.title,
   });
@@ -79,6 +83,7 @@ class EquippedCosmetics {
         for (final id in owned)
           if (id.startsWith('emote_')) id.substring('emote_'.length),
       },
+      avatar: Art.avatar(inventory?.equippedFor(CosmeticType.avatar) ?? ''),
       badge: Art.badge(inventory?.equippedFor(CosmeticType.badge) ?? ''),
       title: _titleText(inventory?.equippedFor(CosmeticType.title)),
     );
