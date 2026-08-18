@@ -1,11 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/game_assets.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/game_card.dart';
+import '../../store/cosmetics_provider.dart';
 
 /// A Nuno card face, matching the gameplay mockup.
 ///
@@ -438,7 +440,7 @@ class _CornerGlyph extends StatelessWidget {
 }
 
 /// Face-down card. Uses the rendered 3D art, falling back to a painted back.
-class CardBackView extends StatelessWidget {
+class CardBackView extends ConsumerWidget {
   final double width;
   final VoidCallback? onTap;
   final bool isHighlighted;
@@ -453,7 +455,10 @@ class CardBackView extends StatelessWidget {
   double get _height => width / 0.68;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The equipped card back, or the default when nothing is equipped.
+    final skin = ref.watch(equippedCosmeticsProvider).cardBack;
+
     final face = Container(
       width: width,
       height: _height,
@@ -474,7 +479,7 @@ class CardBackView extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(width * 0.13),
         child: Image.asset(
-          Art.cardBack3d,
+          skin,
           fit: BoxFit.fill,
           errorBuilder: (_, __, ___) => _PaintedBack(width: width),
         ),

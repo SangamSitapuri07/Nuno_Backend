@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import {
   PurchaseInput,
   RewardInput,
+  EquipInput,
   CosmeticType,
   CurrencyType,
 } from './economy.types';
@@ -26,12 +27,61 @@ export class EconomyService {
       },
     });
 
+    // A map of type -> equipped itemId, so the client does not have to scan
+    // the whole list to answer "what am I using right now".
+    const equipped: Record<string, string> = {};
+    for (const c of cosmetics) {
+      if (c.isEquipped) equipped[c.cosmeticType] = c.cosmeticId;
+    }
+
     return {
       currencies: {
         coins: user?.coins || 0,
       },
       cosmetics,
+      equipped,
     };
+  }
+
+  // ─────────────────────────────────────────
+  // EQUIP COSMETIC
+  // ─────────────────────────────────────────
+
+  /// Makes an owned cosmetic the active one for its type.
+  ///
+  /// Buying something previously had no visible effect anywhere: ownership
+  /// was recorded and nothing ever read it back. Exactly one item per type
+  /// may be equipped, so this clears the others in the same transaction to
+  /// avoid a window where a player has two card backs or none.
+  async equipCosmetic(userId: string, input: EquipInput): Promise<void> {
+    const owned = await prisma.playerCosmetic.findFirst({
+      where: { playerId: userId, cosmeticId: input.cosmeticId },
+    });
+
+    if (!owned) {
+      throw { code: 'NOT_OWNED', message: 'You do not own that item.', status: 403 };
+    }
+
+    await prisma.$transaction([
+      prisma.playerCosmetic.updateMany({
+        where: {
+          playerId: userId,
+          cosmeticType: owned.cosmeticType,
+          isEquipped: true,
+        },
+        data: { isEquipped: false },
+      }),
+      prisma.playerCosmetic.update({
+        where: { id: owned.id },
+        data: { isEquipped: true },
+      }),
+    ]);
+
+    logger.info('Cosmetic equipped', {
+      userId,
+      cosmeticId: input.cosmeticId,
+      cosmeticType: owned.cosmeticType,
+    });
   }
 
   // ─────────────────────────────────────────
@@ -76,14 +126,27 @@ export class EconomyService {
       });
     }
 
-    // Grant item
-    await prisma.playerCosmetic.create({
-      data: {
-        playerId: userId,
-        cosmeticType: input.cosmeticType as any,
-        cosmeticId: input.itemId,
-      },
-    });
+    // Grant the item and put it straight into use. Buying something and then
+    // having to find a separate equip control is a pointless second step,
+    // and players reasonably expect what they just bought to be applied.
+    await prisma.$transaction([
+      prisma.playerCosmetic.updateMany({
+        where: {
+          playerId: userId,
+          cosmeticType: input.cosmeticType as any,
+          isEquipped: true,
+        },
+        data: { isEquipped: false },
+      }),
+      prisma.playerCosmetic.create({
+        data: {
+          playerId: userId,
+          cosmeticType: input.cosmeticType as any,
+          cosmeticId: input.itemId,
+          isEquipped: true,
+        },
+      }),
+    ]);
 
     logger.info('Item purchased', {
       userId,
@@ -190,127 +253,38 @@ export class EconomyService {
   // ─────────────────────────────────────────
 
   async getStoreItems() {
+    // Deliberately small.
+    //
+    // The catalogue used to advertise around eighty items, but only a
+    // handful had artwork and nothing bought could actually be equipped, so
+    // most of it was decoration. Every entry below has real art in the app
+    // and a real effect once equipped. Anything priced in gems was also
+    // removed: the User model only has `coins`, so those were unbuyable.
     return [
-      // ═══ FEATURED ═══
-      { itemId: 'bundle_starter', name: 'Starter Bundle', description: 'Avatar + Card Back + 500 coins', type: 'AVATAR', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true, originalPrice: 800, discountPercent: 37 },
-      { itemId: 'bundle_premium', name: 'Premium Bundle', description: 'Everything you need', type: 'AVATAR', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true, originalPrice: 5000, discountPercent: 40, isLimited: true },
+      // ═══ CARD BACKS - the design shown on face-down cards ═══
+      { itemId: 'card_back_classic', name: 'Classic Back', description: 'The original Nuno back', type: 'CARD_BACK', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
+      { itemId: 'card_back_neon', name: 'Neon City', description: 'Cyberpunk glow', type: 'CARD_BACK', rarity: 'RARE', price: 600, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'card_back_gold', name: 'Gold Leaf', description: 'Gilded finish', type: 'CARD_BACK', rarity: 'EPIC', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'card_back_diamond', name: 'Diamond Elite', description: 'Ultra rare finish', type: 'CARD_BACK', rarity: 'LEGENDARY', price: 4000, currency: 'COINS', imageUrl: null, isAvailable: true },
 
-      // ═══ CARD PACKS ═══
-      { itemId: 'pack_classic', name: 'Classic Pack', description: '5 random cards', type: 'CARD_BACK', rarity: 'COMMON', price: 200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'pack_neon', name: 'Neon Pack', description: '5 rare cards', type: 'CARD_BACK', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'pack_gold', name: 'Gold Pack', description: '5 epic cards', type: 'CARD_BACK', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'pack_diamond', name: 'Diamond Pack', description: '5 legendary cards', type: 'CARD_BACK', rarity: 'LEGENDARY', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
+      // ═══ TABLE THEMES - the background behind the table ═══
+      { itemId: 'table_galaxy', name: 'Galaxy Table', description: 'Deep space vortex', type: 'TABLE_THEME', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
+      { itemId: 'table_panel', name: 'Midnight Table', description: 'Calm violet felt', type: 'TABLE_THEME', rarity: 'RARE', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'table_store', name: 'Aurora Table', description: 'Shifting aurora light', type: 'TABLE_THEME', rarity: 'EPIC', price: 1800, currency: 'COINS', imageUrl: null, isAvailable: true },
 
-      // ═══ CARD BACKS ═══
-      { itemId: 'back_classic', name: 'Classic Back', description: 'Traditional design', type: 'CARD_BACK', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'back_galaxy', name: 'Galaxy Back', description: 'Cosmic space theme', type: 'CARD_BACK', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'back_fire', name: 'Fire Storm', description: 'Blazing fire design', type: 'CARD_BACK', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'back_ocean', name: 'Ocean Wave', description: 'Deep sea design', type: 'CARD_BACK', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'back_neon', name: 'Neon City', description: 'Cyberpunk aesthetic', type: 'CARD_BACK', rarity: 'LEGENDARY', price: 2500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'back_diamond', name: 'Diamond Elite', description: 'Ultra rare finish', type: 'CARD_BACK', rarity: 'MYTHIC', price: 5000, currency: 'COINS', imageUrl: null, isAvailable: true },
+      // ═══ AVATAR FRAMES - the ring around your avatar ═══
+      { itemId: 'frame_bronze', name: 'Bronze Frame', description: 'Where everyone starts', type: 'PROFILE_BANNER', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
+      { itemId: 'frame_silver', name: 'Silver Frame', description: 'Polished silver ring', type: 'PROFILE_BANNER', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'frame_gold', name: 'Gold Frame', description: 'For the consistent winner', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'frame_epic', name: 'Epic Frame', description: 'Radiant arcane ring', type: 'PROFILE_BANNER', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true },
 
-      // ═══ CARD THEMES ═══
-      { itemId: 'theme_classic', name: 'Classic Theme', description: 'Original card design', type: 'CARD_THEME', rarity: 'COMMON', price: 150, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'theme_dark', name: 'Dark Theme', description: 'Sleek dark cards', type: 'CARD_THEME', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'theme_holographic', name: 'Holographic', description: 'Shimmering cards', type: 'CARD_THEME', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'theme_rainbow', name: 'Rainbow', description: 'Colorful gradient', type: 'CARD_THEME', rarity: 'EPIC', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ TABLE THEMES ═══
-      { itemId: 'table_classic', name: 'Classic Table', description: 'Green felt table', type: 'TABLE_THEME', rarity: 'COMMON', price: 200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'table_space', name: 'Space Table', description: 'Galaxy background', type: 'TABLE_THEME', rarity: 'RARE', price: 600, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'table_neon', name: 'Neon Table', description: 'Glowing neon', type: 'TABLE_THEME', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'table_royal', name: 'Royal Table', description: 'Gold and velvet', type: 'TABLE_THEME', rarity: 'LEGENDARY', price: 2500, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ AVATARS ═══
-      { itemId: 'avatar_default', name: 'Default Avatar', description: 'Classic look', type: 'AVATAR', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_warrior', name: 'Warrior', description: 'Battle-tested', type: 'AVATAR', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_wizard', name: 'Wizard', description: 'Mystical powers', type: 'AVATAR', rarity: 'EPIC', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_dragon', name: 'Dragon Lord', description: 'Fire breather', type: 'AVATAR', rarity: 'LEGENDARY', price: 2000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_god', name: 'Cosmic God', description: 'Divine being', type: 'AVATAR', rarity: 'MYTHIC', price: 5000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ EMOTES ═══
-      { itemId: 'emote_laugh', name: 'Laugh', description: 'Ha ha!', type: 'EMOTE', rarity: 'COMMON', price: 50, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_angry', name: 'Angry', description: 'Grrr!', type: 'EMOTE', rarity: 'COMMON', price: 50, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_cool', name: 'Cool', description: 'Too cool', type: 'EMOTE', rarity: 'RARE', price: 200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_dab', name: 'Dab', description: 'Show off', type: 'EMOTE', rarity: 'EPIC', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_crown', name: 'King Wave', description: 'Royal greeting', type: 'EMOTE', rarity: 'LEGENDARY', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ TITLES ═══
-      { itemId: 'title_rookie', name: 'Rookie', description: 'Just starting', type: 'TITLE', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'title_champion', name: 'Champion', description: 'Proven winner', type: 'TITLE', rarity: 'RARE', price: 400, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'title_legend', name: 'Legend', description: 'Legendary status', type: 'TITLE', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'title_god', name: 'The God', description: 'Ultimate title', type: 'TITLE', rarity: 'MYTHIC', price: 5000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ BADGES ═══
-      { itemId: 'badge_bronze', name: 'Bronze Badge', description: 'Bronze tier', type: 'BADGE', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'badge_silver', name: 'Silver Badge', description: 'Silver tier', type: 'BADGE', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'badge_gold', name: 'Gold Badge', description: 'Gold tier', type: 'BADGE', rarity: 'EPIC', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'badge_diamond', name: 'Diamond Badge', description: 'Diamond tier', type: 'BADGE', rarity: 'LEGENDARY', price: 2500, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ PROFILE BANNERS ═══
-      { itemId: 'banner_fire', name: 'Fire Banner', description: 'Flaming background', type: 'PROFILE_BANNER', rarity: 'RARE', price: 400, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'banner_ice', name: 'Ice Banner', description: 'Frozen aesthetic', type: 'PROFILE_BANNER', rarity: 'RARE', price: 400, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'banner_space', name: 'Space Banner', description: 'Cosmic wallpaper', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ VOICE PACKS ═══
-      { itemId: 'voice_hero', name: 'Hero Voice', description: 'Heroic lines', type: 'VOICE_PACK', rarity: 'EPIC', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'voice_villain', name: 'Villain Voice', description: 'Evil lines', type: 'VOICE_PACK', rarity: 'EPIC', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // ═══ COIN PACKS ═══
-      { itemId: 'coins_500', name: '500 Coins', description: 'Small coin pack', type: 'BADGE', rarity: 'COMMON', price: 50, currency: 'GEMS', imageUrl: null, isAvailable: true },
-      { itemId: 'coins_2000', name: '2000 Coins', description: 'Medium coin pack', type: 'BADGE', rarity: 'RARE', price: 150, currency: 'GEMS', imageUrl: null, isAvailable: true },
-      { itemId: 'coins_5000', name: '5000 Coins', description: 'Large coin pack', type: 'BADGE', rarity: 'EPIC', price: 350, currency: 'GEMS', imageUrl: null, isAvailable: true },
-    
-      // AVATARS
-      { itemId: 'avatar_nova_001', name: 'Nova Avatar', description: 'Classic Nova player', type: 'AVATAR', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_warrior', name: 'Warrior Avatar', description: 'Battle-tested warrior', type: 'AVATAR', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_wizard', name: 'Wizard Avatar', description: 'Mystical spell caster', type: 'AVATAR', rarity: 'EPIC', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_dragon', name: 'Dragon Lord', description: 'Legendary dragon rider', type: 'AVATAR', rarity: 'LEGENDARY', price: 2000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'avatar_god', name: 'God Avatar', description: 'Divine cosmic being', type: 'AVATAR', rarity: 'MYTHIC', price: 5000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // CARD BACKS
-      { itemId: 'card_back_classic', name: 'Classic Back', description: 'Traditional design', type: 'CARD_BACK', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'card_back_galaxy', name: 'Galaxy Back', description: 'Cosmic space theme', type: 'CARD_BACK', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'card_back_fire', name: 'Fire Storm', description: 'Blazing fire pattern', type: 'CARD_BACK', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'card_back_ocean', name: 'Ocean Wave', description: 'Deep sea design', type: 'CARD_BACK', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'card_back_neon', name: 'Neon City', description: 'Cyberpunk aesthetic', type: 'CARD_BACK', rarity: 'LEGENDARY', price: 2500, currency: 'COINS', imageUrl: null, isAvailable: true, originalPrice: 3000, discountPercent: 20 },
-      { itemId: 'card_back_diamond', name: 'Diamond Elite', description: 'Ultra rare diamond finish', type: 'CARD_BACK', rarity: 'MYTHIC', price: 8000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // CARD THEMES
-      { itemId: 'theme_classic', name: 'Classic Theme', description: 'Original card design', type: 'CARD_THEME', rarity: 'COMMON', price: 150, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'theme_dark', name: 'Dark Theme', description: 'Sleek dark cards', type: 'CARD_THEME', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'theme_holographic', name: 'Holographic', description: 'Shimmering effect', type: 'CARD_THEME', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true, isLimited: true },
-
-      // EMOTES
-      { itemId: 'emote_laugh', name: 'Laugh', description: 'Ha ha ha!', type: 'EMOTE', rarity: 'COMMON', price: 50, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_angry', name: 'Angry', description: 'Grrr!', type: 'EMOTE', rarity: 'COMMON', price: 50, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_cool', name: 'Cool', description: 'Too cool for school', type: 'EMOTE', rarity: 'RARE', price: 200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_dab', name: 'Dab', description: 'Show off your dab', type: 'EMOTE', rarity: 'EPIC', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'emote_crown', name: 'King Wave', description: 'Royal greeting', type: 'EMOTE', rarity: 'LEGENDARY', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // TITLES
-      { itemId: 'title_champion', name: 'Champion', description: 'Show your victories', type: 'TITLE', rarity: 'RARE', price: 400, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'title_legend', name: 'Legend', description: 'Legendary status', type: 'TITLE', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'title_god', name: 'The God', description: 'Ultimate title', type: 'TITLE', rarity: 'MYTHIC', price: 5000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // BADGES
-      { itemId: 'badge_bronze', name: 'Bronze Badge', description: 'Bronze tier achievement', type: 'BADGE', rarity: 'COMMON', price: 100, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'badge_silver', name: 'Silver Badge', description: 'Silver tier achievement', type: 'BADGE', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'badge_gold', name: 'Gold Badge', description: 'Gold tier achievement', type: 'BADGE', rarity: 'EPIC', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'badge_diamond', name: 'Diamond Badge', description: 'Diamond tier', type: 'BADGE', rarity: 'LEGENDARY', price: 2500, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // PROFILE BANNERS
-      { itemId: 'banner_fire', name: 'Fire Banner', description: 'Flaming background', type: 'PROFILE_BANNER', rarity: 'RARE', price: 400, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'banner_ice', name: 'Ice Banner', description: 'Frozen aesthetic', type: 'PROFILE_BANNER', rarity: 'RARE', price: 400, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'banner_space', name: 'Space Banner', description: 'Cosmic wallpaper', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1000, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // VOICE PACKS
-      { itemId: 'voice_pack_hero', name: 'Hero Voice', description: 'Heroic voice lines', type: 'VOICE_PACK', rarity: 'EPIC', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'voice_pack_villain', name: 'Villain Voice', description: 'Evil voice lines', type: 'VOICE_PACK', rarity: 'EPIC', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
-
-      // BUNDLES (LIMITED)
-      { itemId: 'bundle_starter', name: 'Starter Bundle', description: 'Avatar + Card Back + 100 coins', type: 'AVATAR', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true, originalPrice: 800, discountPercent: 37 },
-      { itemId: 'bundle_premium', name: 'Premium Bundle', description: 'Everything you need', type: 'AVATAR', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true, originalPrice: 5000, discountPercent: 40, isLimited: true },
+      // ═══ EMOTES - sent from the table ═══
+      { itemId: 'emote_laugh', name: 'Laugh', description: 'Ha ha!', type: 'EMOTE', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
+      { itemId: 'emote_cool', name: 'Cool', description: 'Too easy', type: 'EMOTE', rarity: 'COMMON', price: 150, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'emote_clap', name: 'Clap', description: 'Well played', type: 'EMOTE', rarity: 'COMMON', price: 150, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'emote_shock', name: 'Shocked', description: 'You did not', type: 'EMOTE', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'emote_cry', name: 'Cry', description: 'Not again', type: 'EMOTE', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'emote_angry', name: 'Angry', description: 'Grrr!', type: 'EMOTE', rarity: 'RARE', price: 300, currency: 'COINS', imageUrl: null, isAvailable: true },
     ];
   }
 

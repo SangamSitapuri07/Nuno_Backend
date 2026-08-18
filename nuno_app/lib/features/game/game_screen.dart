@@ -15,6 +15,7 @@ import '../../data/models/enums.dart';
 import '../../data/models/game_card.dart';
 import '../../data/models/game_state.dart';
 import '../auth/auth_controller.dart';
+import '../store/cosmetics_provider.dart';
 import 'game_providers.dart';
 import 'widgets/card_action_popup.dart';
 import 'widgets/draw_flight.dart';
@@ -228,7 +229,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0618),
         body: ArtBackground(
-          asset: Art.bgTable,
+          asset: ref.watch(equippedCosmeticsProvider).tableTheme,
           child: Stack(
             children: [
               // Clipped: the table is a fixed-size Stack on a viewport whose

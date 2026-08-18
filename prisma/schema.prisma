@@ -193,9 +193,19 @@ model PlayerCosmetic {
   cosmeticId   String
   unlockedAt   DateTime      @default(now())
 
+  /// Whether this is the item currently in use for its type. At most one
+  /// row per (playerId, cosmeticType) may be true; equipping clears the rest.
+  /// Without this a purchase was recorded but never actually applied
+  /// anywhere in the game.
+  isEquipped   Boolean       @default(false)
+
   user         User          @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
+  /// Buying the same item twice was previously only prevented in application
+  /// code, which leaves a race between two concurrent purchases.
+  @@unique([playerId, cosmeticId])
   @@index([playerId])
+  @@index([playerId, cosmeticType, isEquipped])
 }
 
 // ─────────────────────────────────────────

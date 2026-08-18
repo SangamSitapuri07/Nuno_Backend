@@ -15,12 +15,10 @@ import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/store_models.dart';
 import '../auth/auth_controller.dart';
+import 'cosmetics_provider.dart';
 
 final storeItemsProvider = FutureProvider<List<StoreItem>>(
     (ref) => ref.watch(storeRepositoryProvider).getStore());
-
-final inventoryProvider = FutureProvider<Inventory>(
-    (ref) => ref.watch(storeRepositoryProvider).getInventory());
 
 /// Cosmetics shop backed by GET /api/v1/store + /inventory.
 class StoreScreen extends ConsumerStatefulWidget {
@@ -179,13 +177,21 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (context, i) {
                       final item = filtered[i];
+                      // Free defaults are granted to everyone, so they read
+                      // as owned even before anything is in the inventory.
+                      final owned = item.isDefault ||
+                          (inventory?.owns(item.itemId) ?? false);
+
                       return _StoreItemCard(
                         item: item,
-                        owned: inventory?.owns(item.itemId) ?? false,
+                        owned: owned,
+                        equipped:
+                            inventory?.isEquipped(item.itemId) ?? false,
                         canAfford:
                             (inventory?.coins ?? profile?.coins ?? 0) >=
                                 item.price,
                         onBuy: () => _purchase(item),
+                        onEquip: () => _equip(item),
                       );
                     },
                   ),
@@ -246,7 +252,21 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
       ref.invalidate(inventoryProvider);
       await ref.read(authControllerProvider.notifier).refreshProfile();
       if (!mounted) return;
-      AppSnack.show(context, '${item.name} unlocked!');
+      // The server equips a new purchase immediately, so say so rather than
+      // leaving the player looking for a second step.
+      AppSnack.show(context, '${item.name} unlocked and equipped');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnack.error(context, e.toString());
+    }
+  }
+
+  Future<void> _equip(StoreItem item) async {
+    try {
+      await ref.read(storeRepositoryProvider).equip(item);
+      ref.invalidate(inventoryProvider);
+      if (!mounted) return;
+      AppSnack.show(context, '${item.name} equipped');
     } catch (e) {
       if (!mounted) return;
       AppSnack.error(context, e.toString());
@@ -301,14 +321,18 @@ class _FilterChip extends StatelessWidget {
 class _StoreItemCard extends StatelessWidget {
   final StoreItem item;
   final bool owned;
+  final bool equipped;
   final bool canAfford;
   final VoidCallback onBuy;
+  final VoidCallback onEquip;
 
   const _StoreItemCard({
     required this.item,
     required this.owned,
+    required this.equipped,
     required this.canAfford,
     required this.onBuy,
+    required this.onEquip,
   });
 
   @override
@@ -390,18 +414,19 @@ class _StoreItemCard extends StatelessWidget {
                     ),
                   ),
 
-                if (owned)
+                if (equipped)
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
+                        color: AppColors.success.withValues(alpha: 0.18),
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(AppDimens.radiusLg),
                         ),
+                        border: Border.all(color: AppColors.success, width: 2),
                       ),
                       child: const Center(
                         child: Icon(Icons.check_circle_rounded,
-                            size: 36, color: AppColors.success),
+                            size: 32, color: AppColors.success),
                       ),
                     ),
                   ),
@@ -429,11 +454,34 @@ class _StoreItemCard extends StatelessWidget {
                   style: AppTextStyles.caption,
                 ),
                 const SizedBox(height: AppDimens.sm),
-                if (owned)
+                if (equipped)
                   const AppChip(
-                    label: 'OWNED',
+                    label: 'IN USE',
                     color: AppColors.success,
                     icon: Icons.check_rounded,
+                  )
+                else if (owned)
+                  // Owned but not active. Without this the only thing a
+                  // purchased item ever did was show a tick.
+                  GestureDetector(
+                    onTap: onEquip,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceHigh,
+                        borderRadius: AppDimens.brPill,
+                        border: Border.all(color: AppColors.accent),
+                      ),
+                      child: Text(
+                        'EQUIP',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                   )
                 else
                   Row(
@@ -449,7 +497,9 @@ class _StoreItemCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        Formatters.number(item.price),
+                        item.price == 0
+                            ? 'FREE'
+                            : Formatters.number(item.price),
                         style: AppTextStyles.body.copyWith(
                           fontWeight: FontWeight.w800,
                           color: canAfford

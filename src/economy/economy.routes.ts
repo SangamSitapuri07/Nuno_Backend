@@ -23,6 +23,12 @@ router.post(
 );
 
 router.post(
+  '/store/equip',
+  authMiddleware,
+  economyController.equipCosmetic
+);
+
+router.post(
   '/rewards/daily',
   authMiddleware,
   economyController.claimDailyReward

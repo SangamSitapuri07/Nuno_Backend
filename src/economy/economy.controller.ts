@@ -3,7 +3,7 @@ import economyService from './economy.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { HTTP_STATUS, ERROR_CODES } from '../utils/constants';
 import asyncHandler from '../utils/asyncHandler';
-import { PurchaseInput } from './economy.types';
+import { PurchaseInput, EquipInput } from './economy.types';
 
 export class EconomyController {
 
@@ -46,6 +46,28 @@ export class EconomyController {
 
     await economyService.purchaseItem(userId, input);
     sendSuccess(res, { message: 'Item purchased successfully.' });
+  });
+
+  // ─────────────────────────────────────────
+  // EQUIP COSMETIC
+  // ─────────────────────────────────────────
+
+  equipCosmetic = asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.userId;
+    const input: EquipInput = req.body;
+
+    if (!input?.cosmeticId) {
+      sendError(
+        res,
+        ERROR_CODES.VALIDATION_ERROR,
+        'An item id is required.',
+        HTTP_STATUS.BAD_REQUEST
+      );
+      return;
+    }
+
+    await economyService.equipCosmetic(userId, input);
+    sendSuccess(res, { message: 'Item equipped.' });
   });
 
   // ─────────────────────────────────────────
