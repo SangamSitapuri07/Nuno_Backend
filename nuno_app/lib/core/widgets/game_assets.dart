@@ -41,6 +41,9 @@ class Art {
   static const skinOcean = 'assets/images/skin_ocean.png';
   static const skinRoyal = 'assets/images/skin_royal.png';
   static const skinForest = 'assets/images/skin_forest.png';
+  static const skinCircuit = 'assets/images/skin_circuit.png';
+  static const skinFrost = 'assets/images/skin_frost.png';
+  static const skinSunset = 'assets/images/skin_sunset.png';
 
   // Purchasable avatar portraits. The default remains the initials tile.
   static const avatarWarrior = 'assets/images/avatar_warrior.png';
@@ -51,6 +54,10 @@ class Art {
   static const avatarRobot = 'assets/images/avatar_robot.png';
   static const avatarPirate = 'assets/images/avatar_pirate.png';
   static const avatarAlien = 'assets/images/avatar_alien.png';
+  static const avatarDetective = 'assets/images/avatar_detective.png';
+  static const avatarAstronaut = 'assets/images/avatar_astronaut.png';
+  static const avatarVampire = 'assets/images/avatar_vampire.png';
+  static const avatarJester = 'assets/images/avatar_jester.png';
 
   // Table themes sold in the store. These are the store thumbnails; the
   // in-game background uses the full-bleed bg_* images.
@@ -59,6 +66,7 @@ class Art {
   static const tableAurora = 'assets/images/table_aurora.png';
   static const tableEmerald = 'assets/images/table_emerald.png';
   static const tableLava = 'assets/images/table_lava.png';
+  static const tableRoyal = 'assets/images/table_royal.png';
 
   // Achievement medals.
   static const medalStar = 'assets/images/medal_star.png';
@@ -84,6 +92,8 @@ class Art {
   static const frameEpic = 'assets/images/frame_epic.png';
   static const frameEmerald = 'assets/images/frame_emerald.png';
   static const frameInferno = 'assets/images/frame_inferno.png';
+  static const frameFrost = 'assets/images/frame_frost.png';
+  static const frameCircuit = 'assets/images/frame_circuit.png';
 
   // Emote reaction bubbles.
   static const emoteLaugh = 'assets/images/emote_laugh.png';
@@ -132,6 +142,9 @@ class Art {
         'card_back_ocean' => skinOcean,
         'card_back_royal' => skinRoyal,
         'card_back_forest' => skinForest,
+        'card_back_circuit' => skinCircuit,
+        'card_back_frost' => skinFrost,
+        'card_back_sunset' => skinSunset,
         _ => null,
       };
 
@@ -148,12 +161,15 @@ class Art {
         'table_aurora' => tableAurora,
         'table_emerald' => tableEmerald,
         'table_lava' => tableLava,
+        'table_royal' => tableRoyal,
         'frame_bronze' => frameBronze,
         'frame_silver' => frameSilver,
         'frame_gold' => frameGold,
         'frame_epic' => frameEpic,
         'frame_emerald' => frameEmerald,
         'frame_inferno' => frameInferno,
+        'frame_frost' => frameFrost,
+        'frame_circuit' => frameCircuit,
         'badge_star' => medalStar,
         'badge_cards' => medalCards,
         'badge_first' => medalFirst,
@@ -168,6 +184,10 @@ class Art {
         'avatar_robot' => avatarRobot,
         'avatar_pirate' => avatarPirate,
         'avatar_alien' => avatarAlien,
+        'avatar_detective' => avatarDetective,
+        'avatar_astronaut' => avatarAstronaut,
+        'avatar_vampire' => avatarVampire,
+        'avatar_jester' => avatarJester,
         _ => itemId.startsWith('emote_')
             ? emote(itemId.substring('emote_'.length))
             : null,
@@ -183,6 +203,10 @@ class Art {
         'avatar_robot' => avatarRobot,
         'avatar_pirate' => avatarPirate,
         'avatar_alien' => avatarAlien,
+        'avatar_detective' => avatarDetective,
+        'avatar_astronaut' => avatarAstronaut,
+        'avatar_vampire' => avatarVampire,
+        'avatar_jester' => avatarJester,
         _ => null,
       };
 

@@ -111,6 +111,9 @@ class EquippedCosmetics {
         'card_back_ocean' => Art.skinOcean,
         'card_back_royal' => Art.skinRoyal,
         'card_back_forest' => Art.skinForest,
+        'card_back_circuit' => Art.skinCircuit,
+        'card_back_frost' => Art.skinFrost,
+        'card_back_sunset' => Art.skinSunset,
         'card_back_classic' => Art.skinClassic,
         // The 3D render is the default back, and the one the table used
         // before any of this existed.
@@ -131,6 +134,9 @@ class EquippedCosmetics {
         'table_lava' => const TableBackdrop(
             colors: [Color(0xFF5A1503), Color(0xFF17060B)],
           ),
+        'table_royal' => const TableBackdrop(
+            colors: [Color(0xFF3B1466), Color(0xFF120726)],
+          ),
         _ => const TableBackdrop(asset: Art.bgTable),
       };
 
@@ -141,6 +147,8 @@ class EquippedCosmetics {
         'frame_epic' => Art.frameEpic,
         'frame_emerald' => Art.frameEmerald,
         'frame_inferno' => Art.frameInferno,
+        'frame_frost' => Art.frameFrost,
+        'frame_circuit' => Art.frameCircuit,
         // Nothing equipped: let the level decide, as it did before.
         _ => null,
       };

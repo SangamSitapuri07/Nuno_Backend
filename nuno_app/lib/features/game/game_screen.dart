@@ -449,6 +449,8 @@ class _Table extends ConsumerWidget {
                   isCurrentTurn: isMyTurn,
                   hasCalledUno: state.unoCalledBy.contains(myId ?? ''),
                   ringColor: AppColors.primary,
+                  // Our own seat, so it wears our equipped avatar and frame.
+                  isSelf: true,
                 ),
                 if (isMyTurn)
                   const Padding(

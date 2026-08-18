@@ -125,12 +125,28 @@ class _IdentitySection extends ConsumerWidget {
         children: [
           Row(
             children: [
-              PlayerAvatar(
-                username: p.username,
-                avatarUrl: cosmetics.avatar ?? p.avatarUrl,
-                size: 56,
-                level: p.level,
-                ringColor: tierColor,
+              // Avatar with the equipped frame over it, matching the home
+              // badge. Without the frame this screen silently ignored a
+              // cosmetic the player had paid for.
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PlayerAvatar(
+                      username: p.username,
+                      avatarUrl: cosmetics.avatar ?? p.avatarUrl,
+                      size: 52,
+                      level: p.level,
+                      ringColor: tierColor,
+                    ),
+                    ArtImage(
+                      cosmetics.avatarFrame ?? Art.frameForLevel(p.level),
+                      width: 72,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: AppDimens.md),
               Expanded(

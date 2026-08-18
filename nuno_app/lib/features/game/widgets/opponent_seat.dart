@@ -1,11 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/game_assets.dart';
 import '../../../core/widgets/player_avatar.dart';
+import '../../store/cosmetics_provider.dart';
 import '../../../data/models/game_state.dart';
 import 'playing_card.dart';
 
@@ -23,6 +26,10 @@ class OpponentSeat extends StatelessWidget {
   final Color ringColor;
   final int score;
 
+  /// True for the local player's own seat. Only their equipped avatar and
+  /// frame are known to this client, so cosmetics are applied there alone.
+  final bool isSelf;
+
   const OpponentSeat({
     super.key,
     required this.player,
@@ -32,6 +39,7 @@ class OpponentSeat extends StatelessWidget {
     this.turnProgress = 1,
     this.ringColor = AppColors.blue,
     this.score = 0,
+    this.isSelf = false,
   });
 
   @override
@@ -42,6 +50,7 @@ class OpponentSeat extends StatelessWidget {
       hasCalledUno: hasCalledUno,
       ringColor: ringColor,
       score: score,
+      isSelf: isSelf,
     );
 
     final fan = _CardFan(count: player.cardCount, placement: placement);
@@ -70,12 +79,13 @@ class OpponentSeat extends StatelessWidget {
   }
 }
 
-class _Identity extends StatelessWidget {
+class _Identity extends ConsumerWidget {
   final GamePlayerInfo player;
   final bool isCurrentTurn;
   final bool hasCalledUno;
   final Color ringColor;
   final int score;
+  final bool isSelf;
 
   const _Identity({
     required this.player,
@@ -83,10 +93,12 @@ class _Identity extends StatelessWidget {
     required this.hasCalledUno,
     required this.ringColor,
     required this.score,
+    required this.isSelf,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cosmetics = ref.watch(equippedCosmeticsProvider);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -110,8 +122,20 @@ class _Identity extends StatelessWidget {
                       ]
                     : null,
               ),
-              child: PlayerAvatar(username: player.username, size: 34),
+              child: PlayerAvatar(
+                username: player.username,
+                // Only our own portrait is known here; an opponent's
+                // cosmetics are not part of the game state.
+                avatarUrl: isSelf ? cosmetics.avatar : null,
+                size: 34,
+              ),
             ),
+
+            // Equipped frame over our own avatar.
+            if (isSelf && cosmetics.avatarFrame != null)
+              IgnorePointer(
+                child: ArtImage(cosmetics.avatarFrame!, width: 46),
+              ),
 
             // Level badge, top-right on the ring.
             Positioned(
