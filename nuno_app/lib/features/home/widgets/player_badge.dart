@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -6,9 +7,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/game_assets.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../data/models/enums.dart';
+import '../../store/cosmetics_provider.dart';
 
 /// Top-left identity card: avatar, username, a level XP bar and a tier pill.
-class PlayerBadge extends StatelessWidget {
+class PlayerBadge extends ConsumerWidget {
   final String username;
   final String? avatarUrl;
   final int level;
@@ -27,8 +29,13 @@ class PlayerBadge extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tierColor = AppColors.forTier(tier.wire);
+
+    // An equipped frame overrides the level-derived one, which is the whole
+    // point of buying it. Falls back to the level frame when none is set.
+    final frame = ref.watch(equippedCosmeticsProvider).avatarFrame ??
+        Art.frameForLevel(level);
 
     return GestureDetector(
       onTap: onTap,
@@ -72,7 +79,7 @@ class PlayerBadge extends StatelessWidget {
                     avatarUrl: avatarUrl,
                     size: 32,
                   ),
-                  ArtImage(Art.frameForLevel(level), width: 46),
+                  ArtImage(frame, width: 46),
                 ],
               ),
             ),

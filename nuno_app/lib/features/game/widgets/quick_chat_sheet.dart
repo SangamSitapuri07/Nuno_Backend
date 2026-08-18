@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/game_assets.dart';
 import '../../../services/socket_events.dart';
+import '../../store/cosmetics_provider.dart';
 
 /// Screen 14 — Quick Chat / Emotes. Preset phrases on top, emoji row beneath.
-class QuickChatSheet extends StatelessWidget {
+class QuickChatSheet extends ConsumerWidget {
   final void Function(String) onEmote;
   final void Function(String) onQuickChat;
 
@@ -31,9 +33,13 @@ class QuickChatSheet extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final phrases = QuickChat.presets.entries.toList();
     final emotes = Emotes.glyphs.entries.toList();
+
+    // Emotes the player has unlocked in the store. Locked ones stay visible
+    // but dimmed, so the shop's stock is discoverable from the table.
+    final unlocked = ref.watch(equippedCosmeticsProvider).emotes;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(AppDimens.xxl),
@@ -85,32 +91,14 @@ class QuickChatSheet extends StatelessWidget {
                     alignment: WrapAlignment.center,
                     children: [
                       for (final e in emotes)
-                        GestureDetector(
+                        _EmoteTile(
+                          emoteKey: e.key,
+                          glyph: e.value,
+                          locked: !unlocked.contains(e.key),
                           onTap: () {
                             onEmote(e.key);
                             Navigator.of(context).pop();
                           },
-                          child: SizedBox(
-                            width: 46,
-                            height: 46,
-                            child: ArtImage(
-                              Art.emote(e.key) ?? '',
-                              width: 46,
-                              // Emotes without bespoke art fall back to the
-                              // unicode glyph in a tile.
-                              fallback: Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceHigh,
-                                  borderRadius: AppDimens.brSm,
-                                  border: Border.all(
-                                      color: AppColors.surfaceStroke),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(e.value,
-                                    style: const TextStyle(fontSize: 20)),
-                              ),
-                            ),
-                          ),
                         ),
                     ],
                   ),
@@ -149,6 +137,55 @@ class _PhraseChip extends StatelessWidget {
           style: AppTextStyles.body.copyWith(fontSize: 12),
         ),
       ),
+    );
+  }
+}
+
+
+/// One emote in the picker. Locked emotes are dimmed and carry a padlock
+/// rather than being hidden, so the player can see what the store sells.
+class _EmoteTile extends StatelessWidget {
+  final String emoteKey;
+  final String glyph;
+  final bool locked;
+  final VoidCallback onTap;
+
+  const _EmoteTile({
+    required this.emoteKey,
+    required this.glyph,
+    required this.locked,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tile = SizedBox(
+      width: 46,
+      height: 46,
+      child: ArtImage(
+        Art.emote(emoteKey) ?? '',
+        width: 46,
+        // Emotes without bespoke art fall back to the unicode glyph.
+        fallback: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceHigh,
+            borderRadius: AppDimens.brSm,
+            border: Border.all(color: AppColors.surfaceStroke),
+          ),
+          alignment: Alignment.center,
+          child: Text(glyph, style: const TextStyle(fontSize: 20)),
+        ),
+      ),
+    );
+
+    if (!locked) return GestureDetector(onTap: onTap, child: tile);
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Opacity(opacity: 0.30, child: tile),
+        const Icon(Icons.lock_rounded, size: 16, color: Colors.white70),
+      ],
     );
   }
 }

@@ -4,11 +4,16 @@ import '../../core/providers.dart';
 import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/store_models.dart';
+import '../auth/auth_controller.dart';
 
 /// The inventory, refreshed after every purchase or equip.
-final inventoryProvider = FutureProvider<Inventory>(
-  (ref) => ref.watch(storeRepositoryProvider).getInventory(),
-);
+///
+/// Keyed on the signed-in user: without that, signing out and back in as
+/// somebody else would leave the previous player's cosmetics on the table.
+final inventoryProvider = FutureProvider<Inventory>((ref) {
+  ref.watch(currentUserIdProvider);
+  return ref.watch(storeRepositoryProvider).getInventory();
+});
 
 /// Which cosmetics are actually in use, resolved to concrete asset paths.
 ///
@@ -28,10 +33,12 @@ class EquippedCosmetics {
   /// Background behind the game table.
   final String tableTheme;
 
-  /// Ring drawn around the player's avatar.
-  final String avatarFrame;
+  /// Ring drawn around the player's avatar, or null when the player has not
+  /// equipped one - callers then fall back to the level-derived frame.
+  final String? avatarFrame;
 
-  /// Emote ids the player may send. The defaults are always available.
+  /// Emote KEYS the player may send, matching Emotes.glyphs - so 'laugh',
+  /// not the store's 'emote_laugh'. The defaults are always available.
   final Set<String> emotes;
 
   const EquippedCosmetics({
@@ -57,14 +64,18 @@ class EquippedCosmetics {
         inventory?.equippedFor(CosmeticType.profileBanner),
       ),
       // Emotes are additive rather than exclusive: owning one unlocks it.
+      // Store ids are prefixed ('emote_laugh'); the sheet and the socket
+      // both speak the bare key ('laugh').
       emotes: {
         ..._freeEmotes,
-        ...owned.where((id) => id.startsWith('emote_')),
+        for (final id in owned)
+          if (id.startsWith('emote_')) id.substring('emote_'.length),
       },
     );
   }
 
-  static const _freeEmotes = {'emote_laugh'};
+  /// Granted to everyone, matching the isDefault entries in the catalogue.
+  static const _freeEmotes = {'laugh'};
 
   static String _cardBackAsset(String? itemId) => switch (itemId) {
         'card_back_neon' => Art.skinNeon,
@@ -82,10 +93,12 @@ class EquippedCosmetics {
         _ => Art.bgTable,
       };
 
-  static String _frameAsset(String? itemId) => switch (itemId) {
+  static String? _frameAsset(String? itemId) => switch (itemId) {
+        'frame_bronze' => Art.frameBronze,
         'frame_silver' => Art.frameSilver,
         'frame_gold' => Art.frameGold,
         'frame_epic' => Art.frameEpic,
-        _ => Art.frameBronze,
+        // Nothing equipped: let the level decide, as it did before.
+        _ => null,
       };
 }
