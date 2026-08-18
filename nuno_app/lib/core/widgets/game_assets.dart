@@ -39,18 +39,26 @@ class Art {
   static const skinDiamond = 'assets/images/skin_diamond.png';
   static const skinFire = 'assets/images/skin_fire.png';
   static const skinOcean = 'assets/images/skin_ocean.png';
+  static const skinRoyal = 'assets/images/skin_royal.png';
+  static const skinForest = 'assets/images/skin_forest.png';
 
   // Purchasable avatar portraits. The default remains the initials tile.
   static const avatarWarrior = 'assets/images/avatar_warrior.png';
   static const avatarWizard = 'assets/images/avatar_wizard.png';
   static const avatarRogue = 'assets/images/avatar_rogue.png';
   static const avatarQueen = 'assets/images/avatar_queen.png';
+  static const avatarNinja = 'assets/images/avatar_ninja.png';
+  static const avatarRobot = 'assets/images/avatar_robot.png';
+  static const avatarPirate = 'assets/images/avatar_pirate.png';
+  static const avatarAlien = 'assets/images/avatar_alien.png';
 
   // Table themes sold in the store. These are the store thumbnails; the
   // in-game background uses the full-bleed bg_* images.
   static const tableGalaxy = 'assets/images/table_galaxy.png';
   static const tableMidnight = 'assets/images/table_midnight.png';
   static const tableAurora = 'assets/images/table_aurora.png';
+  static const tableEmerald = 'assets/images/table_emerald.png';
+  static const tableLava = 'assets/images/table_lava.png';
 
   // Achievement medals.
   static const medalStar = 'assets/images/medal_star.png';
@@ -74,6 +82,8 @@ class Art {
   static const frameSilver = 'assets/images/frame_silver.png';
   static const frameGold = 'assets/images/frame_gold.png';
   static const frameEpic = 'assets/images/frame_epic.png';
+  static const frameEmerald = 'assets/images/frame_emerald.png';
+  static const frameInferno = 'assets/images/frame_inferno.png';
 
   // Emote reaction bubbles.
   static const emoteLaugh = 'assets/images/emote_laugh.png';
@@ -120,6 +130,8 @@ class Art {
         'card_back_diamond' => skinDiamond,
         'card_back_fire' => skinFire,
         'card_back_ocean' => skinOcean,
+        'card_back_royal' => skinRoyal,
+        'card_back_forest' => skinForest,
         _ => null,
       };
 
@@ -134,10 +146,14 @@ class Art {
         'table_galaxy' => tableGalaxy,
         'table_midnight' => tableMidnight,
         'table_aurora' => tableAurora,
+        'table_emerald' => tableEmerald,
+        'table_lava' => tableLava,
         'frame_bronze' => frameBronze,
         'frame_silver' => frameSilver,
         'frame_gold' => frameGold,
         'frame_epic' => frameEpic,
+        'frame_emerald' => frameEmerald,
+        'frame_inferno' => frameInferno,
         'badge_star' => medalStar,
         'badge_cards' => medalCards,
         'badge_first' => medalFirst,
@@ -148,6 +164,10 @@ class Art {
         'avatar_wizard' => avatarWizard,
         'avatar_rogue' => avatarRogue,
         'avatar_queen' => avatarQueen,
+        'avatar_ninja' => avatarNinja,
+        'avatar_robot' => avatarRobot,
+        'avatar_pirate' => avatarPirate,
+        'avatar_alien' => avatarAlien,
         _ => itemId.startsWith('emote_')
             ? emote(itemId.substring('emote_'.length))
             : null,
@@ -159,6 +179,10 @@ class Art {
         'avatar_wizard' => avatarWizard,
         'avatar_rogue' => avatarRogue,
         'avatar_queen' => avatarQueen,
+        'avatar_ninja' => avatarNinja,
+        'avatar_robot' => avatarRobot,
+        'avatar_pirate' => avatarPirate,
+        'avatar_alien' => avatarAlien,
         _ => null,
       };
 
@@ -195,7 +219,13 @@ class Art {
 
 /// Full-bleed background image with a graceful gradient fallback.
 class ArtBackground extends StatelessWidget {
-  final String asset;
+  /// Image to fill the screen with. Ignored when [colors] is given.
+  final String? asset;
+
+  /// Two-stop radial gradient, for backdrops that are painted rather than
+  /// photographed.
+  final List<Color>? colors;
+
   final Widget child;
 
   /// Darkens the edges so overlaid UI stays legible.
@@ -203,23 +233,37 @@ class ArtBackground extends StatelessWidget {
 
   const ArtBackground({
     super.key,
-    required this.asset,
+    this.asset,
+    this.colors,
     required this.child,
     this.vignette = true,
-  });
+  }) : assert(asset != null || colors != null,
+            'a background needs either an asset or colours');
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          asset,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const DecoratedBox(
-            decoration: BoxDecoration(gradient: AppColors.backgroundGradient),
+        if (colors != null)
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.center,
+                radius: 1.1,
+                colors: colors!,
+              ),
+            ),
+          )
+        else
+          Image.asset(
+            asset!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const DecoratedBox(
+              decoration:
+                  BoxDecoration(gradient: AppColors.backgroundGradient),
+            ),
           ),
-        ),
         if (vignette)
           const DecoratedBox(
             decoration: BoxDecoration(

@@ -229,7 +229,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0618),
         body: ArtBackground(
-          asset: ref.watch(equippedCosmeticsProvider).tableTheme,
+          asset: ref.watch(equippedCosmeticsProvider).tableTheme.asset,
+          colors: ref.watch(equippedCosmeticsProvider).tableTheme.colors,
           child: Stack(
             children: [
               // Clipped: the table is a fixed-size Stack on a viewport whose

@@ -324,18 +324,24 @@ export class EconomyService {
       { itemId: 'card_back_gold', name: 'Gold Leaf', description: 'Gilded finish', type: 'CARD_BACK', rarity: 'EPIC', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'card_back_fire', name: 'Fire Storm', description: 'Blazing ember burst', type: 'CARD_BACK', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'card_back_ocean', name: 'Ocean Wave', description: 'Deep sea crest', type: 'CARD_BACK', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'card_back_forest', name: 'Wildgrove', description: 'Leaf and vine', type: 'CARD_BACK', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'card_back_royal', name: 'Royal Filigree', description: 'Gold on deep purple', type: 'CARD_BACK', rarity: 'EPIC', price: 1800, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'card_back_diamond', name: 'Diamond Elite', description: 'Ultra rare finish', type: 'CARD_BACK', rarity: 'LEGENDARY', price: 4000, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ TABLE THEMES - the background behind the table ═══
       { itemId: 'table_galaxy', name: 'Galaxy Table', description: 'Deep space vortex', type: 'TABLE_THEME', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
       { itemId: 'table_midnight', name: 'Midnight Table', description: 'Calm violet felt', type: 'TABLE_THEME', rarity: 'RARE', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'table_emerald', name: 'Emerald Table', description: 'Classic green felt', type: 'TABLE_THEME', rarity: 'RARE', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'table_aurora', name: 'Aurora Table', description: 'Shifting aurora light', type: 'TABLE_THEME', rarity: 'EPIC', price: 1800, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'table_lava', name: 'Molten Table', description: 'Cracked volcanic rock', type: 'TABLE_THEME', rarity: 'LEGENDARY', price: 3200, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ AVATAR FRAMES - the ring around your avatar ═══
       { itemId: 'frame_bronze', name: 'Bronze Frame', description: 'Where everyone starts', type: 'PROFILE_BANNER', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
       { itemId: 'frame_silver', name: 'Silver Frame', description: 'Polished silver ring', type: 'PROFILE_BANNER', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'frame_gold', name: 'Gold Frame', description: 'For the consistent winner', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'frame_emerald', name: 'Wildgrove Frame', description: 'Bronze wrapped in leaves', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'frame_epic', name: 'Epic Frame', description: 'Radiant arcane ring', type: 'PROFILE_BANNER', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'frame_inferno', name: 'Inferno Frame', description: 'Forged in embers', type: 'PROFILE_BANNER', rarity: 'LEGENDARY', price: 3400, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ AVATARS - your portrait ═══
       //
@@ -344,6 +350,10 @@ export class EconomyService {
       { itemId: 'avatar_warrior', name: 'Warrior', description: 'Steel and nerve', type: 'AVATAR', rarity: 'RARE', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'avatar_rogue', name: 'Rogue', description: 'Plays close to the chest', type: 'AVATAR', rarity: 'RARE', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'avatar_wizard', name: 'Wizard', description: 'Reads the table', type: 'AVATAR', rarity: 'EPIC', price: 2000, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_ninja', name: 'Ninja', description: 'Never sees it coming', type: 'AVATAR', rarity: 'RARE', price: 900, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_pirate', name: 'Captain', description: 'Takes what is dealt', type: 'AVATAR', rarity: 'EPIC', price: 2000, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_robot', name: 'Unit-7', description: 'Calculates every draw', type: 'AVATAR', rarity: 'EPIC', price: 2200, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'avatar_alien', name: 'Visitor', description: 'Not from this table', type: 'AVATAR', rarity: 'LEGENDARY', price: 3600, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'avatar_queen', name: 'Queen', description: 'Rules every round', type: 'AVATAR', rarity: 'LEGENDARY', price: 3800, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ TITLES - shown under your name ═══

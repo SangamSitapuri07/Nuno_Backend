@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
@@ -31,7 +32,7 @@ class EquippedCosmetics {
   final String cardBack;
 
   /// Background behind the game table.
-  final String tableTheme;
+  final TableBackdrop tableTheme;
 
   /// Ring drawn around the player's avatar, or null when the player has not
   /// equipped one - callers then fall back to the level-derived frame.
@@ -69,7 +70,7 @@ class EquippedCosmetics {
       cardBack: _cardBackAsset(
         inventory?.equippedFor(CosmeticType.cardBack),
       ),
-      tableTheme: _tableAsset(
+      tableTheme: _tableBackdrop(
         inventory?.equippedFor(CosmeticType.tableTheme),
       ),
       avatarFrame: _frameAsset(
@@ -108,16 +109,29 @@ class EquippedCosmetics {
         'card_back_diamond' => Art.skinDiamond,
         'card_back_fire' => Art.skinFire,
         'card_back_ocean' => Art.skinOcean,
+        'card_back_royal' => Art.skinRoyal,
+        'card_back_forest' => Art.skinForest,
         'card_back_classic' => Art.skinClassic,
         // The 3D render is the default back, and the one the table used
         // before any of this existed.
         _ => Art.cardBack3d,
       };
 
-  static String _tableAsset(String? itemId) => switch (itemId) {
-        'table_midnight' => Art.bgPanel,
-        'table_aurora' => Art.bgStore,
-        _ => Art.bgTable,
+  /// Backdrop for the game table.
+  ///
+  /// Three themes have a full-bleed photograph; the other two are painted
+  /// gradients. Both are real backdrops - a gradient is not a placeholder -
+  /// which lets the catalogue grow without waiting on more artwork.
+  static TableBackdrop _tableBackdrop(String? itemId) => switch (itemId) {
+        'table_midnight' => const TableBackdrop(asset: Art.bgPanel),
+        'table_aurora' => const TableBackdrop(asset: Art.bgStore),
+        'table_emerald' => const TableBackdrop(
+            colors: [Color(0xFF0B3B2A), Color(0xFF05160F)],
+          ),
+        'table_lava' => const TableBackdrop(
+            colors: [Color(0xFF5A1503), Color(0xFF17060B)],
+          ),
+        _ => const TableBackdrop(asset: Art.bgTable),
       };
 
   static String? _frameAsset(String? itemId) => switch (itemId) {
@@ -125,7 +139,22 @@ class EquippedCosmetics {
         'frame_silver' => Art.frameSilver,
         'frame_gold' => Art.frameGold,
         'frame_epic' => Art.frameEpic,
+        'frame_emerald' => Art.frameEmerald,
+        'frame_inferno' => Art.frameInferno,
         // Nothing equipped: let the level decide, as it did before.
         _ => null,
       };
+}
+
+
+/// What to paint behind the game table: either a full-bleed image or a
+/// two-stop radial gradient.
+@immutable
+class TableBackdrop {
+  final String? asset;
+  final List<Color>? colors;
+
+  const TableBackdrop({this.asset, this.colors})
+      : assert(asset != null || colors != null,
+            'a backdrop needs either an asset or colours');
 }
