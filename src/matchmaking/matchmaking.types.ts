@@ -28,6 +28,10 @@ export interface QueueEntry {
 export interface QueueJoinInput {
   mode: GameMode;
   region?: string;
+
+  /// Table size the player is queuing for. Only players who asked for the
+  /// same size are matched together, so a 2-player and a 6-player request
+  /// never end up in the same game.
   requiredPlayers?: number;
 }
 
@@ -38,9 +42,4 @@ export interface MatchFound {
   mode: GameMode;
   region: string;
   createdAt: number;
-}
-
-export interface QueueJoinInput {
-  mode: GameMode;
-  region?: string;
 }

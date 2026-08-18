@@ -12,8 +12,14 @@ import {
 const RATING_RANGE_INITIAL = 1000;
 const RATING_RANGE_EXPANSION = 50;
 const EXPANSION_INTERVAL = 10000;
+
+/// After this long, pair whoever is waiting regardless of rating.
+const RATING_IGNORED_AFTER = 45000;
 const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 10;
+const MAX_PLAYERS = 8;
+
+/// Table sizes a player may queue for. Anything outside this is clamped.
+const VALID_TABLE_SIZES = [2, 3, 4, 6, 8];
 
 export class MatchmakingService {
 
@@ -52,19 +58,28 @@ export class MatchmakingService {
     const rating = leaderboard?.rating || 1000;
     const region = input.region || 'AUTO';
 
-    const entry: QueueEntry = {
-    userId,
-    username,
-    rating,
-    mode: input.mode,
-    region,
-    joinedAt: Date.now(),
-    socketId,
-    requiredPlayers: input.requiredPlayers || 2,
-};
+    // Clamp to a size we actually offer, so a malformed client cannot park
+    // itself in a bucket nobody else can ever join.
+    const requested = input.requiredPlayers ?? 2;
+    const requiredPlayers = VALID_TABLE_SIZES.includes(requested)
+      ? requested
+      : Math.min(Math.max(requested, MIN_PLAYERS), MAX_PLAYERS);
 
-    // Add to queue
-    const queueKey = `queue:${input.mode}`;
+    const entry: QueueEntry = {
+      userId,
+      username,
+      rating,
+      mode: input.mode,
+      region,
+      joinedAt: Date.now(),
+      socketId,
+      requiredPlayers,
+    };
+
+    // The size is part of the key. With a single list per mode, a 2-player
+    // and an 8-player request sat in the same queue and the fallback below
+    // would eventually pair them regardless of what either asked for.
+    const queueKey = `queue:${input.mode}:${requiredPlayers}`;
     await redisClient.lPush(queueKey, JSON.stringify(entry));
     await redisClient.set(
       `queue:player:${userId}`,
@@ -77,6 +92,7 @@ export class MatchmakingService {
       username,
       mode: input.mode,
       rating,
+      requiredPlayers,
       queueKey,
     });
   }
@@ -112,13 +128,17 @@ export class MatchmakingService {
   // FIND MATCH
   // ─────────────────────────────────────────
 
-  async findMatch(mode: GameMode): Promise<MatchFound | null> {
-    const queueKey = `queue:${mode}`;
+  async findMatch(
+    mode: GameMode,
+    tableSize: number
+  ): Promise<MatchFound | null> {
+    const queueKey = `queue:${mode}:${tableSize}`;
     const entries = await redisClient.lRange(queueKey, 0, -1);
 
-    logger.info('FindMatch', { mode, entriesCount: entries.length });
+    logger.info('FindMatch', { mode, tableSize, entriesCount: entries.length });
 
-    if (entries.length < MIN_PLAYERS) return null;
+    // A table only starts when the size the players asked for is met.
+    if (entries.length < tableSize) return null;
 
     const players: QueueEntry[] = [];
     for (const entry of entries) {
@@ -134,9 +154,13 @@ export class MatchmakingService {
     players.sort((a, b) => a.joinedAt - b.joinedAt);
 
     // Try to find compatible players
-    const matched = this.matchPlayers(players, mode);
-    if (!matched || matched.length < MIN_PLAYERS) {
-      logger.info('No compatible match found', { mode, playerCount: players.length });
+    const matched = this.matchPlayers(players, tableSize);
+    if (!matched || matched.length < tableSize) {
+      logger.info('No compatible match found', {
+        mode,
+        tableSize,
+        playerCount: players.length,
+      });
       return null;
     }
 
@@ -198,6 +222,7 @@ export class MatchmakingService {
       matchId,
       roomId,
       playerCount: matched.length,
+      tableSize,
       mode,
       players: matched.map(p => p.username),
     });
@@ -209,60 +234,46 @@ export class MatchmakingService {
   // MATCH PLAYERS
   // ─────────────────────────────────────────
 
+  /// Picks [tableSize] compatible players from a single-size queue.
+  ///
+  /// Everyone in this queue asked for the same table size, so the only
+  /// question left is rating. The permitted rating gap widens the longer the
+  /// oldest player has waited, and after a grace period it is ignored
+  /// entirely - a long wait is worse than an uneven table.
   private matchPlayers(
     players: QueueEntry[],
-    mode: GameMode
+    tableSize: number
   ): QueueEntry[] | null {
-    if (players.length < 2) return null;
-
-    // Remove duplicates by userId
-    const uniquePlayers = players.filter((player, index, self) =>
-      index === self.findIndex(p => p.userId === player.userId)
+    const unique = players.filter(
+      (p, i, self) => i === self.findIndex((o) => o.userId === p.userId)
     );
 
-    if (uniquePlayers.length < 2) return null;
+    if (unique.length < tableSize) return null;
 
-    // Group by requiredPlayers count
-    const groups: { [key: number]: QueueEntry[] } = {};
-    uniquePlayers.forEach(p => {
-      const required = p.requiredPlayers || 2;
-      if (!groups[required]) groups[required] = [];
-      groups[required].push(p);
-    });
+    const first = unique[0];
+    const waitedMs = Date.now() - first.joinedAt;
+    const expansions = Math.floor(waitedMs / EXPANSION_INTERVAL);
+    const ratingRange =
+      RATING_RANGE_INITIAL + expansions * RATING_RANGE_EXPANSION;
 
-    // Try to match groups that have enough players
-    for (const [requiredStr, groupPlayers] of Object.entries(groups)) {
-      const required = parseInt(requiredStr);
+    const compatible = unique.filter(
+      (p) =>
+        p.userId === first.userId ||
+        Math.abs(p.rating - first.rating) <= ratingRange
+    );
 
-      if (groupPlayers.length >= required) {
-        const now = Date.now();
-        const first = groupPlayers[0];
-        const waitTime = (now - first.joinedAt) / 1000;
-        const expansions = Math.floor(waitTime / (EXPANSION_INTERVAL / 1000));
-        const ratingRange = RATING_RANGE_INITIAL + expansions * RATING_RANGE_EXPANSION;
-
-        const compatible = groupPlayers.filter(p => {
-          if (p.userId === first.userId) return true;
-          return Math.abs(p.rating - first.rating) <= ratingRange;
-        });
-
-        if (compatible.length >= required) {
-          return compatible.slice(0, required);
-        }
-      }
+    if (compatible.length >= tableSize) {
+      return compatible.slice(0, tableSize);
     }
 
-    // Fallback: after 30 seconds waiting, match any 2+ players regardless of requiredPlayers
-    const now = Date.now();
-    const oldest = uniquePlayers[0];
-    if (oldest && (now - oldest.joinedAt) > 30000) {
-      if (uniquePlayers.length >= 2) {
-        return uniquePlayers.slice(0, Math.min(uniquePlayers.length, 4));
-      }
+    // Ignore rating once someone has waited this long.
+    if (waitedMs > RATING_IGNORED_AFTER && unique.length >= tableSize) {
+      return unique.slice(0, tableSize);
     }
 
     return null;
   }
+
   // ─────────────────────────────────────────
   // GET QUEUE STATUS
   // ─────────────────────────────────────────
@@ -282,20 +293,32 @@ export class MatchmakingService {
       if (mode === GameMode.PRIVATE) continue;
       if (mode === GameMode.CUSTOM) continue;
 
-      const queueKey = `queue:${mode}`;
-      const queueSize = await redisClient.lLen(queueKey);
-      logger.info('Queue check', { mode, queueSize });
+      // Each table size is its own queue, so they are checked separately.
+      for (const tableSize of VALID_TABLE_SIZES) {
+        const queueKey = `queue:${mode}:${tableSize}`;
+        const queueSize = await redisClient.lLen(queueKey);
+        if (queueSize < tableSize) continue;
 
-      if (queueSize >= MIN_PLAYERS) {
-        const match = await this.findMatch(mode);
+        logger.info('Queue check', { mode, tableSize, queueSize });
+
+        const match = await this.findMatch(mode, tableSize);
         if (match) {
           matches.push(match);
-          logger.info('Match found!', { mode, playerCount: match.players.length });
+          logger.info('Match found!', {
+            mode,
+            tableSize,
+            playerCount: match.players.length,
+          });
         }
       }
     }
 
     return matches;
+  }
+
+  /// How many players are waiting for a given size, for the searching screen.
+  async getQueueDepth(mode: GameMode, tableSize: number): Promise<number> {
+    return await redisClient.lLen(`queue:${mode}:${tableSize}`);
   }
 }
 

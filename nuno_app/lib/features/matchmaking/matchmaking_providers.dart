@@ -18,12 +18,17 @@ class MatchmakingState {
   final MatchFoundPayload? match;
   final String? error;
 
+  /// Table size being queued for. Only players who chose the same size are
+  /// ever matched together.
+  final int tableSize;
+
   const MatchmakingState({
     this.status = QueueStatus.idle,
     this.mode = GameMode.casual,
     this.elapsedSeconds = 0,
     this.match,
     this.error,
+    this.tableSize = 2,
   });
 
   MatchmakingState copyWith({
@@ -32,6 +37,7 @@ class MatchmakingState {
     int? elapsedSeconds,
     MatchFoundPayload? match,
     String? error,
+    int? tableSize,
     bool clearError = false,
   }) =>
       MatchmakingState(
@@ -40,6 +46,7 @@ class MatchmakingState {
         elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
         match: match ?? this.match,
         error: clearError ? null : (error ?? this.error),
+        tableSize: tableSize ?? this.tableSize,
       );
 
   bool get isSearching => status == QueueStatus.searching;
@@ -74,6 +81,7 @@ class MatchmakingController extends StateNotifier<MatchmakingState> {
       state = state.copyWith(
         status: QueueStatus.searching,
         mode: GameModeX.parse(J.strOrNull(p['mode'])),
+        tableSize: J.int_(p['requiredPlayers'], state.tableSize),
         elapsedSeconds: 0,
         clearError: true,
       );
@@ -129,6 +137,7 @@ class MatchmakingController extends StateNotifier<MatchmakingState> {
     state = state.copyWith(
       status: QueueStatus.searching,
       mode: mode,
+      tableSize: requiredPlayers,
       elapsedSeconds: 0,
       clearError: true,
     );

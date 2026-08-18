@@ -81,8 +81,7 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
             const SizedBox(height: AppDimens.sm),
             Row(
               children: [
-                // Backend supports up to 10, the design caps at 7.
-                for (final n in [2, 3, 4, 5, 6, 7]) ...[
+                for (final n in [2, 3, 4, 5, 6, 7, 8]) ...[
                   Expanded(
                     child: _PlayerCountChip(
                       count: n,
@@ -90,7 +89,7 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
                       onTap: () => setState(() => _maxPlayers = n),
                     ),
                   ),
-                  if (n != 7) const SizedBox(width: AppDimens.sm),
+                  if (n != 8) const SizedBox(width: AppDimens.sm),
                 ],
               ],
             ),

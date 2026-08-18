@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -29,12 +30,15 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
 }
 
 class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(matchmakingControllerProvider.notifier).joinQueue(widget.mode);
-    });
+  /// Chosen table size. The queue is not joined until the player confirms:
+  /// entering the screen used to drop them straight into a search, with no
+  /// say in how many people they were about to play against.
+  int _tableSize = 4;
+
+  void _startSearch() {
+    ref
+        .read(matchmakingControllerProvider.notifier)
+        .joinQueue(widget.mode, requiredPlayers: _tableSize);
   }
 
   void _cancel() {
@@ -44,6 +48,11 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
     } else {
       context.go(AppRoutes.home);
     }
+  }
+
+  /// Back out of a search without leaving the screen.
+  void _stopSearch() {
+    ref.read(matchmakingControllerProvider.notifier).leaveQueue();
   }
 
   @override
@@ -96,90 +105,128 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
 
                   const Spacer(),
 
-                  // ── Radar ──────────────────────────────
-                  if (state.isMatchFound)
-                    const _MatchFoundBadge()
-                  else
-                    const _SearchRadar(),
-
-                  const SizedBox(height: AppDimens.huge),
-
-                  Text(
-                    state.isMatchFound
-                        ? 'Match found!'
-                        : 'Finding opponents',
-                    style: AppTextStyles.h1,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppDimens.sm),
-                  Text(
-                    state.isMatchFound
-                        ? 'Starting the game...'
-                        : 'Matching you with players of similar skill',
-                    style: AppTextStyles.bodySm,
-                    textAlign: TextAlign.center,
-                  ),
-
-                  const SizedBox(height: AppDimens.xxl),
-
-                  // ── Timer ──────────────────────────────
-                  if (!state.isMatchFound)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.xl,
-                        vertical: AppDimens.md,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: AppDimens.brPill,
-                        border: Border.all(color: AppColors.surfaceStroke),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.timer_outlined,
-                              size: 16, color: AppColors.textMuted),
-                          const SizedBox(width: AppDimens.sm),
-                          Text(
-                            state.elapsedLabel,
-                            style: AppTextStyles.numeric.copyWith(fontSize: 18),
-                          ),
-                        ],
-                      ),
+                  // Before searching, the player picks how many people they
+                  // want at the table; only then is the queue joined.
+                  if (state.status == QueueStatus.idle) ...[
+                    Text('TABLE SIZE', style: AppTextStyles.label),
+                    const SizedBox(height: AppDimens.sm),
+                    Text(
+                      'You will only be matched with players\nwho chose the same size.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodySm
+                          .copyWith(color: AppColors.textMuted),
                     ),
-
-                  // ── Found players ──────────────────────
-                  if (state.isMatchFound && state.match != null) ...[
-                    const SizedBox(height: AppDimens.lg),
+                    const SizedBox(height: AppDimens.xl),
                     Wrap(
-                      spacing: AppDimens.lg,
-                      runSpacing: AppDimens.lg,
+                      spacing: AppDimens.md,
+                      runSpacing: AppDimens.md,
                       alignment: WrapAlignment.center,
                       children: [
-                        for (final p in state.match!.players)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              PlayerAvatar(
-                                username: p.username,
-                                size: 52,
-                                isActive: true,
-                              ),
-                              const SizedBox(height: AppDimens.sm),
-                              SizedBox(
-                                width: 66,
-                                child: Text(
-                                  p.username,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: AppTextStyles.caption,
-                                ),
-                              ),
-                            ],
+                        for (final n in AppConfig.quickMatchSizes)
+                          _SizeChip(
+                            count: n,
+                            selected: _tableSize == n,
+                            onTap: () => setState(() => _tableSize = n),
                           ),
                       ],
                     ),
+                    const SizedBox(height: AppDimens.xxl),
+                    SizedBox(
+                      width: 260,
+                      child: AppButton(
+                        label: 'FIND MATCH',
+                        icon: Icons.search_rounded,
+                        variant: AppButtonVariant.gold,
+                        onPressed: _startSearch,
+                      ),
+                    ),
+                  ] else ...[
+                    // ── Radar ──────────────────────────────
+                    if (state.isMatchFound)
+                      const _MatchFoundBadge()
+                    else
+                      const _SearchRadar(),
+
+                    const SizedBox(height: AppDimens.xl),
+
+                    Text(
+                      state.isMatchFound
+                          ? 'Match found!'
+                          : 'Finding ${state.tableSize} players',
+                      style: AppTextStyles.h2,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppDimens.xs),
+                    Text(
+                      state.isMatchFound
+                          ? 'Starting the game...'
+                          : 'Waiting for a ${state.tableSize}-player table',
+                      style: AppTextStyles.bodySm,
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: AppDimens.lg),
+
+                    // ── Timer ──────────────────────────────
+                    if (!state.isMatchFound)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimens.xl,
+                          vertical: AppDimens.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: AppDimens.brPill,
+                          border: Border.all(color: AppColors.surfaceStroke),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.timer_outlined,
+                                size: 16, color: AppColors.textMuted),
+                            const SizedBox(width: AppDimens.sm),
+                            Text(
+                              state.elapsedLabel,
+                              style:
+                                  AppTextStyles.numeric.copyWith(fontSize: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // ── Found players ──────────────────────
+                    if (state.isMatchFound && state.match != null) ...[
+                      const SizedBox(height: AppDimens.md),
+                      Wrap(
+                        spacing: AppDimens.md,
+                        runSpacing: AppDimens.md,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          for (final p in state.match!.players)
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                PlayerAvatar(
+                                  username: p.username,
+                                  size: 44,
+                                  isActive: true,
+                                ),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  width: 66,
+                                  child: Text(
+                                    p.username,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: AppTextStyles.caption,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
 
                   const Spacer(),
@@ -187,13 +234,15 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
                   // ── Tip ────────────────────────────────
                   const _RotatingTip(),
 
-                  const SizedBox(height: AppDimens.xl),
+                  const SizedBox(height: AppDimens.lg),
 
-                  if (!state.isMatchFound)
+                  // Stopping the search returns to the size picker rather
+                  // than leaving the screen entirely.
+                  if (state.isSearching)
                     AppButton(
-                      label: 'CANCEL SEARCH',
+                      label: 'STOP SEARCHING',
                       variant: AppButtonVariant.ghost,
-                      onPressed: _cancel,
+                      onPressed: _stopSearch,
                     ),
                 ],
               ),
@@ -377,6 +426,67 @@ class _RotatingTipState extends State<_RotatingTip> {
           ),
         );
       },
+    );
+  }
+}
+
+
+/// One table-size option in the quick-match picker.
+class _SizeChip extends StatelessWidget {
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SizeChip({
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  /// Familiar names for the small sizes, as in other games.
+  String get _label => switch (count) {
+        2 => 'DUO',
+        3 => 'TRIO',
+        4 => 'SQUAD',
+        _ => '$count PLAYERS',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 92,
+        padding: const EdgeInsets.symmetric(vertical: AppDimens.sm),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surfaceHigh,
+          borderRadius: AppDimens.brMd,
+          border: Border.all(
+            color: selected ? AppColors.gold : AppColors.surfaceStroke,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$count',
+              style: AppTextStyles.h2.copyWith(
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              _label,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: selected ? Colors.white70 : AppColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

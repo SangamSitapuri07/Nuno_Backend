@@ -67,7 +67,7 @@ export class RoomService {
     roomCode,
     hostId: userId,
     players: [host],
-    maxPlayers: Math.min(Math.max(input.maxPlayers || 4, 2), 10),
+    maxPlayers: Math.min(Math.max(input.maxPlayers || 4, 2), 8),
       currentPlayers: 1,
       voiceEnabled: input.voiceEnabled ?? true,
       chatEnabled: true,

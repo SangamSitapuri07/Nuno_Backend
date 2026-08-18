@@ -55,16 +55,18 @@ export const initializeMatchmakingHandlers = (
       socket.emit('queue.joined', {
         mode: data.mode,
         region: data.region || 'AUTO',
+        requiredPlayers: data.requiredPlayers ?? 2,
         timestamp: Date.now(),
       });
 
       logger.info('Player joined queue', {
         userId: socket.userId,
         mode: data.mode,
+        requiredPlayers: data.requiredPlayers ?? 2,
       });
 
       // Try to find match
-      await processAndNotify(io, data.mode);
+      await processAndNotify(io);
 
     } catch (error: any) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -103,10 +105,7 @@ export const initializeMatchmakingHandlers = (
 // PROCESS AND NOTIFY
 // ─────────────────────────────────────────
 
-const processAndNotify = async (
-  io: Server,
-  mode: GameMode
-): Promise<void> => {
+const processAndNotify = async (io: Server): Promise<void> => {
   try {
     const matches = await matchmakingService.processQueues();
 
@@ -124,7 +123,9 @@ const processAndNotify = async (
         firstPlayer.socketId,
         {
           gameMode: match.mode,
-          maxPlayers: 4,
+          // Sized to the table the players queued for, rather than a
+          // hardcoded 4 that could be smaller than the match itself.
+          maxPlayers: match.players.length,
           voiceEnabled: true,
         }
       );

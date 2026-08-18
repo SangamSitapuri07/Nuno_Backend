@@ -64,7 +64,12 @@ class AppConfig {
 
   /// Mirrors GAME_CONSTANTS in src/utils/constants.ts
   static const int minPlayers = 2;
-  static const int maxPlayers = 10;
+  static const int maxPlayers = 8;
+
+  /// Table sizes offered by quick match, mirroring VALID_TABLE_SIZES in
+  /// src/matchmaking/matchmaking.service.ts. Players are only ever matched
+  /// with others who picked the same size.
+  static const List<int> quickMatchSizes = [2, 3, 4, 6, 8];
   static const int initialHandSize = 7;
   static const int turnTimerSeconds = 20;
   static const int maxChatLength = 200;
