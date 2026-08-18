@@ -132,9 +132,26 @@ class Art {
         'frame_silver' => frameSilver,
         'frame_gold' => frameGold,
         'frame_epic' => frameEpic,
+        'badge_star' => medalStar,
+        'badge_cards' => medalCards,
+        'badge_first' => medalFirst,
+        'badge_flame' => medalFlame,
+        'badge_bolt' => medalBolt,
+        'badge_crown' => medalCrown,
         _ => itemId.startsWith('emote_')
             ? emote(itemId.substring('emote_'.length))
             : null,
+      };
+
+  /// Medal art for a store badge itemId, or null when it is not a badge.
+  static String? badge(String itemId) => switch (itemId) {
+        'badge_star' => medalStar,
+        'badge_cards' => medalCards,
+        'badge_first' => medalFirst,
+        'badge_flame' => medalFlame,
+        'badge_bolt' => medalBolt,
+        'badge_crown' => medalCrown,
+        _ => null,
       };
 
   /// Medal art cycled by achievement index.

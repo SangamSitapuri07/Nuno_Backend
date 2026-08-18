@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
+import '../store/cosmetics_provider.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -116,6 +117,7 @@ class _IdentitySection extends ConsumerWidget {
     final tierColor = AppColors.forTier(
       rank?.tier.wire ?? p.leaderboard?.tier.wire ?? 'BRONZE',
     );
+    final cosmetics = ref.watch(equippedCosmeticsProvider);
 
     return SingleChildScrollView(
       child: Column(
@@ -135,7 +137,25 @@ class _IdentitySection extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.username, style: AppTextStyles.h3),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(p.username, style: AppTextStyles.h3),
+                        ),
+                        if (cosmetics.badge != null) ...[
+                          const SizedBox(width: 6),
+                          ArtImage(cosmetics.badge!, width: 20),
+                        ],
+                      ],
+                    ),
+                    if (cosmetics.title != null)
+                      Text(
+                        cosmetics.title!,
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.gold,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     Text('Lv. ${p.level}', style: AppTextStyles.caption),
                     const SizedBox(height: 5),
                     ClipRRect(

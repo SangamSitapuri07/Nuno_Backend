@@ -27,6 +27,7 @@ export class EconomyService {
     { itemId: 'table_galaxy', type: CosmeticType.TABLE_THEME },
     { itemId: 'frame_bronze', type: CosmeticType.PROFILE_BANNER },
     { itemId: 'emote_laugh', type: CosmeticType.EMOTE },
+    { itemId: 'title_rookie', type: CosmeticType.TITLE },
   ];
 
   /// Backfills the free items for a player who does not have them yet.
@@ -335,6 +336,24 @@ export class EconomyService {
       { itemId: 'frame_silver', name: 'Silver Frame', description: 'Polished silver ring', type: 'PROFILE_BANNER', rarity: 'RARE', price: 500, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'frame_gold', name: 'Gold Frame', description: 'For the consistent winner', type: 'PROFILE_BANNER', rarity: 'EPIC', price: 1200, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'frame_epic', name: 'Epic Frame', description: 'Radiant arcane ring', type: 'PROFILE_BANNER', rarity: 'LEGENDARY', price: 3000, currency: 'COINS', imageUrl: null, isAvailable: true },
+
+      // ═══ TITLES - shown under your name ═══
+      //
+      // Text rather than art, so these need no asset and cannot end up
+      // looking like a placeholder.
+      { itemId: 'title_rookie', name: 'Rookie', description: 'Everyone starts here', type: 'TITLE', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
+      { itemId: 'title_sharp', name: 'Sharp Shuffler', description: 'Quick with a deck', type: 'TITLE', rarity: 'COMMON', price: 200, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'title_champion', name: 'Champion', description: 'Proven winner', type: 'TITLE', rarity: 'RARE', price: 600, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'title_untouchable', name: 'Untouchable', description: 'Never seen losing', type: 'TITLE', rarity: 'EPIC', price: 1400, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'title_legend', name: 'Legend', description: 'Spoken of in whispers', type: 'TITLE', rarity: 'LEGENDARY', price: 3500, currency: 'COINS', imageUrl: null, isAvailable: true },
+
+      // ═══ BADGES - a medal beside your name ═══
+      { itemId: 'badge_star', name: 'Star Badge', description: 'A bright start', type: 'BADGE', rarity: 'COMMON', price: 250, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'badge_cards', name: 'Card Badge', description: 'For the regulars', type: 'BADGE', rarity: 'COMMON', price: 250, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'badge_flame', name: 'Flame Badge', description: 'On a hot streak', type: 'BADGE', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'badge_bolt', name: 'Bolt Badge', description: 'Lightning fast', type: 'BADGE', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'badge_first', name: 'First Place', description: 'Top of the table', type: 'BADGE', rarity: 'EPIC', price: 1600, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'badge_crown', name: 'Crown Badge', description: 'Rules the room', type: 'BADGE', rarity: 'LEGENDARY', price: 3200, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ EMOTES - sent from the table ═══
       { itemId: 'emote_laugh', name: 'Laugh', description: 'Ha ha!', type: 'EMOTE', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },

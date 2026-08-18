@@ -41,11 +41,19 @@ class EquippedCosmetics {
   /// not the store's 'emote_laugh'. The defaults are always available.
   final Set<String> emotes;
 
+  /// Medal shown beside the player's name, or null when none is equipped.
+  final String? badge;
+
+  /// Title shown under the player's name, or null when none is equipped.
+  final String? title;
+
   const EquippedCosmetics({
     required this.cardBack,
     required this.tableTheme,
     required this.avatarFrame,
     required this.emotes,
+    this.badge,
+    this.title,
   });
 
   /// Falls back to the free default for anything not owned or not equipped,
@@ -71,11 +79,23 @@ class EquippedCosmetics {
         for (final id in owned)
           if (id.startsWith('emote_')) id.substring('emote_'.length),
       },
+      badge: Art.badge(inventory?.equippedFor(CosmeticType.badge) ?? ''),
+      title: _titleText(inventory?.equippedFor(CosmeticType.title)),
     );
   }
 
   /// Granted to everyone, matching the isDefault entries in the catalogue.
   static const _freeEmotes = {'laugh'};
+
+  /// Titles are words rather than pictures, so they map to display text.
+  static String? _titleText(String? itemId) => switch (itemId) {
+        'title_rookie' => 'Rookie',
+        'title_sharp' => 'Sharp Shuffler',
+        'title_champion' => 'Champion',
+        'title_untouchable' => 'Untouchable',
+        'title_legend' => 'Legend',
+        _ => null,
+      };
 
   static String _cardBackAsset(String? itemId) => switch (itemId) {
         'card_back_neon' => Art.skinNeon,

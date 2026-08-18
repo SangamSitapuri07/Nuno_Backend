@@ -34,8 +34,8 @@ class PlayerBadge extends ConsumerWidget {
 
     // An equipped frame overrides the level-derived one, which is the whole
     // point of buying it. Falls back to the level frame when none is set.
-    final frame = ref.watch(equippedCosmeticsProvider).avatarFrame ??
-        Art.frameForLevel(level);
+    final cosmetics = ref.watch(equippedCosmeticsProvider);
+    final frame = cosmetics.avatarFrame ?? Art.frameForLevel(level);
 
     return GestureDetector(
       onTap: onTap,
@@ -91,12 +91,34 @@ class PlayerBadge extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    username,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.h4.copyWith(fontSize: 15),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          username,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.h4.copyWith(fontSize: 15),
+                        ),
+                      ),
+                      // Equipped badge, beside the name.
+                      if (cosmetics.badge != null) ...[
+                        const SizedBox(width: 4),
+                        ArtImage(cosmetics.badge!, width: 16),
+                      ],
+                    ],
                   ),
+                  // Equipped title, under the name.
+                  if (cosmetics.title != null)
+                    Text(
+                      cosmetics.title!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.gold,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
