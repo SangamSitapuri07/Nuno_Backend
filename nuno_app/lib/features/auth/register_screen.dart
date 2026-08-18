@@ -63,8 +63,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       title: 'Create Account',
       onBack: () => context.pop(),
       maxWidth: 640,
-      child: SingleChildScrollView(
-        child: Form(
+      // PanelScreen's body already scrolls.
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -146,7 +146,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 }

@@ -231,7 +231,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           asset: Art.bgTable,
           child: Stack(
             children: [
-              SafeArea(
+              // Clipped: the table is a fixed-size Stack on a viewport whose
+              // height varies by device, and anything spilling past the edge
+              // would paint the debug overflow stripes over the hand.
+              ClipRect(
+                child: SafeArea(
                 child: game == null
                     ? const LoadingView(label: 'Joining the table...')
                     : _Table(
@@ -246,6 +250,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                         onPlayCard: _playCard,
                         onExit: _confirmExit,
                       ),
+                ),
               ),
 
               // Shuffle-and-deal flourish over the first moment of the match.

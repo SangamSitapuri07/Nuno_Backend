@@ -42,8 +42,20 @@ class PlayingCardView extends StatelessWidget {
     // A flat fill looks like coloured paper. Real cards have a slight
     // vertical shade across the ink, so the body is a soft gradient of the
     // suit colour rather than one tone.
+    // A wild draw four keeps a dark body so it never reads as a plain wild
+    // even before the centre symbol is taken in.
     final body = _isWildFace
-        ? const _WildQuadrants()
+        ? (card.value == CardValue.wildDrawFour
+            ? const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF2A2A38), Color(0xFF0E0E16)],
+                  ),
+                ),
+              )
+            : const _WildQuadrants())
         : DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -193,7 +205,6 @@ class _CenterSymbol extends StatelessWidget {
 
     switch (card.value) {
       case CardValue.wild:
-      case CardValue.wildDrawFour:
         // Four colour swatches inside the ellipse.
         return SizedBox(
           width: width * 0.46,
@@ -220,6 +231,66 @@ class _CenterSymbol extends StatelessWidget {
                   ),
               ],
             ),
+          ),
+        );
+
+      case CardValue.wildDrawFour:
+        // Two stacked cards plus the count, mirroring how +2 is drawn.
+        //
+        // A wild draw four used to render the same four swatches as a plain
+        // wild, so the two were indistinguishable at a glance - and picking
+        // the wrong one is a very expensive mistake. Keeping the +2 language
+        // makes the "draw" meaning obvious, and the four coloured card backs
+        // still say "wild".
+        return SizedBox(
+          width: width * 0.52,
+          height: width * 0.52,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                left: 0,
+                top: width * 0.05,
+                child: _MiniCard(
+                  size: width * 0.22,
+                  fill: AppColors.cardRed,
+                  stroke: Colors.white,
+                ),
+              ),
+              Positioned(
+                left: width * 0.12,
+                top: 0,
+                child: _MiniCard(
+                  size: width * 0.22,
+                  fill: AppColors.cardBlue,
+                  stroke: Colors.white,
+                ),
+              ),
+              Positioned(
+                right: width * 0.06,
+                bottom: width * 0.02,
+                child: _MiniCard(
+                  size: width * 0.22,
+                  fill: AppColors.cardYellow,
+                  stroke: Colors.white,
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: width * 0.10,
+                child: _MiniCard(
+                  size: width * 0.22,
+                  fill: AppColors.cardGreen,
+                  stroke: Colors.white,
+                ),
+              ),
+              // The count sits on top, which is the part read first.
+              _OutlinedNumber(
+                text: '+4',
+                fontSize: width * 0.30,
+                fill: const Color(0xFF141414),
+              ),
+            ],
           ),
         );
 

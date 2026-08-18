@@ -64,8 +64,9 @@ class LobbyScreen extends ConsumerWidget {
           context.go(AppRoutes.home);
         },
         child: room == null
-            ? SingleChildScrollView(
-                child: state.error != null && !state.isConnecting
+            // PanelScreen's body already scrolls.
+            ? Builder(
+                builder: (context) => state.error != null && !state.isConnecting
                     ? Column(
                         children: [
                           EmptyState(
@@ -142,10 +143,8 @@ class _LobbyBody extends StatelessWidget {
         .every((p) => p.isReady);
     final canStart = room.players.length >= 2 && guestsReady;
 
-    // Scrollable: a short landscape viewport plus the system inset left the
-    // action row 134px past the bottom edge on the reporter's device.
-    return SingleChildScrollView(
-      child: Row(
+    // PanelScreen's body already scrolls, so this only needs to lay out.
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Left: code + card art ──────────────────
@@ -317,7 +316,6 @@ class _LobbyBody extends StatelessWidget {
           ),
         ),
       ],
-      ),
     );
   }
 }

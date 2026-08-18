@@ -80,7 +80,24 @@ class TitledPanel extends StatelessWidget {
             ),
           ),
 
-          Flexible(child: Padding(padding: padding, child: child)),
+          // Scrollable and clipped.
+          //
+          // Every panel in the app funnels through here, and a landscape
+          // phone leaves very little height once the system insets and the
+          // header strip are taken out. Any content that did not fit painted
+          // the debug overflow stripes across the bottom of the screen,
+          // hiding whatever sat there. Making the body scroll means content
+          // that does not fit can still be reached, and the clip guarantees
+          // nothing is ever drawn outside the panel.
+          Flexible(
+            child: ClipRRect(
+              borderRadius: AppDimens.brLg,
+              child: SingleChildScrollView(
+                padding: padding,
+                child: child,
+              ),
+            ),
+          ),
         ],
       ),
     );

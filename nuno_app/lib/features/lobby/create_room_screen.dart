@@ -54,8 +54,8 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
       title: 'Create Room',
       onBack: () => context.pop(),
       maxWidth: 520,
-      child: SingleChildScrollView(
-        child: Column(
+      // PanelScreen's body already scrolls.
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('ROOM NAME', style: AppTextStyles.label),
@@ -129,7 +129,6 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 }

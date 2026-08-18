@@ -98,10 +98,14 @@ class _PlayerHandState extends State<PlayerHand> {
       ),
     );
 
-    if (!needsScroll) return stack;
+    // Clipped either way: the arc lifts cards above their box and a selected
+    // card lifts further still, which would otherwise paint outside and trip
+    // the overflow indicator.
+    if (!needsScroll) return ClipRect(child: stack);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.hardEdge,
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.lg),
       child: stack,
     );
