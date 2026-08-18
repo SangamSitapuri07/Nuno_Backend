@@ -14,7 +14,63 @@ export class EconomyService {
   // GET INVENTORY
   // ─────────────────────────────────────────
 
+  /// Items every player owns without buying them.
+  ///
+  /// These are granted as real rows rather than being special-cased in the
+  /// client. The store used to show EQUIP on a default the player had no
+  /// PlayerCosmetic row for, and equipping it failed with NOT_OWNED.
+  private static readonly DEFAULT_ITEMS: Array<{
+    itemId: string;
+    type: CosmeticType;
+  }> = [
+    { itemId: 'card_back_classic', type: CosmeticType.CARD_BACK },
+    { itemId: 'table_galaxy', type: CosmeticType.TABLE_THEME },
+    { itemId: 'frame_bronze', type: CosmeticType.PROFILE_BANNER },
+    { itemId: 'emote_laugh', type: CosmeticType.EMOTE },
+  ];
+
+  /// Backfills the free items for a player who does not have them yet.
+  ///
+  /// Done on read so existing accounts pick them up too, not just ones
+  /// created after this shipped. createMany with skipDuplicates leans on the
+  /// (playerId, cosmeticId) unique index, so concurrent calls are safe.
+  private async grantDefaults(userId: string): Promise<void> {
+    await prisma.playerCosmetic.createMany({
+      data: EconomyService.DEFAULT_ITEMS.map((d) => ({
+        playerId: userId,
+        cosmeticType: d.type as any,
+        cosmeticId: d.itemId,
+        // Equipped only if nothing of that type is set yet; resolved below.
+        isEquipped: false,
+      })),
+      skipDuplicates: true,
+    });
+
+    // Make sure each type has exactly one equipped item. A player who has
+    // never equipped anything would otherwise render nothing at all.
+    const rows = await prisma.playerCosmetic.findMany({
+      where: { playerId: userId },
+    });
+
+    const typesWithEquip = new Set(
+      rows.filter((r: any) => r.isEquipped).map((r: any) => r.cosmeticType)
+    );
+
+    for (const d of EconomyService.DEFAULT_ITEMS) {
+      if (typesWithEquip.has(d.type)) continue;
+      const row = rows.find((r: any) => r.cosmeticId === d.itemId);
+      if (!row) continue;
+      await prisma.playerCosmetic.update({
+        where: { id: row.id },
+        data: { isEquipped: true },
+      });
+      typesWithEquip.add(d.type);
+    }
+  }
+
   async getInventory(userId: string) {
+    await this.grantDefaults(userId);
+
     const cosmetics = await prisma.playerCosmetic.findMany({
       where: { playerId: userId },
       orderBy: { unlockedAt: 'desc' },
@@ -265,12 +321,14 @@ export class EconomyService {
       { itemId: 'card_back_classic', name: 'Classic Back', description: 'The original Nuno back', type: 'CARD_BACK', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
       { itemId: 'card_back_neon', name: 'Neon City', description: 'Cyberpunk glow', type: 'CARD_BACK', rarity: 'RARE', price: 600, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'card_back_gold', name: 'Gold Leaf', description: 'Gilded finish', type: 'CARD_BACK', rarity: 'EPIC', price: 1500, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'card_back_fire', name: 'Fire Storm', description: 'Blazing ember burst', type: 'CARD_BACK', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'card_back_ocean', name: 'Ocean Wave', description: 'Deep sea crest', type: 'CARD_BACK', rarity: 'RARE', price: 700, currency: 'COINS', imageUrl: null, isAvailable: true },
       { itemId: 'card_back_diamond', name: 'Diamond Elite', description: 'Ultra rare finish', type: 'CARD_BACK', rarity: 'LEGENDARY', price: 4000, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ TABLE THEMES - the background behind the table ═══
       { itemId: 'table_galaxy', name: 'Galaxy Table', description: 'Deep space vortex', type: 'TABLE_THEME', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },
-      { itemId: 'table_panel', name: 'Midnight Table', description: 'Calm violet felt', type: 'TABLE_THEME', rarity: 'RARE', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
-      { itemId: 'table_store', name: 'Aurora Table', description: 'Shifting aurora light', type: 'TABLE_THEME', rarity: 'EPIC', price: 1800, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'table_midnight', name: 'Midnight Table', description: 'Calm violet felt', type: 'TABLE_THEME', rarity: 'RARE', price: 800, currency: 'COINS', imageUrl: null, isAvailable: true },
+      { itemId: 'table_aurora', name: 'Aurora Table', description: 'Shifting aurora light', type: 'TABLE_THEME', rarity: 'EPIC', price: 1800, currency: 'COINS', imageUrl: null, isAvailable: true },
 
       // ═══ AVATAR FRAMES - the ring around your avatar ═══
       { itemId: 'frame_bronze', name: 'Bronze Frame', description: 'Where everyone starts', type: 'PROFILE_BANNER', rarity: 'COMMON', price: 0, currency: 'COINS', imageUrl: null, isAvailable: true, isDefault: true },

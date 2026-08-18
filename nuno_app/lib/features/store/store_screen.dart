@@ -177,10 +177,11 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (context, i) {
                       final item = filtered[i];
-                      // Free defaults are granted to everyone, so they read
-                      // as owned even before anything is in the inventory.
-                      final owned = item.isDefault ||
-                          (inventory?.owns(item.itemId) ?? false);
+                      // The server grants the free defaults as real rows, so
+                      // ownership is whatever the inventory says. Treating
+                      // isDefault as owned here is what produced an EQUIP
+                      // button that failed with NOT_OWNED.
+                      final owned = inventory?.owns(item.itemId) ?? false;
 
                       return _StoreItemCard(
                         item: item,
@@ -365,10 +366,15 @@ class _StoreItemCard extends StatelessWidget {
                   ),
                   child: Center(
                     child: ArtImage(
-                      // Card backs show their real skin; everything else
-                      // falls back to the generic bundle art.
-                      Art.cardSkin(item.itemId) ?? Art.shopBundle,
-                      height: item.type == CosmeticType.cardBack ? 74 : 62,
+                      // Each item has its own picture now. The type-based
+                      // icon remains only as a fallback for an item whose
+                      // art is missing.
+                      Art.storePreview(item.itemId) ?? '',
+                      height: switch (item.type) {
+                        CosmeticType.cardBack => 74,
+                        CosmeticType.emote => 46,
+                        _ => 62,
+                      },
                       fallback: Icon(
                         _iconFor(item.type),
                         size: 44,

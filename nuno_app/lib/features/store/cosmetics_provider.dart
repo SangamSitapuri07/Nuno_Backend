@@ -81,6 +81,8 @@ class EquippedCosmetics {
         'card_back_neon' => Art.skinNeon,
         'card_back_gold' => Art.skinGold,
         'card_back_diamond' => Art.skinDiamond,
+        'card_back_fire' => Art.skinFire,
+        'card_back_ocean' => Art.skinOcean,
         'card_back_classic' => Art.skinClassic,
         // The 3D render is the default back, and the one the table used
         // before any of this existed.
@@ -88,8 +90,8 @@ class EquippedCosmetics {
       };
 
   static String _tableAsset(String? itemId) => switch (itemId) {
-        'table_panel' => Art.bgPanel,
-        'table_store' => Art.bgStore,
+        'table_midnight' => Art.bgPanel,
+        'table_aurora' => Art.bgStore,
         _ => Art.bgTable,
       };
 

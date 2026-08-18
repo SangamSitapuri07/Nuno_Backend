@@ -37,6 +37,14 @@ class Art {
   static const skinNeon = 'assets/images/skin_neon.png';
   static const skinGold = 'assets/images/skin_gold.png';
   static const skinDiamond = 'assets/images/skin_diamond.png';
+  static const skinFire = 'assets/images/skin_fire.png';
+  static const skinOcean = 'assets/images/skin_ocean.png';
+
+  // Table themes sold in the store. These are the store thumbnails; the
+  // in-game background uses the full-bleed bg_* images.
+  static const tableGalaxy = 'assets/images/table_galaxy.png';
+  static const tableMidnight = 'assets/images/table_midnight.png';
+  static const tableAurora = 'assets/images/table_aurora.png';
 
   // Achievement medals.
   static const medalStar = 'assets/images/medal_star.png';
@@ -96,15 +104,38 @@ class Art {
 
   /// Card-back skin art for a store itemId, or null when the item is not a
   /// card back with bespoke art.
-  static String? cardSkin(String itemId) {
-    if (itemId.contains('neon')) return skinNeon;
-    if (itemId.contains('gold')) return skinGold;
-    if (itemId.contains('diamond')) return skinDiamond;
-    if (itemId.contains('card_back') || itemId.contains('classic')) {
-      return skinClassic;
-    }
-    return null;
-  }
+  ///
+  /// Matched exactly rather than by substring: 'frame_gold' and 'table_...'
+  /// both contain words that used to collide with a card-back skin here.
+  static String? cardSkin(String itemId) => switch (itemId) {
+        'card_back_classic' => skinClassic,
+        'card_back_neon' => skinNeon,
+        'card_back_gold' => skinGold,
+        'card_back_diamond' => skinDiamond,
+        'card_back_fire' => skinFire,
+        'card_back_ocean' => skinOcean,
+        _ => null,
+      };
+
+  /// Thumbnail for any store item, or null when it has none.
+  ///
+  /// Every purchasable item now has its own picture. Previously only card
+  /// backs did, and everything else fell back to one generic bundle image,
+  /// so a table, a frame and an emote all looked identical in the shop.
+  static String? storePreview(String itemId) =>
+      cardSkin(itemId) ??
+      switch (itemId) {
+        'table_galaxy' => tableGalaxy,
+        'table_midnight' => tableMidnight,
+        'table_aurora' => tableAurora,
+        'frame_bronze' => frameBronze,
+        'frame_silver' => frameSilver,
+        'frame_gold' => frameGold,
+        'frame_epic' => frameEpic,
+        _ => itemId.startsWith('emote_')
+            ? emote(itemId.substring('emote_'.length))
+            : null,
+      };
 
   /// Medal art cycled by achievement index.
   static String medalFor(int index) {
