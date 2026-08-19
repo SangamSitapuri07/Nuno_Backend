@@ -45,10 +45,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // `stretch`, not `start`.
+    //
+    // With CrossAxisAlignment.start the Row only ever grows to its tallest
+    // child's intrinsic height, and the Container that draws the panel border
+    // sizes itself to that Row. On the Stats and Achievements sections - a
+    // short list - that is a few hundred pixels, so the panel stopped partway
+    // down and the rest of the screen was bare background. Stretching makes
+    // both the side nav and the section fill whatever height they are given.
     final body = Padding(
       padding: const EdgeInsets.all(AppDimens.md),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SideNav(
             items: _items,
@@ -81,13 +89,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // of the height the shell's nav bar was still reserving, is what
           // stopped this tab short of the bottom of the screen.
           padding: const EdgeInsets.all(4),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: AppDimens.brLg,
-              border: Border.all(color: AppColors.surfaceStroke),
+          // SizedBox.expand forces the panel to take the full width AND
+          // height it has been offered. A bare Container sizes to its child,
+          // which is why this tab never reached the bottom edge.
+          child: SizedBox.expand(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: AppDimens.brLg,
+                border: Border.all(color: AppColors.surfaceStroke),
+              ),
+              child: body,
             ),
-            child: body,
           ),
         ),
       );

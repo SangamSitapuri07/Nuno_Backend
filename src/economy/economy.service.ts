@@ -320,14 +320,32 @@ export class EconomyService {
     { coins: 500, xp: 150 },
   ];
 
+  /// Minutes to shift UTC by before deciding which calendar day it is.
+  ///
+  /// The boundary has to be the player's local midnight, not UTC midnight.
+  /// Slicing an ISO string rolled the reward day over at 05:30 IST, so a
+  /// player claiming at 1am was still on "yesterday" and one claiming at 6am
+  /// had silently skipped into the next day - which also meant a streak could
+  /// break overnight without a day actually being missed.
+  private static get dayOffsetMinutes(): number {
+    const raw = Number(process.env.REWARD_DAY_OFFSET_MINUTES);
+    // Defaults to IST (UTC+5:30), the player base this is being run for.
+    return Number.isFinite(raw) ? raw : 330;
+  }
+
   private static dayStamp(at: Date = new Date()): string {
-    return at.toISOString().slice(0, 10);
+    const shifted = new Date(
+      at.getTime() + EconomyService.dayOffsetMinutes * 60_000
+    );
+    return shifted.toISOString().slice(0, 10);
   }
 
   private static previousDayStamp(stamp: string): string {
+    // Plain calendar arithmetic on the already-shifted stamp, so it is not
+    // affected by the offset a second time.
     const d = new Date(`${stamp}T00:00:00.000Z`);
     d.setUTCDate(d.getUTCDate() - 1);
-    return EconomyService.dayStamp(d);
+    return d.toISOString().slice(0, 10);
   }
 
   private async readDailyState(
@@ -389,6 +407,29 @@ export class EconomyService {
 
   async claimDailyReward(userId: string) {
     const today = EconomyService.dayStamp();
+    const redis = await import('../config/redis').then((m) => m.default);
+
+    // Claim the day atomically BEFORE paying anything.
+    //
+    // Read-then-write is not safe here: a double tap, or the client's retry
+    // after a slow response, ran two claims concurrently. Both read
+    // "not claimed yet" and both paid out, so four taps minted four days'
+    // coins. `incr` is atomic in both backing stores (Redis INCR, and a
+    // single INSERT .. ON CONFLICT DO UPDATE in Postgres), so exactly one
+    // caller can ever see the value 1.
+    const guardKey = `daily:lock:${userId}:${today}`;
+    const holders = await redis.incr(guardKey);
+    // Outlives the day it guards, and is cheap to keep.
+    await redis.expire(guardKey, 2 * 86400);
+
+    if (holders > 1) {
+      throw {
+        code: 'ALREADY_CLAIMED',
+        message: 'Daily reward already claimed. Come back tomorrow.',
+        status: 400,
+      };
+    }
+
     const status = await this.getDailyStatus(userId);
 
     if (!status.canClaim) {
@@ -408,7 +449,6 @@ export class EconomyService {
       reason: `Daily Login Reward - Day ${status.currentDay}`,
     });
 
-    const redis = await import('../config/redis').then((m) => m.default);
     // Kept for 30 days, not 24 hours: the record IS the streak, so it has to
     // outlive the day it was written or the streak can never advance.
     await redis.set(

@@ -71,10 +71,25 @@ class InMemoryStore implements Store {
   }
 
   async incr(key: string): Promise<number> {
-    const next = parseInt((await this.get(key)) ?? '0', 10) + 1;
-    // Preserve any existing TTL: only the value changes.
+    // Read and write with NO await in between.
+    //
+    // `await this.get(key)` looks harmless but it is a suspension point:
+    // concurrent callers all resumed having read the same value and all wrote
+    // back the same number, so incr handed out duplicates. That silently
+    // broke every caller relying on it as a lock - the daily reward guard
+    // among them, where four simultaneous taps each saw "1" and were each
+    // paid. Everything below is synchronous, so it runs to completion before
+    // any other caller can observe the map.
     const item = this.store.get(key);
-    this.store.set(key, { value: String(next), expiry: item?.expiry ?? null });
+    const expired = item?.expiry != null && Date.now() > item.expiry;
+    const current = !item || expired ? 0 : parseInt(item.value, 10) || 0;
+    const next = current + 1;
+    // A value that had expired starts a fresh entry with no TTL, matching
+    // Redis; otherwise the existing TTL is preserved and only the value moves.
+    this.store.set(key, {
+      value: String(next),
+      expiry: expired ? null : (item?.expiry ?? null),
+    });
     return next;
   }
 

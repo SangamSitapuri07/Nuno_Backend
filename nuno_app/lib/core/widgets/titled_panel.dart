@@ -210,20 +210,34 @@ class PanelScreen extends StatelessWidget {
           left: false,
           child: LayoutBuilder(
             builder: (context, box) {
-              // Only honour a width cap when there is real room to spare;
-              // otherwise the panel takes the whole viewport.
+              // Resolve a CONCRETE width, never null.
+              //
+              // This is what was still broken. `Align` hands its child LOOSE
+              // constraints, so a SizedBox with `width: null` collapses to the
+              // panel's intrinsic width - roughly half a landscape phone, with
+              // the rest of the display empty. That is the "aadha screen hi
+              // dikh raha hai" report, and no amount of stretching inside the
+              // panel can fix it, because the panel itself was never given the
+              // width in the first place.
+              //
+              // The available width is taken from the LayoutBuilder and the
+              // horizontal padding subtracted, so the panel is told exactly
+              // how wide to be. A cap is applied only when the viewport is
+              // genuinely wider than it - i.e. on a tablet.
+              const gutter = 4.0;
+              final available = box.maxWidth - gutter * 2;
               final cap = maxWidth;
-              final width = (cap != null && box.maxWidth > cap + 120)
+              final width = (cap != null && available > cap + 120)
                   ? cap
-                  : double.infinity;
+                  : available;
 
               return Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                  padding: const EdgeInsets.all(gutter),
                   child: SizedBox(
-                    width: width == double.infinity ? null : width,
-                    height: double.infinity,
+                    width: width,
+                    height: box.maxHeight - gutter * 2,
                     child: TitledPanel(
                       title: title,
                       onBack: onBack,
