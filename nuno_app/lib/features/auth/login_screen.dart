@@ -64,6 +64,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         child: SafeArea(
+          // Left inset excluded: in landscape it is the display
+          // cutout, and honouring it indents the whole screen.
+          left: false,
           child: Row(
             children: [
               // ── Branding ─────────────────────────

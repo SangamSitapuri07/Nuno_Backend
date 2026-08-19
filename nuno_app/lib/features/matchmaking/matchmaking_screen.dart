@@ -77,8 +77,15 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       child: Scaffold(
         body: AppBackground(
           child: SafeArea(
+            left: false,
             child: Padding(
-              padding: const EdgeInsets.all(AppDimens.xxl),
+              // Tight to the left edge, normal gutter elsewhere.
+              padding: const EdgeInsets.fromLTRB(
+                AppDimens.md,
+                AppDimens.lg,
+                AppDimens.xxl,
+                AppDimens.lg,
+              ),
               child: Column(
                 children: [
                   // ── Header ─────────────────────────────

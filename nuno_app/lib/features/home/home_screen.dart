@@ -63,6 +63,9 @@ class HomeScreen extends ConsumerWidget {
 
         SafeArea(
           // No bottom inset: PLAY is meant to sit flush on the screen edge.
+          // No left inset either: in landscape that is the display cutout,
+          // and honouring it indents the whole screen.
+          left: false,
           bottom: false,
           child: LayoutBuilder(
             builder: (context, box) {
@@ -80,8 +83,9 @@ class HomeScreen extends ConsumerWidget {
               final playHeight = (h * 0.28).clamp(70.0, 120.0);
 
               return Padding(
+                // Tight to the left edge; the right keeps a normal gutter.
                 padding: const EdgeInsets.fromLTRB(
-                  AppDimens.md,
+                  4,
                   AppDimens.sm,
                   AppDimens.md,
                   0,

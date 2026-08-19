@@ -238,6 +238,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               // would paint the debug overflow stripes over the hand.
               ClipRect(
                 child: SafeArea(
+                // The table is full-bleed art; the cutout must not shrink it.
+                left: false,
                 child: game == null
                     ? const LoadingView(label: 'Joining the table...')
                     : _Table(
