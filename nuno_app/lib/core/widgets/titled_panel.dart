@@ -165,14 +165,27 @@ class PanelScreen extends StatelessWidget {
       body: ArtBackground(
         asset: Art.bgPanel,
         vignette: false,
+        // Left-aligned and tight to the edge.
+        //
+        // Centring inside a maxWidth left a wide gap down the left of a
+        // landscape phone, which read as the screen being half empty. The
+        // panel now starts at the edge and simply stops at maxWidth.
+        //
+        // SafeArea excludes the left inset for the same reason the bottom bar
+        // does: in landscape it reports the cutout there and would reopen the
+        // gap. Vertical insets are still respected.
         child: SafeArea(
-          child: Center(
+          left: false,
+          child: Align(
+            alignment: Alignment.centerLeft,
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxWidth),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.lg,
-                  vertical: AppDimens.sm,
+                padding: const EdgeInsets.fromLTRB(
+                  4,
+                  AppDimens.sm,
+                  AppDimens.sm,
+                  AppDimens.sm,
                 ),
                 child: SizedBox(
                   height: fillHeight ? double.infinity : null,

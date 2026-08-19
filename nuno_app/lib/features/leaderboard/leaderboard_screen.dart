@@ -49,6 +49,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     final myRank = ref.watch(myRankProvider).valueOrNull;
 
     final content = SafeArea(
+      // Left inset excluded: in landscape it is the display cutout, and
+      // honouring it leaves a visible gap down the edge of the screen.
+      left: false,
       bottom: false,
       child: Column(
         children: [

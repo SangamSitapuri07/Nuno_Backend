@@ -49,15 +49,18 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
         ref.watch(friendRequestsProvider).valueOrNull?.length ?? 0;
 
     final content = SafeArea(
+      // Left inset excluded: in landscape it is the display cutout, and
+      // honouring it leaves a visible gap down the edge of the screen.
+      left: false,
       bottom: false,
       child: Column(
         children: [
           // ── Header ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppDimens.lg,
+              AppDimens.md,
               AppDimens.sm,
-              AppDimens.lg,
+              AppDimens.md,
               AppDimens.md,
             ),
             child: Row(
@@ -76,7 +79,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 
           // ── Tabs ────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.surface,
@@ -169,7 +172,7 @@ class _FriendsTab extends ConsumerWidget {
 
     return friends.when(
       loading: () => ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+        padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
         itemCount: 6,
         itemBuilder: (_, __) => const Padding(
           padding: EdgeInsets.only(bottom: AppDimens.md),
@@ -203,7 +206,7 @@ class _FriendsTab extends ConsumerWidget {
           onRefresh: () => ref.read(friendsProvider.notifier).refresh(),
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(
-              AppDimens.xl,
+              AppDimens.md,
               0,
               AppDimens.xl,
               AppDimens.sm,
@@ -400,7 +403,7 @@ class _RequestsTab extends ConsumerWidget {
 
     return requests.when(
       loading: () => ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+        padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
         itemCount: 3,
         itemBuilder: (_, __) => const Padding(
           padding: EdgeInsets.only(bottom: AppDimens.md),
@@ -567,7 +570,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
           child: TextField(
             controller: _controller,
             onChanged: _onChanged,

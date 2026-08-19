@@ -40,15 +40,18 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
     final profile = ref.watch(currentProfileProvider);
 
     final content = SafeArea(
+      // Left inset excluded: in landscape it is the display cutout, and
+      // honouring it leaves a visible gap down the edge of the screen.
+      left: false,
       bottom: false,
       child: Column(
         children: [
           // ── Header ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppDimens.lg,
+              AppDimens.md,
               AppDimens.sm,
-              AppDimens.lg,
+              AppDimens.md,
               AppDimens.md,
             ),
             child: Row(
@@ -100,7 +103,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
             height: 36,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+              padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
               children: [
                 _FilterChip(
                   label: 'All',
@@ -122,7 +125,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
           Expanded(
             child: items.when(
               loading: () => GridView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: AppDimens.xl),
+                padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
                 gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,

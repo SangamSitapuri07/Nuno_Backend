@@ -128,10 +128,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 Positioned(
                   left: 0,
                   top: 0,
-                  // Hard against the corner. SafeArea is applied on the left
-                  // only: in landscape the top inset is zero anyway, and
-                  // padding it as well pushed the button visibly inwards.
+                  // Hard against the corner. The left inset is excluded for
+                  // the same reason as everywhere else - in landscape it is
+                  // the cutout, and honouring it pushed the button inwards.
                   child: SafeArea(
+                    left: false,
                     top: false,
                     bottom: false,
                     right: false,
@@ -218,14 +219,19 @@ class _BottomBar extends StatelessWidget {
     return Container(
       height: AppDimens.bottomNavHeight,
       color: Colors.transparent,
+      // SafeArea is applied to the bottom only. In landscape it also reports
+      // a left inset for the display cutout, which pushed the bar inwards and
+      // left an obvious gap against the edge of the screen.
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: Align(
           alignment: Alignment.bottomLeft,
           child: Container(
             width: 380,
             height: 54,
-            margin: const EdgeInsets.only(left: AppDimens.md, bottom: 6),
+            margin: const EdgeInsets.only(left: 4, bottom: 6),
             padding: const EdgeInsets.symmetric(horizontal: AppDimens.md),
             decoration: BoxDecoration(
               gradient: const LinearGradient(

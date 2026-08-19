@@ -70,11 +70,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (widget.embedded) {
       return SafeArea(
+        // As elsewhere: the left inset is the landscape cutout, and keeping
+        // it pushes the panel away from the edge.
+        left: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppDimens.md,
+            4,
             AppDimens.sm,
-            AppDimens.md,
+            AppDimens.sm,
             AppDimens.sm,
           ),
           child: Container(
