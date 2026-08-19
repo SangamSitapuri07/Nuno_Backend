@@ -72,7 +72,10 @@ class HomeScreen extends ConsumerWidget {
               // Right column: friends panel above, PLAY below.
               final panelWidth = (w * 0.29).clamp(200.0, 320.0);
               // Header shrinks on short canvases so the stage keeps room.
-              final headerHeight = (h * 0.19).clamp(46.0, 66.0);
+              // The badge carries an avatar plus three stacked lines (name,
+              // title, level bar); 46 was too short for that and overflowed
+              // by a few pixels on shorter viewports.
+              final headerHeight = (h * 0.19).clamp(58.0, 72.0);
               // PLAY is pinned bottom-right; the panel takes the rest.
               final playHeight = (h * 0.28).clamp(70.0, 120.0);
 

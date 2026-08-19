@@ -4,6 +4,7 @@ import ruleEngine from './rule.engine';
 import gameStateManager from './game.state';
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { levelForXp, rewardBetween } from '../users/leveling';
 import {
   MatchState,
   MatchStatus,
@@ -49,6 +50,8 @@ export class GameEngine {
       timerStarted: Date.now(),
       winner: null,
       totalTurns: 0,
+      cardsPlayedBy: {},
+      cardsDrawnBy: {},
       startedAt: Date.now(),
       unoCalledBy: [],
       lastWildDrawFourChallengeable: false,
@@ -116,6 +119,9 @@ export class GameEngine {
     state.currentValue = card.value;
     state.totalTurns++;
 
+    state.cardsPlayedBy ??= {};
+    state.cardsPlayedBy[userId] = (state.cardsPlayedBy[userId] ?? 0) + 1;
+
     await this.processCardEffect(card, state, input.selectedColor, events);
 
     // Reset UNO call if player is no longer on 1 card
@@ -171,6 +177,9 @@ export class GameEngine {
         const card = state.drawPile.shift()!;
         state.hands[userId].push(card);
         drawnCards.push(card);
+
+        state.cardsDrawnBy ??= {};
+        state.cardsDrawnBy[userId] = (state.cardsDrawnBy[userId] ?? 0) + 1;
       }
     }
 
@@ -365,23 +374,90 @@ export class GameEngine {
           },
         });
 
-        await prisma.playerStatistics.update({
+        // Streaks and the win rate were never maintained, so the profile
+        // showed zeroes however much you played. Read the row first so both
+        // can be derived rather than blindly incremented.
+        const before = await prisma.playerStatistics.findUnique({
           where: { userId: playerId },
-          data: {
+        });
+
+        const gamesPlayed = (before?.gamesPlayed ?? 0) + 1;
+        const gamesWon = (before?.gamesWon ?? 0) + (isWinner ? 1 : 0);
+        const currentWinStreak = isWinner
+          ? (before?.currentWinStreak ?? 0) + 1
+          : 0;
+        const longestWinStreak = Math.max(
+          before?.longestWinStreak ?? 0,
+          currentWinStreak
+        );
+
+        await prisma.playerStatistics.upsert({
+          where: { userId: playerId },
+          // A row is created at signup, but an account that predates that -
+          // or one whose row was lost - would otherwise throw here and abort
+          // the whole finalisation, losing everyone's xp for the match.
+          create: {
+            userId: playerId,
+            gamesPlayed: 1,
+            gamesWon: isWinner ? 1 : 0,
+            gamesLost: isWinner ? 0 : 1,
+            winRate: isWinner ? 100 : 0,
+            currentWinStreak,
+            longestWinStreak,
+            cardsPlayed: state.cardsPlayedBy?.[playerId] ?? 0,
+            cardsDrawn: state.cardsDrawnBy?.[playerId] ?? 0,
+          },
+          update: {
             gamesPlayed: { increment: 1 },
             gamesWon: isWinner ? { increment: 1 } : undefined,
             gamesLost: !isWinner ? { increment: 1 } : undefined,
-            cardsPlayed: { increment: state.totalTurns },
+            winRate: Math.round((gamesWon / gamesPlayed) * 1000) / 10,
+            currentWinStreak,
+            longestWinStreak,
+            // Per player, not the match-wide turn count that used to be
+            // credited identically to everyone at the table.
+            cardsPlayed: { increment: state.cardsPlayedBy?.[playerId] ?? 0 },
+            cardsDrawn: { increment: state.cardsDrawnBy?.[playerId] ?? 0 },
           },
         });
+
+        // Award the level that the new xp total earns, plus its coins. The
+        // level column existed but nothing ever recalculated it, so every
+        // account stayed at 1 no matter how much xp it accumulated.
+        const player = await prisma.user.findUnique({
+          where: { id: playerId },
+          select: { xp: true, level: true },
+        });
+
+        const newXp = (player?.xp ?? 0) + xpEarned;
+        const oldLevel = player?.level ?? 1;
+        const newLevel = levelForXp(newXp);
+        const levelCoins = rewardBetween(oldLevel, newLevel);
 
         await prisma.user.update({
           where: { id: playerId },
           data: {
-            xp: { increment: xpEarned },
-            coins: { increment: isWinner ? 50 : 20 },
+            xp: newXp,
+            level: newLevel,
+            coins: { increment: (isWinner ? 50 : 20) + levelCoins },
           },
         });
+
+        if (newLevel > oldLevel) {
+          await prisma.notification.create({
+            data: {
+              playerId,
+              title: `Level ${newLevel}`,
+              message: `You reached level ${newLevel} and earned ${levelCoins} coins.`,
+            },
+          });
+          logger.info('Player levelled up', {
+            playerId,
+            from: oldLevel,
+            to: newLevel,
+            coins: levelCoins,
+          });
+        }
 
         await prisma.leaderboard.update({
           where: { playerId },

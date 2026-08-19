@@ -15,6 +15,14 @@ class TitledPanel extends StatelessWidget {
   final Color? accent;
   final EdgeInsetsGeometry padding;
 
+  /// Give the body the panel's remaining height instead of scrolling it.
+  ///
+  /// A body that lays out horizontally - a side nav beside a list, say -
+  /// needs a bounded height. Wrapping that in a vertical scroll view hands it
+  /// infinite height instead, which is a different bug from the overflow the
+  /// scroll view was added to prevent.
+  final bool expandBody;
+
   const TitledPanel({
     super.key,
     required this.title,
@@ -23,6 +31,7 @@ class TitledPanel extends StatelessWidget {
     this.trailing,
     this.accent,
     this.padding = const EdgeInsets.all(AppDimens.lg),
+    this.expandBody = false,
   });
 
   @override
@@ -92,10 +101,9 @@ class TitledPanel extends StatelessWidget {
           Flexible(
             child: ClipRRect(
               borderRadius: AppDimens.brLg,
-              child: SingleChildScrollView(
-                padding: padding,
-                child: child,
-              ),
+              child: expandBody
+                  ? Padding(padding: padding, child: child)
+                  : SingleChildScrollView(padding: padding, child: child),
             ),
           ),
         ],
@@ -134,6 +142,12 @@ class PanelScreen extends StatelessWidget {
   final double maxWidth;
   final EdgeInsetsGeometry padding;
 
+  /// Stretch the panel to the full height of the viewport.
+  ///
+  /// Screens with a list or a side nav look stranded when the panel shrinks
+  /// to its content and floats in the middle of a landscape display.
+  final bool fillHeight;
+
   const PanelScreen({
     super.key,
     required this.title,
@@ -142,6 +156,7 @@ class PanelScreen extends StatelessWidget {
     this.trailing,
     this.maxWidth = 560,
     this.padding = const EdgeInsets.all(AppDimens.lg),
+    this.fillHeight = false,
   });
 
   @override
@@ -156,15 +171,21 @@ class PanelScreen extends StatelessWidget {
               constraints: BoxConstraints(maxWidth: maxWidth),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.xl,
-                  vertical: AppDimens.md,
+                  horizontal: AppDimens.lg,
+                  vertical: AppDimens.sm,
                 ),
-                child: TitledPanel(
-                  title: title,
-                  onBack: onBack,
-                  trailing: trailing,
-                  padding: padding,
-                  child: child,
+                child: SizedBox(
+                  height: fillHeight ? double.infinity : null,
+                  child: TitledPanel(
+                    title: title,
+                    onBack: onBack,
+                    trailing: trailing,
+                    padding: padding,
+                    // A full-height panel bounds its body, so it lays out
+                    // directly rather than being handed infinite height.
+                    expandBody: fillHeight,
+                    child: child,
+                  ),
                 ),
               ),
             ),

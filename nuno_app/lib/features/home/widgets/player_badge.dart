@@ -66,11 +66,14 @@ class PlayerBadge extends ConsumerWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          // Centre rather than stretch: the badge is placed in a fixed-height
+          // header, and a tall child was overflowing it by a few pixels.
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Avatar with a violet ring.
             SizedBox(
-              width: 46,
-              height: 46,
+              width: 42,
+              height: 42,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -80,7 +83,7 @@ class PlayerBadge extends ConsumerWidget {
                     avatarUrl: cosmetics.avatar ?? avatarUrl,
                     size: 32,
                   ),
-                  ArtImage(frame, width: 46),
+                  ArtImage(frame, width: 42),
                 ],
               ),
             ),
@@ -91,6 +94,7 @@ class PlayerBadge extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Row(
                     children: [
@@ -99,7 +103,7 @@ class PlayerBadge extends ConsumerWidget {
                           username,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.h4.copyWith(fontSize: 15),
+                          style: AppTextStyles.h4.copyWith(fontSize: 14),
                         ),
                       ),
                       // Equipped badge, beside the name.
@@ -118,9 +122,10 @@ class PlayerBadge extends ConsumerWidget {
                       style: AppTextStyles.caption.copyWith(
                         color: AppColors.gold,
                         fontWeight: FontWeight.w700,
+                        fontSize: 10,
                       ),
                     ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Row(
                     children: [
                       Text(

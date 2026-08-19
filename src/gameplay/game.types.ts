@@ -71,6 +71,12 @@ export interface MatchState {
   timerStarted: number;
   winner: string | null;
   totalTurns: number;
+
+  /// Per-player counters, so statistics reflect what each player actually
+  /// did rather than a match-wide total attributed to everyone.
+  cardsPlayedBy?: Record<string, number>;
+  cardsDrawnBy?: Record<string, number>;
+
   startedAt: number;
   unoCalledBy: string[];
   lastWildDrawFourBy?: string;

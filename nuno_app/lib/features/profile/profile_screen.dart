@@ -70,12 +70,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (widget.embedded) {
       return SafeArea(
-        bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppDimens.xl,
+            AppDimens.md,
             AppDimens.sm,
-            AppDimens.xl,
+            AppDimens.md,
             AppDimens.sm,
           ),
           child: Container(
@@ -90,12 +89,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     }
 
+    // Fills the viewport rather than a fixed 260px box, which left the panel
+    // floating in the middle of the screen with its content clipped.
     return PanelScreen(
       title: 'Profile',
       onBack: () => context.pop(),
-      maxWidth: 640,
+      maxWidth: 900,
+      fillHeight: true,
       padding: EdgeInsets.zero,
-      child: SizedBox(height: 260, child: body),
+      child: body,
     );
   }
 }
@@ -172,7 +174,7 @@ class _IdentitySection extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    Text('Lv. ${p.level}', style: AppTextStyles.caption),
+                    Text('Lv. ${p.effectiveLevel}', style: AppTextStyles.caption),
                     const SizedBox(height: 5),
                     ClipRRect(
                       borderRadius: AppDimens.brPill,
@@ -186,7 +188,7 @@ class _IdentitySection extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${p.xp} / ${p.nextLevelXp} XP',
+                      p.xpLabel,
                       style: AppTextStyles.caption.copyWith(fontSize: 9),
                     ),
                   ],

@@ -18,14 +18,15 @@ class PlayMenuScreen extends ConsumerWidget {
     return PanelScreen(
       title: 'Play Menu',
       onBack: () => context.pop(),
-      maxWidth: 620,
+      maxWidth: 760,
+      // Fills the screen instead of a small floating card, and the grid
+      // scrolls on its own now that the panel bounds it.
+      fillHeight: true,
       child: GridView.count(
-        shrinkWrap: true,
         crossAxisCount: 2,
         mainAxisSpacing: AppDimens.md,
         crossAxisSpacing: AppDimens.md,
-        childAspectRatio: 2.2,
-        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 2.6,
         children: [
           _MenuTile(
             title: 'QUICK MATCH',

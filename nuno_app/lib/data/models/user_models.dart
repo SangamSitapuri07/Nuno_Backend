@@ -78,58 +78,44 @@ class PlayerProfile extends Equatable {
         leaderboard: leaderboard,
       );
 
-  /// XP floor of the current level.
+  /// The level [xp] actually earns, capped at [kMaxLevel].
   ///
-  /// Derived from the next target so the two always bracket the current xp,
-  /// even when the server reports a level and xp that disagree.
-  int get levelFloorXp {
-    final target = nextLevelXp;
-
-    // Highest threshold strictly below the target...
-    int floor = 0;
-    for (final t in kLevelThresholds) {
-      if (t < target) floor = t;
-    }
-
-    // ...but past the table the bands are 1000 wide.
-    if (target > kLevelThresholds.last) floor = target - 1000;
-
-    // Never let the floor sit above the player's xp, or the bar goes empty.
-    return floor > xp ? (target - 1000).clamp(0, xp) : floor;
-  }
-
-  /// XP needed to reach the next level.
-  ///
-  /// The server may report xp beyond the level it also reports (levels are
-  /// awarded on match end, xp can run ahead), so the result is always kept
-  /// above the current xp rather than trusting the table blindly.
-  int get nextLevelXp {
-    int target;
-    if (level >= kLevelThresholds.length) {
-      target =
-          kLevelThresholds.last + 1000 * (level - kLevelThresholds.length + 1);
-    } else {
-      target = kLevelThresholds[level.clamp(0, kLevelThresholds.length - 1)];
-    }
-
-    // Never show a target the player has already passed.
-    if (target <= xp) {
-      for (final t in kLevelThresholds) {
-        if (t > xp) return t;
+  /// Derived rather than trusting the server's level column, so a profile
+  /// fetched between a match ending and the row being written still shows a
+  /// consistent bar.
+  int get effectiveLevel {
+    var result = 1;
+    for (var candidate = 2; candidate <= kMaxLevel; candidate++) {
+      if (xp >= kLevelThresholds[candidate]) {
+        result = candidate;
+      } else {
+        break;
       }
-      // Past the table: round up to the next 1000 above the floor.
-      final over = xp - kLevelThresholds.last;
-      return kLevelThresholds.last + ((over ~/ 1000) + 1) * 1000;
     }
-    return target;
+    return result > level ? result : level.clamp(1, kMaxLevel);
   }
+
+  bool get isMaxLevel => effectiveLevel >= kMaxLevel;
+
+  /// XP floor of the current level.
+  int get levelFloorXp => kLevelThresholds[effectiveLevel];
+
+  /// Total XP needed to reach the next level, or the final threshold at cap.
+  int get nextLevelXp => isMaxLevel
+      ? kLevelThresholds[kMaxLevel]
+      : kLevelThresholds[effectiveLevel + 1];
 
   /// 0..1 progress through the current level.
   double get levelProgress {
+    if (isMaxLevel) return 1;
     final span = nextLevelXp - levelFloorXp;
     if (span <= 0) return 1;
     return ((xp - levelFloorXp) / span).clamp(0.0, 1.0);
   }
+
+  /// e.g. "1200 / 1750 XP", or "MAX LEVEL" at the cap.
+  String get xpLabel =>
+      isMaxLevel ? 'MAX LEVEL' : '$xp / $nextLevelXp XP';
 
   String get initials {
     if (username.isEmpty) return '?';

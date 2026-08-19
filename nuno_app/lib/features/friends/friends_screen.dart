@@ -443,12 +443,19 @@ class _RequestsTab extends ConsumerWidget {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      // Only as tall as its two lines. Left to stretch, the
+                      // column took the row's full height and overflowed the
+                      // tile on a short landscape viewport.
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(r.senderUsername,
                             style: AppTextStyles.h4,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                         Text(
                           Formatters.relativeTime(r.createdAt),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.caption,
                         ),
                       ],

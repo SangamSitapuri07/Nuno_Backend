@@ -148,8 +148,13 @@ export class UserService {
       },
     });
 
+    // A missing row is not an error: an account created before statistics
+    // were seeded - or one whose row was lost - would otherwise see the whole
+    // Stats tab fail with a 404 rather than a set of zeroes.
     if (!statistics) {
-      throw { code: 'STATISTICS_NOT_FOUND', message: 'Statistics not found.', status: 404 };
+      return await prisma.playerStatistics.create({
+        data: { userId },
+      });
     }
 
     return statistics;
