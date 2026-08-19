@@ -80,7 +80,15 @@ class HomeScreen extends ConsumerWidget {
               // by a few pixels on shorter viewports.
               final headerHeight = (h * 0.19).clamp(58.0, 72.0);
               // PLAY is pinned bottom-right; the panel takes the rest.
-              final playHeight = (h * 0.28).clamp(70.0, 120.0);
+              //
+              // Derived from the artwork's aspect ratio rather than a share
+              // of the viewport height. The button is a 2:1 rectangle, and a
+              // slot taller than that just adds empty space above and below
+              // it - BoxFit.contain letterboxes the image inside whatever box
+              // it is given, so an over-tall slot is what made the button
+              // read as a square block.
+              final playHeight =
+                  (panelWidth / Art.buttonAspect).clamp(52.0, 96.0);
 
               return Padding(
                 // Tight to the left edge; the right keeps a normal gutter.

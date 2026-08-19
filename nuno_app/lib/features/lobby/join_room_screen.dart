@@ -155,15 +155,21 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
                 ),
               ),
               const SizedBox(width: AppDimens.sm),
-              Expanded(
-                child: Opacity(
-                  opacity: _complete ? 1 : 0.4,
-                  child: ArtButton(
-                    asset: Art.btnJoin,
-                    fallbackLabel: 'JOIN',
-                    width: 130,
-                    onTap: _complete ? _submit : null,
-                  ),
+              // NOT Expanded.
+              //
+              // Expanded hands its child a TIGHT width, which overrode
+              // ArtButton's own `width` entirely - the button simply grew to
+              // half the row. That went unnoticed while the panel was capped
+              // at 420px and became obvious once the panel went full-bleed.
+              // The button now takes its natural size and sits at the end of
+              // the row.
+              Opacity(
+                opacity: _complete ? 1 : 0.4,
+                child: ArtButton(
+                  asset: Art.btnJoin,
+                  fallbackLabel: 'JOIN',
+                  width: 132,
+                  onTap: _complete ? _submit : null,
                 ),
               ),
             ],

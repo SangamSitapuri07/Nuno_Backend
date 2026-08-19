@@ -109,6 +109,14 @@ class Art {
   static const btnReady = 'assets/images/btn_ready.png';
   static const btnInvite = 'assets/images/btn_invite.png';
 
+  /// Width / height of the button artwork.
+  ///
+  /// Every one of the button PNGs is a ~2:1 landscape plate. Callers size
+  /// their slot from this instead of guessing, because BoxFit.contain
+  /// letterboxes the art inside whatever box it is handed - a squarer slot
+  /// does not make the button bigger, it just pads it with empty space.
+  static const buttonAspect = 2.0;
+
   /// Shield art for a rank tier wire value (BRONZE, SILVER, ...).
   static String tierShield(String wire) => switch (wire.toUpperCase()) {
         'SILVER' => tierSilver,
@@ -461,13 +469,17 @@ class _ArtButtonState extends State<ArtButton> {
         duration: const Duration(milliseconds: 110),
         child: Opacity(
           opacity: enabled ? 1 : 0.45,
+          // The art is a ~2:1 plate, so the height follows from the width.
+          // Stating it explicitly means the button keeps its shape even when
+          // a parent hands it constraints of its own.
           child: Image.asset(
             widget.asset,
             width: widget.width,
+            height: widget.width / Art.buttonAspect,
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => Container(
               width: widget.width,
-              height: widget.width * 0.34,
+              height: widget.width / Art.buttonAspect,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: AppColors.goldGradient,
