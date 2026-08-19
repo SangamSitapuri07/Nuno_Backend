@@ -25,11 +25,9 @@ class AchievementsScreen extends ConsumerWidget {
     return PanelScreen(
       title: 'Achievements',
       onBack: () => context.pop(),
-      maxWidth: 560,
       padding: const EdgeInsets.all(AppDimens.md),
-      child: SizedBox(
-        height: 250,
-        child: ListView.separated(
+      fillHeight: true,
+      child: ListView.separated(
           itemCount: _definitions.length,
           separatorBuilder: (_, __) => const SizedBox(height: AppDimens.sm),
           itemBuilder: (context, i) {
@@ -40,8 +38,7 @@ class AchievementsScreen extends ConsumerWidget {
               index: i,
               current: current.clamp(0, def.target),
             );
-          },
-        ),
+        },
       ),
     );
   }

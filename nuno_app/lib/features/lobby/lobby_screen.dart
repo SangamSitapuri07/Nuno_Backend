@@ -57,7 +57,6 @@ class LobbyScreen extends ConsumerWidget {
       },
       child: PanelScreen(
         title: 'Room Lobby',
-        maxWidth: 860,
         onBack: () {
           controller.leave();
           controller.clear();

@@ -81,10 +81,10 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
             child: Padding(
               // Tight to the left edge, normal gutter elsewhere.
               padding: const EdgeInsets.fromLTRB(
+                AppDimens.sm,
                 AppDimens.md,
-                AppDimens.lg,
-                AppDimens.xxl,
-                AppDimens.lg,
+                AppDimens.sm,
+                AppDimens.md,
               ),
               child: Column(
                 children: [

@@ -218,9 +218,9 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
     return PanelScreen(
       title: 'Store',
       onBack: () => context.pop(),
-      maxWidth: 700,
       padding: EdgeInsets.zero,
-      child: SizedBox(height: 268, child: content),
+      fillHeight: true,
+      child: content,
     );
   }
 

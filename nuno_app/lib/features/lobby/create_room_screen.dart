@@ -53,7 +53,6 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
     return PanelScreen(
       title: 'Create Room',
       onBack: () => context.pop(),
-      maxWidth: 520,
       // PanelScreen's body already scrolls.
       child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

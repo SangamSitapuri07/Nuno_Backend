@@ -76,8 +76,19 @@ export class EconomyController {
 
   claimDailyReward = asyncHandler(async (req: Request, res: Response) => {
     const userId = (req as any).user?.userId;
-    await economyService.claimDailyReward(userId);
-    sendSuccess(res, { message: 'Daily reward claimed successfully.' });
+    const status = await economyService.claimDailyReward(userId);
+    // The new streak state comes back with the response so the app can redraw
+    // the track without a second round trip.
+    sendSuccess(res, { message: 'Daily reward claimed successfully.', ...status });
+  });
+
+  // ─────────────────────────────────────────
+  // DAILY REWARD STATUS
+  // ─────────────────────────────────────────
+
+  getDailyStatus = asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.userId;
+    sendSuccess(res, await economyService.getDailyStatus(userId));
   });
 
   // ─────────────────────────────────────────

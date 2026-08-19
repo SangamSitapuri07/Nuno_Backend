@@ -154,9 +154,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
     return PanelScreen(
       title: 'Friends',
       onBack: () => context.pop(),
-      maxWidth: 640,
       padding: EdgeInsets.zero,
-      child: SizedBox(height: 262, child: content),
+      fillHeight: true,
+      child: content,
     );
   }
 }

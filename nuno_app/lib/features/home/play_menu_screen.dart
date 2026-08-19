@@ -18,7 +18,6 @@ class PlayMenuScreen extends ConsumerWidget {
     return PanelScreen(
       title: 'Play Menu',
       onBack: () => context.pop(),
-      maxWidth: 760,
       // Fills the screen instead of a small floating card, and the grid
       // scrolls on its own now that the panel bounds it.
       fillHeight: true,

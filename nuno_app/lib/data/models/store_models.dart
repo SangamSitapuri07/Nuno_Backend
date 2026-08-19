@@ -136,3 +136,59 @@ class Inventory extends Equatable {
   @override
   List<Object?> get props => [coins, cosmetics, equipped];
 }
+
+/// GET / POST /api/v1/rewards/daily
+///
+/// The seven-day track and which day is next both come from the server. The
+/// app used to hard-code the reward table and a fixed "current day" of 2, so
+/// the track it drew had no relationship to what the account had claimed.
+class DailyReward extends Equatable {
+  final int day;
+  final int coins;
+  final int xp;
+
+  const DailyReward({required this.day, this.coins = 0, this.xp = 0});
+
+  factory DailyReward.fromJson(Map<String, dynamic> json) => DailyReward(
+        day: J.int_(json['day']),
+        coins: J.int_(json['coins']),
+        xp: J.int_(json['xp']),
+      );
+
+  @override
+  List<Object?> get props => [day, coins, xp];
+}
+
+class DailyStatus extends Equatable {
+  /// 1-7. The day that is claimable now, or the one just claimed today.
+  final int currentDay;
+
+  /// Consecutive days claimed, 0 once the streak has lapsed.
+  final int streak;
+
+  final bool claimedToday;
+  final bool canClaim;
+  final List<DailyReward> rewards;
+
+  const DailyStatus({
+    this.currentDay = 1,
+    this.streak = 0,
+    this.claimedToday = false,
+    this.canClaim = true,
+    this.rewards = const [],
+  });
+
+  factory DailyStatus.fromJson(Map<String, dynamic> json) => DailyStatus(
+        currentDay: J.int_(json['currentDay'], 1).clamp(1, 7),
+        streak: J.int_(json['streak']),
+        claimedToday: J.bool_(json['claimedToday']),
+        canClaim: J.bool_(json['canClaim'], true),
+        rewards: J
+            .list(json['rewards'])
+            .map((e) => DailyReward.fromJson(J.map(e)))
+            .toList(),
+      );
+
+  @override
+  List<Object?> get props => [currentDay, streak, claimedToday, canClaim, rewards];
+}

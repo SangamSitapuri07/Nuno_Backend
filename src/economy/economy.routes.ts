@@ -28,6 +28,12 @@ router.post(
   economyController.equipCosmetic
 );
 
+router.get(
+  '/rewards/daily',
+  authMiddleware,
+  economyController.getDailyStatus
+);
+
 router.post(
   '/rewards/daily',
   authMiddleware,

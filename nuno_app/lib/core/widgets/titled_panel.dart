@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -103,7 +105,28 @@ class TitledPanel extends StatelessWidget {
               borderRadius: AppDimens.brLg,
               child: expandBody
                   ? Padding(padding: padding, child: child)
-                  : SingleChildScrollView(padding: padding, child: child),
+                  : LayoutBuilder(
+                      builder: (context, box) {
+                        final insets = padding.resolve(
+                          Directionality.of(context),
+                        );
+                        // The scroll view still fills the panel: without the
+                        // minimum height a short body sat in a strip at the
+                        // top with the rest of the panel empty.
+                        return SingleChildScrollView(
+                          padding: padding,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: math.max(
+                                0,
+                                box.maxHeight - insets.vertical,
+                              ),
+                            ),
+                            child: child,
+                          ),
+                        );
+                      },
+                    ),
             ),
           ),
         ],
@@ -133,19 +156,32 @@ class _HeaderIcon extends StatelessWidget {
   }
 }
 
-/// Full-screen landscape scaffold: dark gradient + a centered titled panel.
+/// Full-screen landscape scaffold: dark gradient + a full-bleed titled panel.
 class PanelScreen extends StatelessWidget {
   final String title;
   final Widget child;
   final VoidCallback? onBack;
   final Widget? trailing;
-  final double maxWidth;
+
+  /// Optional cap on the panel width.
+  ///
+  /// Defaults to unbounded. Every screen used to pass a hand-tuned figure
+  /// (420, 560, 620, 900...) which, on a landscape phone, left the panel
+  /// occupying half the display with dead space to the right of it. A cap is
+  /// only useful on a tablet, so it is applied *only* when the viewport is
+  /// genuinely wider than the cap by a comfortable margin.
+  final double? maxWidth;
+
   final EdgeInsetsGeometry padding;
 
-  /// Stretch the panel to the full height of the viewport.
+  /// Hand the body the panel's height instead of wrapping it in a scroll
+  /// view. Set this when the body is itself a list, a grid, or a row with a
+  /// side nav — anything that needs a bounded height to lay out.
   ///
-  /// Screens with a list or a side nav look stranded when the panel shrinks
-  /// to its content and floats in the middle of a landscape display.
+  /// The panel fills the viewport either way now. Panels that sized
+  /// themselves to their content floated in the middle of the screen with
+  /// the rest of the display empty, which is what "aadha screen hi dikh raha
+  /// hai" describes.
   final bool fillHeight;
 
   const PanelScreen({
@@ -154,7 +190,7 @@ class PanelScreen extends StatelessWidget {
     required this.child,
     this.onBack,
     this.trailing,
-    this.maxWidth = 560,
+    this.maxWidth,
     this.padding = const EdgeInsets.all(AppDimens.lg),
     this.fillHeight = false,
   });
@@ -165,43 +201,45 @@ class PanelScreen extends StatelessWidget {
       body: ArtBackground(
         asset: Art.bgPanel,
         vignette: false,
-        // Left-aligned and tight to the edge.
-        //
-        // Centring inside a maxWidth left a wide gap down the left of a
-        // landscape phone, which read as the screen being half empty. The
-        // panel now starts at the edge and simply stops at maxWidth.
+        // Full-bleed, hard against the left edge.
         //
         // SafeArea excludes the left inset for the same reason the bottom bar
-        // does: in landscape it reports the cutout there and would reopen the
-        // gap. Vertical insets are still respected.
+        // does: in landscape it reports the display cutout there, and
+        // honouring it reopens the gap down the side of every screen.
         child: SafeArea(
           left: false,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  4,
-                  AppDimens.sm,
-                  AppDimens.sm,
-                  AppDimens.sm,
-                ),
-                child: SizedBox(
-                  height: fillHeight ? double.infinity : null,
-                  child: TitledPanel(
-                    title: title,
-                    onBack: onBack,
-                    trailing: trailing,
-                    padding: padding,
-                    // A full-height panel bounds its body, so it lays out
-                    // directly rather than being handed infinite height.
-                    expandBody: fillHeight,
-                    child: child,
+          child: LayoutBuilder(
+            builder: (context, box) {
+              // Only honour a width cap when there is real room to spare;
+              // otherwise the panel takes the whole viewport.
+              final cap = maxWidth;
+              final width = (cap != null && box.maxWidth > cap + 120)
+                  ? cap
+                  : double.infinity;
+
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                  child: SizedBox(
+                    width: width == double.infinity ? null : width,
+                    height: double.infinity,
+                    child: TitledPanel(
+                      title: title,
+                      onBack: onBack,
+                      trailing: trailing,
+                      padding: padding,
+                      // A body that lays out horizontally, or scrolls on its
+                      // own, wants the panel's height directly. Everything
+                      // else goes through the panel's own scroll view, which
+                      // now also stretches to fill the height.
+                      expandBody: fillHeight,
+                      child: child,
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

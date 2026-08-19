@@ -73,13 +73,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         // As elsewhere: the left inset is the landscape cutout, and keeping
         // it pushes the panel away from the edge.
         left: false,
+        // The shell sets extendBody, so the tab paints all the way down; the
+        // bottom inset is the gesture bar and the panel sits just above it.
+        minimum: const EdgeInsets.only(bottom: 2),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            4,
-            AppDimens.sm,
-            AppDimens.sm,
-            AppDimens.sm,
-          ),
+          // A uniform 4px hairline on every side. The old 8px bottom, on top
+          // of the height the shell's nav bar was still reserving, is what
+          // stopped this tab short of the bottom of the screen.
+          padding: const EdgeInsets.all(4),
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -97,7 +98,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return PanelScreen(
       title: 'Profile',
       onBack: () => context.pop(),
-      maxWidth: 900,
       fillHeight: true,
       padding: EdgeInsets.zero,
       child: body,

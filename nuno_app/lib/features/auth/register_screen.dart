@@ -62,7 +62,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return PanelScreen(
       title: 'Create Account',
       onBack: () => context.pop(),
-      maxWidth: 640,
       // PanelScreen's body already scrolls.
       child: Form(
           key: _formKey,

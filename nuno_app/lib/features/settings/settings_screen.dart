@@ -75,11 +75,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return PanelScreen(
       title: 'Settings',
       onBack: () => context.pop(),
-      maxWidth: 640,
       padding: EdgeInsets.zero,
-      child: SizedBox(
-        height: 260,
-        child: Padding(
+      fillHeight: true,
+      child: Padding(
           padding: const EdgeInsets.all(AppDimens.md),
           child: settings.when(
             loading: () => const LoadingView(),
@@ -109,7 +107,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ],
-            ),
           ),
         ),
       ),

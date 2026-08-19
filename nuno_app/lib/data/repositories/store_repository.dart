@@ -36,5 +36,11 @@ class StoreRepository {
         body: {'cosmeticId': item.itemId, 'cosmeticType': item.type.wire},
       );
 
-  Future<void> claimDailyReward() => _api.post('/rewards/daily');
+  /// The seven-day track and which day is claimable, straight from the server.
+  Future<DailyStatus> getDailyStatus() async =>
+      DailyStatus.fromJson(J.map(await _api.get('/rewards/daily')));
+
+  /// Claims today's reward and returns the updated track.
+  Future<DailyStatus> claimDailyReward() async =>
+      DailyStatus.fromJson(J.map(await _api.post('/rewards/daily')));
 }

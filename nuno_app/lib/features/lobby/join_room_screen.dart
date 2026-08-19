@@ -81,7 +81,6 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
     return PanelScreen(
       title: 'Join Room',
       onBack: () => context.pop(),
-      maxWidth: 420,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

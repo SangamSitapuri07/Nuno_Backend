@@ -93,12 +93,12 @@ class _TutorialScreenState extends State<TutorialScreen> {
     return PanelScreen(
       title: 'Tutorial',
       onBack: () => context.pop(),
-      maxWidth: 560,
+      fillHeight: true,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: 150,
+          // The pager takes whatever height is left instead of a fixed 150px
+          // strip with the rest of the panel empty below it.
+          Expanded(
             child: PageView.builder(
               controller: _controller,
               itemCount: _pages.length,

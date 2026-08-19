@@ -22,17 +22,15 @@ class NotificationsScreen extends ConsumerWidget {
     return PanelScreen(
       title: 'Notifications',
       onBack: () => context.pop(),
-      maxWidth: 560,
       padding: const EdgeInsets.all(AppDimens.md),
+      fillHeight: true,
       trailing: IconButton(
         icon: const Icon(Icons.done_all_rounded,
             size: 16, color: AppColors.textSecondary),
         tooltip: 'Mark all read',
         onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
       ),
-      child: SizedBox(
-        height: 250,
-        child: notifications.when(
+      child: notifications.when(
           loading: () => ListView.builder(
             itemCount: 5,
             itemBuilder: (_, __) => const Padding(
@@ -103,8 +101,7 @@ class NotificationsScreen extends ConsumerWidget {
                 );
               },
             );
-          },
-        ),
+        },
       ),
     );
   }

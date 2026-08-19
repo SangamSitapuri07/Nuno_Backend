@@ -22,11 +22,9 @@ class MatchHistoryScreen extends ConsumerWidget {
     return PanelScreen(
       title: 'Match History',
       onBack: () => context.pop(),
-      maxWidth: 560,
       padding: const EdgeInsets.all(AppDimens.md),
-      child: SizedBox(
-        height: 250,
-        child: history.when(
+      fillHeight: true,
+      child: history.when(
           loading: () => ListView.builder(
             itemCount: 5,
             itemBuilder: (_, __) => const Padding(
@@ -120,8 +118,7 @@ class MatchHistoryScreen extends ConsumerWidget {
                 );
               },
             );
-          },
-        ),
+        },
       ),
     );
   }

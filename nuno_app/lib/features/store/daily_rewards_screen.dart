@@ -10,36 +10,53 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/game_assets.dart';
 import '../../core/widgets/titled_panel.dart';
+import '../../data/models/store_models.dart';
 import '../auth/auth_controller.dart';
 
-/// Screen 24 — Daily Rewards. A 7-day track with a CLAIM action.
+/// The seven-day login track, driven entirely by the server.
 ///
-/// The backend exposes only `POST /rewards/daily` with no streak state, so the
-/// current day is not persisted server-side; the track is presentational.
+/// Everything here used to be fabricated in the app: a hard-coded reward
+/// table, a constant "today is day 2", and a claim button that reported
+/// success whatever the server did with it. `GET /rewards/daily` now returns
+/// the real track, the real streak, and whether today has already been
+/// claimed, so what is drawn is what will actually be paid.
+final dailyStatusProvider = FutureProvider<DailyStatus>((ref) {
+  ref.watch(currentUserIdProvider);
+  return ref.watch(storeRepositoryProvider).getDailyStatus();
+});
+
 class DailyRewardsScreen extends ConsumerStatefulWidget {
   const DailyRewardsScreen({super.key});
 
   @override
-  ConsumerState<DailyRewardsScreen> createState() =>
-      _DailyRewardsScreenState();
+  ConsumerState<DailyRewardsScreen> createState() => _DailyRewardsScreenState();
 }
 
 class _DailyRewardsScreenState extends ConsumerState<DailyRewardsScreen> {
-  static const _rewards = [100, 150, 200, 250, 300, 400, 500];
-  static const _currentDay = 2; // 1-based; no server streak to read.
-
   bool _busy = false;
-  bool _claimed = false;
 
-  Future<void> _claim() async {
+  Future<void> _claim(DailyStatus status) async {
     setState(() => _busy = true);
     try {
-      await ref.read(storeRepositoryProvider).claimDailyReward();
+      final updated =
+          await ref.read(storeRepositoryProvider).claimDailyReward();
+      // Overwrite the cached status with what the server just returned rather
+      // than guessing, and pull the new balance in.
+      ref.invalidate(dailyStatusProvider);
       await ref.read(authControllerProvider.notifier).refreshProfile();
       if (!mounted) return;
-      setState(() => _claimed = true);
-      AppSnack.show(context, 'Daily reward claimed!',
-          icon: Icons.card_giftcard_rounded);
+
+      final claimed = updated.rewards.length >= updated.currentDay
+          ? updated.rewards[updated.currentDay - 1]
+          : null;
+      AppSnack.show(
+        context,
+        claimed == null
+            ? 'Daily reward claimed!'
+            : 'Day ${updated.currentDay}: +${claimed.coins} coins, '
+                '+${claimed.xp} XP',
+        icon: Icons.card_giftcard_rounded,
+      );
     } catch (e) {
       if (!mounted) return;
       AppSnack.error(context, e.toString());
@@ -50,76 +67,133 @@ class _DailyRewardsScreenState extends ConsumerState<DailyRewardsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final status = ref.watch(dailyStatusProvider);
+
     return PanelScreen(
       title: 'Daily Rewards',
       onBack: () => context.pop(),
-      maxWidth: 620,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ArtImage(Art.treasureChest, width: 110),
-          const SizedBox(height: AppDimens.sm),
-          Text(
-            _claimed ? 'COME BACK TOMORROW' : 'CLAIM YOUR DAILY REWARD',
-            style: AppTextStyles.label.copyWith(color: AppColors.gold),
-          ),
-          const SizedBox(height: AppDimens.md),
-          Row(
+      fillHeight: true,
+      child: status.when(
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorStateView(
+          message: e.toString(),
+          onRetry: () => ref.invalidate(dailyStatusProvider),
+        ),
+        data: (s) => _Track(
+          status: s,
+          busy: _busy,
+          onClaim: () => _claim(s),
+        ),
+      ),
+    );
+  }
+}
+
+class _Track extends StatelessWidget {
+  final DailyStatus status;
+  final bool busy;
+  final VoidCallback onClaim;
+
+  const _Track({
+    required this.status,
+    required this.busy,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final claimed = status.claimedToday;
+
+    // The tiles take whatever height is left after the header, so the track
+    // fills the panel instead of sitting in a strip with the bottom half of
+    // the screen empty.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            ArtImage(Art.treasureChest, width: 64),
+            const SizedBox(width: AppDimens.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    claimed
+                        ? 'COME BACK TOMORROW'
+                        : 'DAY ${status.currentDay} IS READY',
+                    style:
+                        AppTextStyles.label.copyWith(color: AppColors.gold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    status.streak > 0
+                        ? '${status.streak} day streak - miss a day and '
+                            'the track restarts at day 1.'
+                        : 'Claim seven days in a row for the biggest '
+                            'payout.',
+                    style: AppTextStyles.caption,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 150,
+              child: AppButton(
+                label: claimed ? 'CLAIMED' : 'CLAIM',
+                variant: AppButtonVariant.gold,
+                size: AppButtonSize.small,
+                isLoading: busy,
+                onPressed: status.canClaim ? onClaim : null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.md),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (var day = 1; day <= 7; day++) ...[
+              for (var i = 0; i < status.rewards.length; i++) ...[
                 Expanded(
                   child: _DayTile(
-                    day: day,
-                    amount: _rewards[day - 1],
-                    isGem: day == 7,
-                    state: day < _currentDay
-                        ? _DayState.claimed
-                        : day == _currentDay
-                            ? (_claimed ? _DayState.claimed : _DayState.today)
-                            : _DayState.locked,
+                    reward: status.rewards[i],
+                    state: _stateFor(status, status.rewards[i].day),
                   ),
                 ),
-                if (day != 7) const SizedBox(width: 6),
+                if (i != status.rewards.length - 1) const SizedBox(width: 6),
               ],
             ],
           ),
-          const SizedBox(height: AppDimens.lg),
-          SizedBox(
-            width: 220,
-            child: AppButton(
-              label: _claimed ? 'CLAIMED' : 'CLAIM',
-              variant: AppButtonVariant.gold,
-              size: AppButtonSize.small,
-              isLoading: _busy,
-              onPressed: _claimed ? null : _claim,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  static _DayState _stateFor(DailyStatus s, int day) {
+    // Days before the current one in this cycle have been collected; the
+    // current one is either today's claim or already taken.
+    if (day < s.currentDay) return _DayState.claimed;
+    if (day == s.currentDay) {
+      return s.claimedToday ? _DayState.claimed : _DayState.today;
+    }
+    return _DayState.locked;
   }
 }
 
 enum _DayState { claimed, today, locked }
 
 class _DayTile extends StatelessWidget {
-  final int day;
-  final int amount;
-  final bool isGem;
+  final DailyReward reward;
   final _DayState state;
 
-  const _DayTile({
-    required this.day,
-    required this.amount,
-    required this.state,
-    this.isGem = false,
-  });
+  const _DayTile({required this.reward, required this.state});
 
   @override
   Widget build(BuildContext context) {
     final isToday = state == _DayState.today;
     final isClaimed = state == _DayState.claimed;
-    final accent = isGem ? AppColors.gem : AppColors.coin;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: AppDimens.sm),
@@ -134,36 +208,44 @@ class _DayTile extends StatelessWidget {
         ),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            'Day $day',
+            'Day ${reward.day}',
             style: AppTextStyles.caption.copyWith(
               fontSize: 9,
               color: isToday ? AppColors.gold : AppColors.textMuted,
             ),
           ),
           const SizedBox(height: 4),
-          if (isClaimed)
-            const Icon(Icons.check_circle_rounded,
-                size: 26, color: AppColors.green)
-          else
-            ArtImage(
-              isGem ? Art.gemStack : Art.coinStack,
-              width: 34,
-              fallback: Icon(
-                isGem ? Icons.diamond_rounded : Icons.monetization_on_rounded,
-                size: 20,
-                color: accent,
-              ),
-            ),
+          Flexible(
+            child: isClaimed
+                ? const Icon(Icons.check_circle_rounded,
+                    size: 26, color: AppColors.green)
+                : ArtImage(
+                    Art.coinStack,
+                    width: 34,
+                    fallback: const Icon(
+                      Icons.monetization_on_rounded,
+                      size: 20,
+                      color: AppColors.coin,
+                    ),
+                  ),
+          ),
           const SizedBox(height: 4),
           Text(
-            '$amount',
+            '${reward.coins}',
             style: AppTextStyles.caption.copyWith(
               fontSize: 10,
               fontWeight: FontWeight.w800,
               color: isClaimed ? AppColors.textMuted : AppColors.textPrimary,
+            ),
+          ),
+          Text(
+            '+${reward.xp} XP',
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 8,
+              color: AppColors.textMuted,
             ),
           ),
         ],

@@ -136,9 +136,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     return PanelScreen(
       title: 'Leaderboard',
       onBack: () => context.pop(),
-      maxWidth: 640,
       padding: EdgeInsets.zero,
-      child: SizedBox(height: 262, child: content),
+      fillHeight: true,
+      child: content,
     );
   }
 }

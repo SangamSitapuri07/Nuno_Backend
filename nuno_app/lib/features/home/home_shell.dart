@@ -143,26 +143,20 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             ],
           ),
         ),
-      // Always present on Home; slides away on the other tabs, which are
-      // full-bleed panels with their own back button.
-      bottomNavigationBar: IgnorePointer(
-        ignoring: !_isHome,
-        child: AnimatedSlide(
-          offset: _isHome ? Offset.zero : const Offset(0, 1),
-          duration: const Duration(milliseconds: 140),
-          curve: Curves.easeOutCubic,
-          child: AnimatedOpacity(
-            opacity: _isHome ? 1 : 0,
-            duration: const Duration(milliseconds: 120),
-            child: _BottomBar(
+      // Present on Home only, and genuinely absent elsewhere.
+      //
+      // It used to be slid out of view but still handed to the Scaffold,
+      // which keeps reserving its height. That reserved strip is why the
+      // other tabs stopped short of the bottom of the screen with a dead
+      // band underneath them.
+      bottomNavigationBar: _isHome
+          ? _BottomBar(
               index: _index,
               tabs: _tabs,
               badges: const {},
               onChanged: _go,
-            ),
-          ),
-        ),
-      ),
+            )
+          : null,
       ),
     );
   }
