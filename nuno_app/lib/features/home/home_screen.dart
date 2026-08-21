@@ -102,11 +102,18 @@ class HomeScreen extends ConsumerWidget {
               // slides away, which is what "hide the friends list" should
               // mean: nothing else on the screen moves at all.
               final columnWidth = (w * 0.29).clamp(200.0, 320.0);
-              // Header shrinks on short canvases so the stage keeps room.
-              // The badge carries an avatar plus three stacked lines (name,
-              // title, level bar); 46 was too short for that and overflowed
-              // by a few pixels on shorter viewports.
-              final headerHeight = (h * 0.19).clamp(58.0, 72.0);
+              // Sized to the strip's contents, not a share of the screen.
+              //
+              // 19% of the height gave a 72px bar to hold a 48px badge, so
+              // roughly a third of it was empty and the stage lost the space
+              // for nothing. The badge is the tallest thing in it, so the
+              // bar is now just that plus a hairline, and the clamp only
+              // guards very short canvases.
+              // Floor is 50, not 48: with a title equipped the badge's three
+              // stacked lines need 48.1px, and 48 left it 0.1px short on a
+              // 300px-tall canvas - which is an overflow stripe, not a
+              // rounding detail.
+              final headerHeight = (h * 0.14).clamp(50.0, 56.0);
               // PLAY is pinned bottom-right; the panel takes the rest.
               //
               // Derived from the artwork's aspect ratio rather than a share
@@ -122,7 +129,9 @@ class HomeScreen extends ConsumerWidget {
                 // Tight to the left edge; the right keeps a normal gutter.
                 padding: const EdgeInsets.fromLTRB(
                   4,
-                  AppDimens.sm,
+                  // Was AppDimens.sm (8). The strip already has its own
+                  // internal padding, so this was doubling up.
+                  4,
                   AppDimens.md,
                   0,
                 ),
@@ -151,21 +160,21 @@ class HomeScreen extends ConsumerWidget {
                                     onTap: () => onNavigate?.call(3),
                                   ),
                                 ),
-                                const SizedBox(width: AppDimens.sm),
+                                const SizedBox(width: 6),
                                 _CurrencyCapsule(
                                   icon: Icons.monetization_on_rounded,
                                   iconColor: AppColors.gold,
                                   value: profile?.coins ?? 0,
                                   onAdd: () => onNavigate?.call(2),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 const _CurrencyCapsule(
                                   icon: Icons.diamond_rounded,
                                   iconColor: AppColors.cyan,
                                   // No gem currency on the backend yet.
                                   value: 0,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 _GlassCircleButton(
                                   icon: Icons.settings_rounded,
                                   onTap: () =>
@@ -418,8 +427,9 @@ class _CurrencyCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 34,
-      padding: const EdgeInsets.only(left: 4, right: 4),
+      // 34 -> 30: the tallest thing inside is a 20px coin disc.
+      height: 30,
+      padding: const EdgeInsets.only(left: 3, right: 3),
       decoration: BoxDecoration(
         color: const Color(0xE61E1147),
         borderRadius: AppDimens.brPill,
@@ -429,26 +439,26 @@ class _CurrencyCapsule extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 22,
-            height: 22,
+            width: 20,
+            height: 20,
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 14, color: iconColor),
+            child: Icon(icon, size: 13, color: iconColor),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 4),
           Text(
             Formatters.compact(value),
-            style: AppTextStyles.h4.copyWith(fontSize: 14),
+            style: AppTextStyles.h4.copyWith(fontSize: 13),
           ),
           if (onAdd != null) ...[
-            const SizedBox(width: 5),
+            const SizedBox(width: 4),
             GestureDetector(
               onTap: onAdd,
               child: Container(
-                width: 19,
-                height: 19,
+                width: 18,
+                height: 18,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.14),
                   shape: BoxShape.circle,
@@ -476,8 +486,9 @@ class _GlassCircleButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 34,
-        height: 34,
+        // Matches the currency capsules so the row reads as one strip.
+        width: 30,
+        height: 30,
         decoration: BoxDecoration(
           color: const Color(0xE61E1147),
           shape: BoxShape.circle,

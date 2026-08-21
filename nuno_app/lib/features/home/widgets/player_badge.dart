@@ -40,10 +40,16 @@ class PlayerBadge extends ConsumerWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 250, minWidth: 150),
+        // Sized to its contents rather than a 150px floor.
+        //
+        // The badge sets the height of the whole header, and it was carrying
+        // a 42px avatar inside 6px of padding for a strip that only needs to
+        // hold a name and a level bar. Trimming the padding and the avatar
+        // takes the header down without shrinking a single glyph.
+        constraints: const BoxConstraints(maxWidth: 230),
         padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.sm,
-          vertical: 6,
+          horizontal: 6,
+          vertical: 4,
         ),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -72,8 +78,8 @@ class PlayerBadge extends ConsumerWidget {
           children: [
             // Avatar with a violet ring.
             SizedBox(
-              width: 42,
-              height: 42,
+              width: 36,
+              height: 36,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -81,17 +87,17 @@ class PlayerBadge extends ConsumerWidget {
                     username: username,
                     // An equipped portrait wins over the account picture.
                     avatarUrl: cosmetics.avatar ?? avatarUrl,
-                    size: 32,
+                    size: 28,
                   ),
                   // Height pinned as well as width: the frame art is very
                   // close to square but not exactly, and without this the
                   // ring grows past the 42x42 slot.
-                  ArtImage(frame, width: 42, height: 42),
+                  ArtImage(frame, width: 36, height: 36),
                 ],
               ),
             ),
 
-            const SizedBox(width: AppDimens.sm),
+            const SizedBox(width: 6),
 
             Flexible(
               child: Column(
@@ -106,13 +112,14 @@ class PlayerBadge extends ConsumerWidget {
                           username,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.h4.copyWith(fontSize: 14),
+                          style: AppTextStyles.h4
+                              .copyWith(fontSize: 13, height: 1.1),
                         ),
                       ),
                       // Equipped badge, beside the name.
                       if (cosmetics.badge != null) ...[
                         const SizedBox(width: 4),
-                        ArtImage(cosmetics.badge!, width: 16),
+                        ArtImage(cosmetics.badge!, width: 14),
                       ],
                     ],
                   ),
@@ -125,16 +132,18 @@ class PlayerBadge extends ConsumerWidget {
                       style: AppTextStyles.caption.copyWith(
                         color: AppColors.gold,
                         fontWeight: FontWeight.w700,
-                        fontSize: 10,
+                        fontSize: 9,
+                        height: 1.1,
                       ),
                     ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Row(
                     children: [
                       Text(
                         'Lv. $level',
                         style: AppTextStyles.bodySm.copyWith(
-                          fontSize: 12,
+                          fontSize: 11,
+                          height: 1.1,
                           color: Colors.white70,
                         ),
                       ),
@@ -145,7 +154,7 @@ class PlayerBadge extends ConsumerWidget {
                           borderRadius: AppDimens.brPill,
                           child: LinearProgressIndicator(
                             value: levelProgress,
-                            minHeight: 6,
+                            minHeight: 5,
                             backgroundColor: Colors.white.withValues(alpha: 0.14),
                             valueColor:
                                 const AlwaysStoppedAnimation(AppColors.cyan),
@@ -158,12 +167,12 @@ class PlayerBadge extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(width: AppDimens.sm),
+            const SizedBox(width: 6),
 
             // Tier shield
             ArtImage(
               Art.tierShield(tier.wire),
-              height: 38,
+              height: 32,
               fallback: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
