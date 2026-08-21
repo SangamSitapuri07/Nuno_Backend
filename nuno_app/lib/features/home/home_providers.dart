@@ -62,6 +62,31 @@ class FriendsNotifier extends AsyncNotifier<List<Friend>> {
   }
 }
 
+/// GET /api/v1/messages/unread — unread DM totals keyed by friend id.
+///
+/// Refreshed whenever a message arrives, so the badge on the friends list
+/// tracks reality without polling.
+final unreadCountsProvider =
+    AsyncNotifierProvider<UnreadCountsNotifier, Map<String, int>>(
+        UnreadCountsNotifier.new);
+
+class UnreadCountsNotifier extends AsyncNotifier<Map<String, int>> {
+  @override
+  Future<Map<String, int>> build() async {
+    final socket = ref.watch(socketServiceProvider);
+    final sub = socket.on(SocketEvents.dmReceived).listen((_) => refresh());
+    ref.onDispose(sub.cancel);
+
+    return ref.read(socialRepositoryProvider).getUnreadCounts();
+  }
+
+  Future<void> refresh() async {
+    state = await AsyncValue.guard(
+      () => ref.read(socialRepositoryProvider).getUnreadCounts(),
+    );
+  }
+}
+
 /// GET /api/v1/friends/requests
 final friendRequestsProvider =
     AsyncNotifierProvider<FriendRequestsNotifier, List<FriendRequest>>(

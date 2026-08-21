@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/router/app_router.dart';
 import '../lobby/lobby_providers.dart';
+import '../home/home_providers.dart';
 import 'widgets/direct_message_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -20,7 +21,6 @@ import '../../core/widgets/player_avatar.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/social_models.dart';
 import '../../services/socket_events.dart';
-import '../home/home_providers.dart';
 
 /// Friends list, pending requests and player search.
 class FriendsScreen extends ConsumerStatefulWidget {
@@ -228,14 +228,54 @@ class _FriendTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Unread DMs from this friend, for the badge.
+    final unread =
+        ref.watch(unreadCountsProvider).valueOrNull?[friend.userId] ?? 0;
+
     return AppPanel(
       padding: const EdgeInsets.all(AppDimens.md),
       child: Row(
         children: [
-          PlayerAvatar(
-            username: friend.username,
-            avatarUrl: friend.avatarUrl,
-            status: friend.status,
+          // The badge hangs off the avatar so it reads as "this person has
+          // messaged you" rather than a generic count on the row.
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              PlayerAvatar(
+                username: friend.username,
+                avatarUrl: friend.avatarUrl,
+                status: friend.status,
+              ),
+              if (unread > 0)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 1,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      borderRadius: AppDimens.brPill,
+                      border: Border.all(
+                        color: AppColors.backgroundAlt,
+                        width: 1.4,
+                      ),
+                    ),
+                    child: Text(
+                      unread > 9 ? '9+' : '$unread',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: AppDimens.md),
           Expanded(
@@ -249,13 +289,19 @@ class _FriendTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  friend.status.isOnline
-                      ? friend.status.label
-                      : Formatters.lastSeen(friend.lastOnline),
+                  unread > 0
+                      ? '$unread new message${unread == 1 ? '' : 's'}'
+                      : friend.status.isOnline
+                          ? friend.status.label
+                          : Formatters.lastSeen(friend.lastOnline),
                   style: AppTextStyles.caption.copyWith(
-                    color: friend.status.isOnline
-                        ? AppColors.forStatus(friend.status.wire)
-                        : AppColors.textMuted,
+                    color: unread > 0
+                        ? AppColors.danger
+                        : friend.status.isOnline
+                            ? AppColors.forStatus(friend.status.wire)
+                            : AppColors.textMuted,
+                    fontWeight:
+                        unread > 0 ? FontWeight.w700 : FontWeight.w400,
                   ),
                 ),
               ],

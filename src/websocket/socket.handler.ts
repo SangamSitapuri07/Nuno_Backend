@@ -178,25 +178,48 @@ export const initializeSocketHandlers = (io: Server): void => {
             try {
               if (!socket.userId || !dmData?.targetUserId || !dmData?.message) return;
 
-              const messageText = dmData.message.trim();
-              if (messageText.length === 0 || messageText.length > 500) return;
+              // Stored first, THEN relayed.
+              //
+              // This used to forward the text and forget it, so the whole
+              // conversation lived in the two apps' memory - gone on restart,
+              // and a message to an offline friend was dropped rather than
+              // waiting for them. The row is now the record and the socket is
+              // just the live delivery on top of it. The service also owns
+              // the length and friends-only rules so they cannot drift.
+              const messagesService = (await import('../friends/messages.service')).default;
+
+              const saved = await messagesService.send(
+                socket.userId,
+                dmData.targetUserId,
+                dmData.message
+              );
 
               io.to(`user:${dmData.targetUserId}`).emit('dm.received', {
+                id: saved.id,
                 fromUserId: socket.userId,
                 fromUsername: socket.username,
-                message: messageText,
-                timestamp: Date.now(),
+                message: saved.body,
+                timestamp: saved.createdAt.getTime(),
               });
 
-              // Also send back to sender for confirmation
+              // Echoed back so the sender's own bubble carries the stored id
+              // and the server's timestamp rather than a local guess.
               socket.emit('dm.sent', {
+                id: saved.id,
                 targetUserId: dmData.targetUserId,
-                message: messageText,
-                timestamp: Date.now(),
+                message: saved.body,
+                timestamp: saved.createdAt.getTime(),
               });
 
               logger.info('DM sent', { from: socket.userId, to: dmData.targetUserId });
-            } catch (error) {
+            } catch (error: any) {
+              // Reported rather than swallowed: a rejected message that
+              // silently vanishes looks like the app is broken.
+              socket.emit('dm.failed', {
+                targetUserId: dmData?.targetUserId,
+                code: error?.code || 'SERVER_ERROR',
+                message: error?.message || 'Message could not be sent.',
+              });
               logger.error('DM error', { error });
             }
           });

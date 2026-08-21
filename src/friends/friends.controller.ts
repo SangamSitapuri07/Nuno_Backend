@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import friendsService from './friends.service';
+import messagesService from './messages.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { HTTP_STATUS, ERROR_CODES } from '../utils/constants';
 import asyncHandler from '../utils/asyncHandler';
@@ -14,6 +15,78 @@ export class FriendsController {
     const userId = (req as any).user?.userId;
     const friends = await friendsService.getFriends(userId);
     sendSuccess(res, friends);
+  });
+
+  // ─────────────────────────────────────────
+  // DIRECT MESSAGES
+  // ─────────────────────────────────────────
+
+  /// The conversation with one friend, oldest last.
+  getConversation = asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.userId;
+    const friendId = String(req.params.friendId ?? '');
+
+    if (!friendId) {
+      sendError(
+        res,
+        ERROR_CODES.VALIDATION_ERROR,
+        'A friend id is required.',
+        HTTP_STATUS.BAD_REQUEST
+      );
+      return;
+    }
+
+    const limit = Number(req.query.limit);
+    const messages = await messagesService.conversation(
+      userId,
+      friendId,
+      Number.isFinite(limit) ? limit : undefined
+    );
+
+    // Opening a conversation is what marks it read, so the badge clears at
+    // the moment the player actually sees the messages.
+    await messagesService.markRead(userId, friendId);
+
+    sendSuccess(res, messages);
+  });
+
+  /// Unread totals keyed by friend id, for the list badges.
+  getUnreadCounts = asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.userId;
+    sendSuccess(res, await messagesService.unreadCounts(userId));
+  });
+
+  /// Sends a message over REST.
+  ///
+  /// The socket is the normal path, but this exists so a message is never
+  /// silently lost when the socket happens to be down.
+  sendMessage = asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.userId;
+    const { friendId, message } = req.body ?? {};
+
+    if (!friendId || typeof message !== 'string') {
+      sendError(
+        res,
+        ERROR_CODES.VALIDATION_ERROR,
+        'A friend id and a message are required.',
+        HTTP_STATUS.BAD_REQUEST
+      );
+      return;
+    }
+
+    const saved = await messagesService.send(userId, String(friendId), message);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${friendId}`).emit('dm.received', {
+        id: saved.id,
+        fromUserId: userId,
+        message: saved.body,
+        timestamp: saved.createdAt.getTime(),
+      });
+    }
+
+    sendSuccess(res, saved, HTTP_STATUS.CREATED);
   });
 
   // ─────────────────────────────────────────

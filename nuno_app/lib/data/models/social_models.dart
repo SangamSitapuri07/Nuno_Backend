@@ -197,3 +197,37 @@ class ChatMessage extends Equatable {
   @override
   List<Object?> get props => [userId, message, timestamp, isSystem];
 }
+
+/// GET /api/v1/messages/:friendId  (Prisma DirectMessage)
+class DirectMessage extends Equatable {
+  final String id;
+  final String senderId;
+  final String receiverId;
+  final String body;
+  final DateTime? readAt;
+  final DateTime? createdAt;
+
+  const DirectMessage({
+    required this.id,
+    required this.senderId,
+    required this.receiverId,
+    required this.body,
+    this.readAt,
+    this.createdAt,
+  });
+
+  factory DirectMessage.fromJson(Map<String, dynamic> json) => DirectMessage(
+        id: J.str(json['id']),
+        senderId: J.str(json['senderId']),
+        receiverId: J.str(json['receiverId']),
+        body: J.str(json['body']),
+        readAt: J.date(json['readAt']),
+        createdAt: J.date(json['createdAt']),
+      );
+
+  /// True when [userId] wrote this message.
+  bool sentBy(String? userId) => userId != null && senderId == userId;
+
+  @override
+  List<Object?> get props => [id, senderId, receiverId, body, readAt];
+}

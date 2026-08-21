@@ -73,6 +73,10 @@ class SocketEvents {
   static const dmReceived = 'dm.received';
   static const dmSent = 'dm.sent';
 
+  /// The server rejected a message - not a friend, too long, empty. Without
+  /// this the text simply vanished and the app looked broken.
+  static const dmFailed = 'dm.failed';
+
   // Invites
   static const inviteSend = 'invite.send';
   static const inviteReceived = 'invite.received';

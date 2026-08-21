@@ -59,6 +59,8 @@ model User {
   notifications   Notification[]
   reportsGiven    Report[]          @relation("Reporter")
   reportsReceived Report[]          @relation("Reported")
+  sentMessages    DirectMessage[]   @relation("SentMessages")
+  receivedMessages DirectMessage[]  @relation("ReceivedMessages")
   leaderboard     Leaderboard?
 
   @@index([username])
@@ -145,6 +147,37 @@ model FriendRequest {
 
   @@index([senderId])
   @@index([receiverId])
+}
+
+// ─────────────────────────────────────────
+// DIRECT MESSAGES
+// ─────────────────────────────────────────
+
+/// A one-to-one message between two friends.
+///
+/// Previously DMs were relayed over the socket and never stored, so the
+/// conversation lived only in the sender's and recipient's app memory: it
+/// vanished on restart, and anything sent while the other player was offline
+/// was lost outright rather than delivered later.
+model DirectMessage {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  body       String   @db.VarChar(500)
+
+  /// Set when the recipient has opened the conversation, so the friends list
+  /// can show an unread badge.
+  readAt     DateTime?
+
+  createdAt  DateTime @default(now())
+
+  sender     User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  /// Reading one conversation is the hot path: both directions, newest first.
+  @@index([senderId, receiverId, createdAt])
+  @@index([receiverId, senderId, createdAt])
+  @@index([receiverId, readAt])
 }
 
 // ─────────────────────────────────────────

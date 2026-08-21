@@ -9,6 +9,33 @@ class SocialRepository {
 
   SocialRepository(this._api);
 
+  // ── Direct messages ─────────────────────────────────────────
+
+  /// The stored conversation with one friend, oldest first.
+  ///
+  /// Fetching this is also what marks it read server-side, so the unread
+  /// badge clears exactly when the player opens the thread.
+  Future<List<DirectMessage>> getConversation(String friendId) async {
+    final data = J.list(await _api.get('/messages/$friendId'));
+    return data.map((e) => DirectMessage.fromJson(J.map(e))).toList();
+  }
+
+  /// Unread totals keyed by friend id.
+  Future<Map<String, int>> getUnreadCounts() async {
+    final data = J.map(await _api.get('/messages/unread'));
+    return data.map((k, v) => MapEntry(k, J.int_(v)));
+  }
+
+  /// Sends over REST. The socket is the usual path; this is the fallback so
+  /// a message is not lost when the socket happens to be down.
+  Future<DirectMessage> sendMessage(String friendId, String message) async {
+    final data = J.map(await _api.post(
+      '/messages',
+      body: {'friendId': friendId, 'message': message},
+    ));
+    return DirectMessage.fromJson(data);
+  }
+
   // ── Friends ─────────────────────────────────────────────────
 
   Future<List<Friend>> getFriends() async {

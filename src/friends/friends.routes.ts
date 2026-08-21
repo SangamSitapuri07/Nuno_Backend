@@ -12,6 +12,11 @@ router.post('/friends/reject', authMiddleware, friendsController.rejectRequest);
 router.delete('/friends/:friendId', authMiddleware, friendsController.removeFriend);
 router.get('/friends/requests', authMiddleware, friendsController.getRequests);
 router.get('/players/search', authMiddleware, friendsController.searchPlayers);
+
+// Direct messages.
+router.get('/messages/unread', authMiddleware, friendsController.getUnreadCounts);
+router.get('/messages/:friendId', authMiddleware, friendsController.getConversation);
+router.post('/messages', authMiddleware, friendsController.sendMessage);
 router.get('/notifications', authMiddleware, friendsController.getNotifications);
 router.patch('/notifications/read', authMiddleware, friendsController.markNotificationsRead);
 
