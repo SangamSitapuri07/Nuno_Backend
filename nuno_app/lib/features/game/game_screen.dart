@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
+import '../../services/socket_events.dart';
 import '../../services/voice_service.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -186,6 +187,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         // "waiting for the others" forever, because the server needs every
         // player to accept and this one never will.
         ref.read(gameControllerProvider.notifier).declineRematch();
+        // And actually leave the room. The server used to evict everyone the
+        // moment a match ended, which is what broke the rematch; now that it
+        // keeps the room, going back to the menu has to say so or this player
+        // stays listed and keeps blocking the others' vote.
+        ref.read(socketServiceProvider).emit(SocketEvents.roomLeave);
         ref.read(gameControllerProvider.notifier).reset();
         ref.read(authControllerProvider.notifier).refreshProfile();
         context.go(AppRoutes.home);

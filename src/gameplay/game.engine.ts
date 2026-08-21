@@ -465,11 +465,17 @@ export class GameEngine {
         });
       }
 
-      // Cleanup player match state
+      // Clear the match mapping, but NOT the room membership.
+      //
+      // Deleting `player:room:` here evicted everyone from their own lobby
+      // the instant the game ended, which is the moment they are being asked
+      // whether they want to play again. The room is what the rematch vote
+      // and the results screen both belong to, so it outlives the match and
+      // is released when the player actually leaves - see room.leave and the
+      // disconnect handler.
       const redis = (await import('../config/redis')).default;
       for (const playerId of state.players) {
         await redis.del(`match:player:${playerId}`);
-        await redis.del(`player:room:${playerId}`);
       }
 
       logger.info('Match finalized', {

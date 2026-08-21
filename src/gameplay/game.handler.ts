@@ -329,11 +329,39 @@ export const initializeGameHandlers = (
     }
   });
 
+  /**
+   * Resolves the room a rematch vote belongs to.
+   *
+   * `socket.roomId` is set when the match starts and survives on a live
+   * socket, but a client that reconnected between the results screen and the
+   * button press has none - and it cannot be rebuilt from `player:room:`
+   * either, because finalizeMatch deletes that too. The room record itself
+   * outlives the match, so it is found by scanning for the one this player is
+   * still listed in, and the socket is repaired on the way through.
+   */
+  const resolveRematchRoom = async (): Promise<string | null> => {
+    if (socket.roomId) return socket.roomId;
+
+    const roomId = await roomService.findRoomContaining(socket.userId!);
+    if (!roomId) return null;
+
+    socket.roomId = roomId;
+    if (!socket.rooms.has(roomId)) socket.join(roomId);
+    return roomId;
+  };
+
   socket.on(SOCKET_EVENTS.REMATCH_REQUEST, async () => {
     try {
-      if (!socket.userId || !socket.matchId || !socket.roomId) return;
-      await rematchService.requestRematch(socket.matchId, socket.userId);
-      io.to(socket.roomId).emit(SOCKET_EVENTS.REMATCH_REQUEST, {
+      // Deliberately NOT gated on socket.matchId: the match is over by the
+      // time anyone votes, so requiring its id is requiring something that
+      // has already been deleted.
+      if (!socket.userId) return;
+
+      const roomId = await resolveRematchRoom();
+      if (!roomId) return;
+
+      await rematchService.accept(roomId, socket.userId);
+      io.to(roomId).emit(SOCKET_EVENTS.REMATCH_REQUEST, {
         userId: socket.userId,
       });
     } catch (error) {
@@ -343,51 +371,70 @@ export const initializeGameHandlers = (
 
   socket.on(SOCKET_EVENTS.REMATCH_ACCEPT, async () => {
     try {
-      if (!socket.userId || !socket.matchId || !socket.roomId) return;
+      if (!socket.userId) return;
 
-      await rematchService.acceptRematch(socket.matchId, socket.userId);
+      const roomId = await resolveRematchRoom();
+      if (!roomId) return;
 
-      const room = await roomService.getRoom(socket.roomId);
+      const room = await roomService.getRoom(roomId);
       if (!room) return;
 
+      // A rematch is only for the players still sitting here. Anyone who
+      // went back to the menu has left the room, so they are not counted and
+      // cannot hold the vote open.
       const playerIds = room.players.map(p => p.userId);
-      const allAccepted = await rematchService.allPlayersAccepted(socket.matchId, playerIds);
 
-      // Two players minimum.
-      //
-      // Everyone else leaving shrinks room.players, and "all of them have
-      // accepted" is trivially true of a single remaining player - which
-      // would have dealt them a game against nobody.
-      if (allAccepted && playerIds.length >= 2) {
-        const newMatchId = generateId();
-        await rematchService.clearRematch(socket.matchId);
+      // The voter must actually be in the room - a stale socket could
+      // otherwise vote its way into a game it is no longer part of.
+      if (!playerIds.includes(socket.userId)) return;
 
-        const gameState = await gameEngine.initializeMatch(
-          newMatchId,
-          socket.roomId,
-          playerIds,
-          room.gameMode
-        );
+      await rematchService.accept(roomId, socket.userId);
 
-        startMatchTimer(io, newMatchId);
+      // Always broadcast the vote, including the one that completes the set.
+      // Previously the deciding vote was swallowed by the else-branch, so the
+      // tally on everyone's results screen stopped one short of the total.
+      io.to(roomId).emit(SOCKET_EVENTS.REMATCH_ACCEPT, {
+        userId: socket.userId,
+      });
 
-        io.to(socket.roomId).emit(SOCKET_EVENTS.REMATCH_STARTED, {
-          matchId: newMatchId,
-        });
+      // Two players minimum, enforced inside allAccepted: "everyone agreed"
+      // is trivially true of a party of one, which would deal a game against
+      // nobody.
+      if (!(await rematchService.allAccepted(roomId, playerIds))) return;
 
-        for (const playerId of playerIds) {
-          const playerSocketId = await getPlayerSocketId(io, playerId);
-          if (playerSocketId) {
-            const playerSocket = io.sockets.sockets.get(playerSocketId);
-            if (playerSocket) (playerSocket as any).matchId = newMatchId;
-            const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
-            io.to(playerSocketId).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
+      const newMatchId = generateId();
+      await rematchService.clear(roomId);
+
+      const gameState = await gameEngine.initializeMatch(
+        newMatchId,
+        roomId,
+        playerIds,
+        room.gameMode
+      );
+
+      // The room is playing again, so it must not accept newcomers midway.
+      room.status = 'IN_GAME' as any;
+      room.matchId = newMatchId;
+      for (const player of room.players) player.isReady = false;
+      await (roomService as any).saveRoom(room);
+
+      startMatchTimer(io, newMatchId);
+
+      io.to(roomId).emit(SOCKET_EVENTS.REMATCH_STARTED, {
+        matchId: newMatchId,
+      });
+
+      for (const playerId of playerIds) {
+        const playerSocketId = await getPlayerSocketId(io, playerId);
+        if (playerSocketId) {
+          const playerSocket = io.sockets.sockets.get(playerSocketId);
+          if (playerSocket) {
+            (playerSocket as any).matchId = newMatchId;
+            (playerSocket as any).roomId = roomId;
           }
+          const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
+          io.to(playerSocketId).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
         }
-      } else {
-        io.to(socket.roomId).emit(SOCKET_EVENTS.REMATCH_ACCEPT, {
-          userId: socket.userId,
-        });
       }
     } catch (error) {
       logger.error('Rematch accept error', { error });
@@ -396,9 +443,13 @@ export const initializeGameHandlers = (
 
   socket.on(SOCKET_EVENTS.REMATCH_DECLINE, async () => {
     try {
-      if (!socket.userId || !socket.matchId || !socket.roomId) return;
-      await rematchService.declineRematch(socket.matchId, socket.userId);
-      io.to(socket.roomId).emit(SOCKET_EVENTS.REMATCH_DECLINE, {
+      if (!socket.userId) return;
+
+      const roomId = await resolveRematchRoom();
+      if (!roomId) return;
+
+      await rematchService.decline(roomId, socket.userId);
+      io.to(roomId).emit(SOCKET_EVENTS.REMATCH_DECLINE, {
         userId: socket.userId,
       });
     } catch (error) {

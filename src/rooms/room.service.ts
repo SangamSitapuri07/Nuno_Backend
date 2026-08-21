@@ -297,6 +297,46 @@ export class RoomService {
    * until its TTL lapses. Verifying the target still exists (and still lists
    * the player) makes the lock self-healing.
    */
+  /**
+   * Finds the room whose player list still contains [userId].
+   *
+   * Used when the `player:room:` pointer is gone but the membership is not -
+   * finalizeMatch deletes that key the moment a match ends, which is exactly
+   * when a player is deciding whether to play again. Scanning the rooms is
+   * more work than a key lookup, but it happens once per vote, not per frame.
+   */
+  async findRoomContaining(userId: string): Promise<string | null> {
+    const pointer = await redisClient.get(`player:room:${userId}`);
+    if (pointer) {
+      const room = await this.getRoom(pointer);
+      if (room?.players.some((p) => p.userId === userId)) return pointer;
+    }
+
+    const keys = await redisClient.keys('room:*');
+    for (const key of keys) {
+      // room:code:* maps a join code to an id; only the room records matter.
+      if (key.startsWith('room:code:')) continue;
+
+      const raw = await redisClient.get(key);
+      if (!raw) continue;
+
+      try {
+        const room = JSON.parse(raw);
+        if (room?.players?.some((p: any) => p.userId === userId)) {
+          // Repair the pointer so the next lookup is a single read.
+          await redisClient.set(`player:room:${userId}`, room.roomId, {
+            EX: 3600,
+          });
+          return room.roomId;
+        }
+      } catch {
+        // Not a room record; ignore.
+      }
+    }
+
+    return null;
+  }
+
   /// The room this player is genuinely in, healing a stale key.
   ///
   /// Public because callers outside the service - accepting an invite, for
