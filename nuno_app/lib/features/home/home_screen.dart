@@ -492,6 +492,14 @@ class _PlayButtonState extends State<_PlayButton>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      // Opaque, so the whole slot is tappable.
+      //
+      // The default (deferToChild) only counts a hit where the CHILD reports
+      // one, and the child is an Image with BoxFit.contain. Any letterboxed
+      // band left over when the slot is not exactly 2:1 is transparent and
+      // registers no hit, so taps near the edge of the button quietly did
+      // nothing.
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),

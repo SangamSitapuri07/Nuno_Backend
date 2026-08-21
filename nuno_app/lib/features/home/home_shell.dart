@@ -210,9 +210,21 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // SizedBox, NOT Container(color: Colors.transparent).
+    //
+    // A Container with a colour paints, and anything that paints takes part
+    // in hit testing - a fully transparent one included. This is documented
+    // Flutter behaviour (flutter#51000), and it is why PLAY did nothing: the
+    // bar is 60px tall and full width, the scaffold sets extendBody so it
+    // sits ON TOP of the page, and PLAY is pinned to the bottom-right inside
+    // that same 60px band. Every tap on the button landed on the invisible
+    // strip instead. The bar only occupies 380px on the left, so the right
+    // of the strip was swallowing taps for nothing.
+    //
+    // A SizedBox reserves the same height without painting, so taps outside
+    // the visible pill fall through to the page underneath.
+    return SizedBox(
       height: AppDimens.bottomNavHeight,
-      color: Colors.transparent,
       // SafeArea is applied to the bottom only. In landscape it also reports
       // a left inset for the display cutout, which pushed the bar inwards and
       // left an obvious gap against the edge of the screen.
