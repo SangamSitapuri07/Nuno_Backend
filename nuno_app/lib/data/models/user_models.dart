@@ -6,7 +6,18 @@ import 'json.dart';
 /// GET /api/v1/profile  (src/users/user.service.ts → getProfile)
 class PlayerProfile extends Equatable {
   final String id;
+
+  /// The public 10-digit player number, shown on the profile and used by
+  /// friends to add this account. Distinct from [id], which is an internal
+  /// uuid and never displayed.
+  final String uid;
+
   final String username;
+
+  /// False when the account was created by a Google sign-in and the player
+  /// has not chosen their own name yet.
+  final bool usernameSet;
+
   final String email;
   final String? avatarUrl;
   final int level;
@@ -21,7 +32,9 @@ class PlayerProfile extends Equatable {
 
   const PlayerProfile({
     required this.id,
+    this.uid = '',
     required this.username,
+    this.usernameSet = true,
     required this.email,
     this.avatarUrl,
     this.level = 1,
@@ -37,7 +50,11 @@ class PlayerProfile extends Equatable {
 
   factory PlayerProfile.fromJson(Map<String, dynamic> json) => PlayerProfile(
         id: J.str(json['id']),
+        uid: J.str(json['uid']),
         username: J.str(json['username']),
+        // Defaults to true so an older server that does not send the field
+        // cannot trap an existing player on the setup screen.
+        usernameSet: J.bool_(json['usernameSet'], true),
         email: J.str(json['email']),
         avatarUrl: J.strOrNull(json['avatarUrl']),
         level: J.int_(json['level'], 1),
@@ -64,7 +81,9 @@ class PlayerProfile extends Equatable {
   }) =>
       PlayerProfile(
         id: id,
+        uid: uid,
         username: username ?? this.username,
+        usernameSet: usernameSet,
         email: email,
         avatarUrl: avatarUrl ?? this.avatarUrl,
         level: level ?? this.level,
@@ -123,7 +142,8 @@ class PlayerProfile extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, username, avatarUrl, level, xp, coins, rankPoints];
+  List<Object?> get props =>
+      [id, uid, username, usernameSet, avatarUrl, level, xp, coins, rankPoints];
 }
 
 /// GET /api/v1/statistics

@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/enums.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/auth/register_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/friends/friends_screen.dart';
 import '../../features/game/game_screen.dart';
@@ -23,6 +22,7 @@ import '../../features/settings/notifications_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/tutorial_screen.dart';
 import '../../features/store/daily_rewards_screen.dart';
+import '../../features/auth/choose_username_screen.dart';
 import '../../features/store/store_screen.dart';
 
 class AppRoutes {
@@ -30,7 +30,9 @@ class AppRoutes {
 
   static const splash = '/';
   static const login = '/login';
-  static const register = '/register';
+
+  /// One-time setup after a first Google sign-in.
+  static const chooseUsername = '/welcome/username';
 
   static const home = '/home';
   static const playMenu = '/play';
@@ -60,6 +62,13 @@ class _AuthRefresh extends ChangeNotifier {
       authControllerProvider.select((s) => s.status),
       (_, __) => notifyListeners(),
     );
+
+    // Also rebuilt when the username is claimed, which is what releases the
+    // player from the setup screen.
+    ref.listen<bool>(
+      authControllerProvider.select((s) => s.needsUsername),
+      (_, __) => notifyListeners(),
+    );
   }
 }
 
@@ -78,10 +87,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return loc == AppRoutes.splash ? null : AppRoutes.splash;
       }
 
-      final isAuthRoute = loc == AppRoutes.login || loc == AppRoutes.register;
+      final isAuthRoute = loc == AppRoutes.login;
 
       if (!auth.isLoggedIn) return isAuthRoute ? null : AppRoutes.login;
-      if (isAuthRoute || loc == AppRoutes.splash) return AppRoutes.home;
+
+      // A signed-in account with no chosen name is pinned to the setup
+      // screen. Enforced here rather than only at the call site, so it also
+      // covers a cold start that restores a half-finished sign-up.
+      if (auth.needsUsername) {
+        return loc == AppRoutes.chooseUsername
+            ? null
+            : AppRoutes.chooseUsername;
+      }
+
+      // Conversely, once the name is set that screen is unreachable.
+      if (isAuthRoute ||
+          loc == AppRoutes.splash ||
+          loc == AppRoutes.chooseUsername) {
+        return AppRoutes.home;
+      }
 
       return null;
     },
@@ -95,8 +119,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (_, s) => _fade(s, const LoginScreen()),
       ),
       GoRoute(
-        path: AppRoutes.register,
-        pageBuilder: (_, s) => _slide(s, const RegisterScreen()),
+        path: AppRoutes.chooseUsername,
+        pageBuilder: (_, s) => _fade(s, const ChooseUsernameScreen()),
       ),
 
       // ── Main shell ────────────────────────────────

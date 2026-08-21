@@ -5,6 +5,7 @@ import '../data/repositories/leaderboard_repository.dart';
 import '../data/repositories/social_repository.dart';
 import '../data/repositories/store_repository.dart';
 import '../data/repositories/user_repository.dart';
+import '../services/google_auth_service.dart';
 import '../services/socket_service.dart';
 import '../services/voice_service.dart';
 import 'network/api_client.dart';
@@ -64,6 +65,11 @@ final sessionLinkProvider = Provider<void>((ref) {
     await api.refreshSession();
   };
 });
+
+/// Interactive Google sign-in. Only ever produces an ID token; the server
+/// decides what it means.
+final googleAuthServiceProvider =
+    Provider<GoogleAuthService>((ref) => GoogleAuthService());
 
 // ── Repositories ──────────────────────────────────────────────
 

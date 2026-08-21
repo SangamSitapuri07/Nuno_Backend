@@ -21,6 +21,13 @@ class SocialRepository {
     return data.map((e) => FriendRequest.fromJson(J.map(e))).toList();
   }
 
+  /// Sends a request to whoever owns [uid].
+  ///
+  /// Resolved server-side, so the app never needs the target's internal id -
+  /// which is the whole point of having a public number.
+  Future<void> sendRequestByUid(String uid) =>
+      _api.post('/friends/request/uid', body: {'uid': uid});
+
   Future<void> sendRequest(String playerId) =>
       _api.post('/friends/request', body: {'playerId': playerId});
 

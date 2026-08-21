@@ -6,6 +6,7 @@ const router = Router();
 
 router.get('/friends', authMiddleware, friendsController.getFriends);
 router.post('/friends/request', authMiddleware, friendsController.sendRequest);
+router.post('/friends/request/uid', authMiddleware, friendsController.sendRequestByUid);
 router.post('/friends/accept', authMiddleware, friendsController.acceptRequest);
 router.post('/friends/reject', authMiddleware, friendsController.rejectRequest);
 router.delete('/friends/:friendId', authMiddleware, friendsController.removeFriend);

@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { isValidUid, UID_LENGTH } from '../auth/uid';
 import redisClient from '../config/redis';
 import logger from '../utils/logger';
 import { PlayerOnlineStatus } from './friends.types';
@@ -21,6 +22,7 @@ export class FriendsService {
         userOneRef: {
           select: {
             id: true,
+            uid: true,
             username: true,
             avatarUrl: true,
             lastLogin: true,
@@ -29,6 +31,7 @@ export class FriendsService {
         userTwoRef: {
           select: {
             id: true,
+            uid: true,
             username: true,
             avatarUrl: true,
             lastLogin: true,
@@ -59,6 +62,7 @@ export class FriendsService {
         return {
           friendshipId: f.id,
           userId: friend.id,
+          uid: friend.uid,
           username: friend.username,
           avatarUrl: friend.avatarUrl,
           status,
@@ -235,6 +239,7 @@ export class FriendsService {
         sender: {
           select: {
             id: true,
+            uid: true,
             username: true,
             avatarUrl: true,
           },
@@ -251,10 +256,39 @@ export class FriendsService {
   // ─────────────────────────────────────────
 
   async searchPlayers(query: string, userId: string) {
+    const trimmed = (query ?? '').trim();
+
+    // A run of digits is a uid, not a name.
+    //
+    // This is the flow players actually use to add each other - read the
+    // number off a friend's profile and type it in - so it is matched
+    // exactly and returns at most the one account it identifies. Punctuation
+    // is stripped first because the app displays the uid with a leading '#'
+    // and people paste it back in that way.
+    const asUid = trimmed.replace(/[^0-9]/g, '');
+    if (asUid.length === UID_LENGTH && isValidUid(asUid)) {
+      const exact = await prisma.user.findFirst({
+        where: {
+          uid: asUid,
+          id: { not: userId },
+          accountStatus: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          uid: true,
+          username: true,
+          avatarUrl: true,
+          rankPoints: true,
+        },
+      });
+
+      return exact ? [exact] : [];
+    }
+
     const players = await prisma.user.findMany({
       where: {
         username: {
-          contains: query,
+          contains: trimmed,
           mode: 'insensitive',
         },
         id: { not: userId },
@@ -262,6 +296,7 @@ export class FriendsService {
       },
       select: {
         id: true,
+        uid: true,
         username: true,
         avatarUrl: true,
         rankPoints: true,
@@ -270,6 +305,46 @@ export class FriendsService {
     });
 
     return players;
+  }
+
+  // ─────────────────────────────────────────
+  // SEND FRIEND REQUEST BY UID
+  // ─────────────────────────────────────────
+
+  /**
+   * Adds a player by the number printed on their profile.
+   *
+   * Resolving the uid here rather than in the app means the client never has
+   * to know a player's internal id to send a request, which is the whole
+   * point of having a public number.
+   */
+  async sendRequestByUid(senderId: string, rawUid: string): Promise<void> {
+    const uid = (rawUid ?? '').replace(/[^0-9]/g, '');
+
+    if (!isValidUid(uid)) {
+      throw {
+        code: 'INVALID_UID',
+        message: `A player ID is ${UID_LENGTH} digits.`,
+        status: 400,
+      };
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { uid },
+      select: { id: true, accountStatus: true },
+    });
+
+    if (!target || target.accountStatus !== 'ACTIVE') {
+      throw {
+        code: 'USER_NOT_FOUND',
+        message: 'No player has that ID.',
+        status: 404,
+      };
+    }
+
+    // Reuses the normal path, so the self-add, already-friends and
+    // duplicate-request rules apply exactly as they do everywhere else.
+    await this.sendFriendRequest(senderId, target.id);
   }
 
   // ─────────────────────────────────────────

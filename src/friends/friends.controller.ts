@@ -20,6 +20,26 @@ export class FriendsController {
   // SEND FRIEND REQUEST
   // ─────────────────────────────────────────
 
+  /// Adds a player by the public number shown on their profile.
+  sendRequestByUid = asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.userId;
+    const { uid } = req.body;
+
+    if (!uid) {
+      sendError(
+        res,
+        ERROR_CODES.VALIDATION_ERROR,
+        'A player ID is required.',
+        HTTP_STATUS.BAD_REQUEST
+      );
+      return;
+    }
+
+    await friendsService.sendRequestByUid(userId, String(uid));
+
+    sendSuccess(res, { message: 'Friend request sent.' });
+  });
+
   sendRequest = asyncHandler(async (req: Request, res: Response) => {
     const userId = (req as any).user?.userId;
     const { playerId } = req.body;

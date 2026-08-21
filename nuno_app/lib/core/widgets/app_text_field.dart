@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
@@ -20,6 +21,9 @@ class AppTextField extends StatefulWidget {
   final bool autofocus;
   final bool enabled;
 
+  /// Restricts what can be typed, e.g. a username's allowed characters.
+  final List<TextInputFormatter>? inputFormatters;
+
   const AppTextField({
     super.key,
     required this.controller,
@@ -35,6 +39,7 @@ class AppTextField extends StatefulWidget {
     this.maxLength,
     this.autofocus = false,
     this.enabled = true,
+    this.inputFormatters,
   });
 
   @override
@@ -62,6 +67,7 @@ class _AppTextFieldState extends State<AppTextField> {
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
           maxLength: widget.maxLength,
+          inputFormatters: widget.inputFormatters,
           autofocus: widget.autofocus,
           enabled: widget.enabled,
           style: AppTextStyles.bodyLg,

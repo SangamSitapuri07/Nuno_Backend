@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../data/repositories/auth_repository.dart';
+import '../../services/google_auth_service.dart';
 import '../../core/network/server_wakeup.dart';
 import '../../core/providers.dart';
 import '../../data/models/user_models.dart';
@@ -21,6 +23,11 @@ class AuthState {
     this.isBusy = false,
     this.error,
   });
+
+  /// True while a Google account still carries its generated placeholder
+  /// name. The router sends these players to the username screen.
+  bool get needsUsername =>
+      status == AuthStatus.authenticated && profile?.usernameSet == false;
 
   AuthState copyWith({
     AuthStatus? status,
@@ -77,13 +84,22 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> login({required String email, required String password}) async {
+  /// Signs in with Google, creating the account on first use.
+  Future<bool> signInWithGoogle() async {
     state = state.copyWith(isBusy: true, clearError: true);
+
     try {
-      await _ref.read(authRepositoryProvider).login(
-            email: email.trim(),
-            password: password,
-          );
+      final idToken = await _ref.read(googleAuthServiceProvider).signIn();
+
+      // Null means the player dismissed the account picker. That is not a
+      // failure, so it must not leave an error on screen.
+      if (idToken == null) {
+        state = state.copyWith(isBusy: false);
+        return false;
+      }
+
+      await _ref.read(authRepositoryProvider).googleSignIn(idToken);
+
       final profile = await _ref.read(userRepositoryProvider).getProfile();
       await _ref.read(tokenStorageProvider).saveUserId(profile.id);
 
@@ -95,47 +111,53 @@ class AuthController extends StateNotifier<AuthState> {
 
       await _ref.read(socketServiceProvider).connect();
       return true;
+    } on GoogleSignInFailure catch (e) {
+      state = state.copyWith(isBusy: false, error: e.message);
+      return false;
     } on ApiException catch (e) {
       state = state.copyWith(isBusy: false, error: e.message);
       return false;
     } catch (_) {
       state = state.copyWith(
         isBusy: false,
-        error: 'Unable to sign in. Please try again.',
+        error: 'Google sign-in failed. Please try again.',
       );
       return false;
     }
   }
 
-  /// Registers then immediately signs in (the backend register endpoint
-  /// returns only a confirmation message).
-  Future<bool> register({
-    required String username,
-    required String email,
-    required String password,
-  }) async {
+  /// Claims the player's chosen username after a Google sign-up.
+  Future<bool> setUsername(String username) async {
     state = state.copyWith(isBusy: true, clearError: true);
     try {
-      await _ref.read(authRepositoryProvider).register(
-            username: username.trim(),
-            email: email.trim(),
-            password: password,
-          );
-      return login(email: email, password: password);
+      await _ref.read(authRepositoryProvider).setUsername(username.trim());
+
+      // Re-read rather than patching locally: this is what flips
+      // usernameSet, and the router keys off it.
+      final profile = await _ref.read(userRepositoryProvider).getProfile();
+      state = state.copyWith(profile: profile, isBusy: false);
+      return true;
     } on ApiException catch (e) {
       state = state.copyWith(isBusy: false, error: e.message);
       return false;
     } catch (_) {
       state = state.copyWith(
         isBusy: false,
-        error: 'Unable to create your account. Please try again.',
+        error: 'Could not set your username. Please try again.',
       );
       return false;
     }
   }
+
+  /// Live availability for the username field.
+  Future<UsernameCheck> checkUsername(String username) =>
+      _ref.read(authRepositoryProvider).checkUsername(username.trim());
 
   Future<void> logout() async {
     _ref.read(socketServiceProvider).disconnect();
+    // Also drop the cached Google account, or the next sign-in silently
+    // reuses it instead of showing the picker.
+    await _ref.read(googleAuthServiceProvider).signOut();
     await _ref.read(authRepositoryProvider).logout();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }

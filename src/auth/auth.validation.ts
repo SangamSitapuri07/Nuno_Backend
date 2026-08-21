@@ -31,6 +31,25 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const googleSignInSchema = z.object({
+  idToken: z.string().min(10, 'A Google ID token is required'),
+});
+
+/// The username rules are shared by registration and the pick-a-username
+/// step after a Google sign-in, so they live in one place.
+export const usernameSchema = z
+  .string()
+  .min(3, 'Username must be at least 3 characters')
+  .max(20, 'Username must be at most 20 characters')
+  .regex(
+    /^[a-zA-Z0-9_]+$/,
+    'Username can only contain letters, numbers, and underscores'
+  );
+
+export const setUsernameSchema = z.object({
+  username: usernameSchema,
+});
+
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });
@@ -38,3 +57,5 @@ export const refreshTokenSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
+export type GoogleSignInInput = z.infer<typeof googleSignInSchema>;
+export type SetUsernameInput = z.infer<typeof setUsernameSchema>;

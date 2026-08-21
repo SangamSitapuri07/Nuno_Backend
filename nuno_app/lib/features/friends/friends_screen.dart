@@ -524,9 +524,15 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
     super.dispose();
   }
 
+  /// A player ID is ten digits; anything else is treated as a name.
+  static bool _looksLikeUid(String value) =>
+      RegExp(r'^[1-9][0-9]{9}$').hasMatch(value.replaceAll(RegExp('[^0-9]'), ''));
+
   void _onChanged(String value) {
     _debounce?.cancel();
-    if (value.trim().length < 2) {
+    final trimmed = value.trim();
+
+    if (trimmed.length < 2) {
       setState(() {
         _results = [];
         _loading = false;
@@ -535,6 +541,14 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
     }
 
     setState(() => _loading = true);
+
+    // A complete ID is unambiguous, so it is looked up at once - waiting out
+    // a debounce after the tenth digit just feels broken.
+    if (_looksLikeUid(trimmed)) {
+      _search(trimmed);
+      return;
+    }
+
     _debounce = Timer(const Duration(milliseconds: 400), () => _search(value));
   }
 
@@ -577,7 +591,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
             style: AppTextStyles.body,
             cursorColor: AppColors.accent,
             decoration: InputDecoration(
-              hintText: 'Search players by username',
+              hintText: 'Username or 10-digit player ID',
               prefixIcon: const Icon(Icons.search_rounded,
                   size: 20, color: AppColors.textMuted),
               suffixIcon: _controller.text.isEmpty
@@ -603,8 +617,11 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
                           ? 'Find new opponents'
                           : 'No players found',
                       message: _controller.text.trim().length < 2
-                          ? 'Type at least 2 characters to search.'
-                          : 'Try a different username.',
+                          ? 'Search by username, or paste a friend\'s '
+                              '10-digit player ID.'
+                          : _looksLikeUid(_controller.text)
+                              ? 'No player has that ID.'
+                              : 'Try a different username.',
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(
@@ -636,8 +653,14 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
                                     Text(p.username,
                                         style: AppTextStyles.h4,
                                         overflow: TextOverflow.ellipsis),
-                                    Text('${p.rankPoints} RP',
-                                        style: AppTextStyles.caption),
+                                    Text(
+                                      p.uid.isEmpty
+                                          ? '${p.rankPoints} RP'
+                                          : 'ID ${p.uid}  ·  '
+                                              '${p.rankPoints} RP',
+                                      style: AppTextStyles.caption,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ],
                                 ),
                               ),

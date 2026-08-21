@@ -13,9 +13,30 @@ datasource db {
 
 model User {
   id              String        @id @default(uuid())
+
+  /// Public player number, shown in-game and used to add friends.
+  ///
+  /// The uuid primary key is unusable for that: nobody is going to read out
+  /// 36 hex characters to a friend. This is a 10-digit number in the style of
+  /// Free Fire / BGMI, unique, and safe to display.
+  uid             String        @unique @db.VarChar(10)
+
   username        String        @unique @db.VarChar(30)
   email           String        @unique @db.VarChar(255)
-  passwordHash    String
+
+  /// Null for Google accounts, which have no password of their own.
+  passwordHash    String?
+
+  /// Google's stable subject id ('sub'), set when the account signs in with
+  /// Google. Unique so two accounts can never claim the same Google user.
+  googleId        String?       @unique
+
+  /// False until the player has chosen their own username.
+  ///
+  /// A Google sign-in has no username, so one is auto-generated and the app
+  /// sends the player to the pick-a-username screen while this is false.
+  usernameSet     Boolean       @default(false)
+
   avatarUrl       String?
   level           Int           @default(1)
   xp              Int           @default(0)
@@ -42,6 +63,8 @@ model User {
 
   @@index([username])
   @@index([email])
+  @@index([uid])
+  @@index([googleId])
   @@index([rankPoints])
   @@index([lastLogin])
 }

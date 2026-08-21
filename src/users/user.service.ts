@@ -13,7 +13,13 @@ export class UserService {
       where: { id: userId },
       select: {
         id: true,
+        // The public player number, so the app can show it on the profile
+        // and the player can read it out to a friend.
+        uid: true,
         username: true,
+        // False until the player has chosen their own name after a Google
+        // sign-in; the app uses it to route to the setup screen.
+        usernameSet: true,
         email: true,
         avatarUrl: true,
         level: true,

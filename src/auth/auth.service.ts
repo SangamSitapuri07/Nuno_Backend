@@ -6,6 +6,8 @@ import config from '../config/config';
 import logger from '../utils/logger';
 import { TokenPayload, AuthTokens, UserRole } from './auth.types';
 import { RegisterInput, LoginInput } from './auth.validation';
+import { verifyGoogleIdToken } from './google';
+import { allocateUid } from './uid';
 
 export class AuthService {
 
@@ -38,16 +40,23 @@ export class AuthService {
 
     const user = await prisma.user.create({
       data: {
+        uid: await allocateUid(),
         username,
         email,
         passwordHash,
+        // This account picked its own name, so it skips the setup screen.
+        usernameSet: true,
         statistics: { create: {} },
         settings: { create: {} },
         leaderboard: { create: {} },
       },
     });
 
-    logger.info('User registered successfully', { userId: user.id, username });
+    logger.info('User registered successfully', {
+      userId: user.id,
+      uid: user.uid,
+      username,
+    });
   }
 
   // ─────────────────────────────────────────
@@ -63,6 +72,16 @@ export class AuthService {
 
     if (!user) {
       throw { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password.', status: 401 };
+    }
+
+    // A Google account has no password of its own. Saying so beats a generic
+    // "invalid credentials" the player cannot possibly act on.
+    if (!user.passwordHash) {
+      throw {
+        code: 'USE_GOOGLE_SIGN_IN',
+        message: 'This account uses Google sign-in. Tap "Continue with Google".',
+        status: 409,
+      };
     }
 
     const passwordValid = await argon2.verify(user.passwordHash, password);
@@ -109,6 +128,271 @@ export class AuthService {
     logger.info('User logged in successfully', { userId: user.id });
 
     return tokens;
+  }
+
+  // ─────────────────────────────────────────
+  // GOOGLE SIGN-IN
+  // ─────────────────────────────────────────
+
+  /**
+   * Signs a player in with a Google ID token, creating the account on first
+   * use.
+   *
+   * One call covers both sign-up and sign-in, because from the player's side
+   * there is no difference - they tap "Continue with Google" and end up in
+   * the game. `isNewAccount` and `needsUsername` tell the app whether to send
+   * them to the pick-a-username screen first.
+   */
+  async googleSignIn(idToken: string): Promise<
+    AuthTokens & { isNewAccount: boolean; needsUsername: boolean }
+  > {
+    const profile = await verifyGoogleIdToken(idToken);
+
+    // Match on googleId first. Email is deliberately the fallback and not the
+    // primary key: people change the email on a Google account, and matching
+    // only on email would also let someone who registered that address with a
+    // password be taken over by a Google account that merely claims it.
+    let user = await prisma.user.findUnique({
+      where: { googleId: profile.googleId },
+    });
+
+    if (!user) {
+      const byEmail = await prisma.user.findUnique({
+        where: { email: profile.email },
+      });
+
+      if (byEmail) {
+        // An existing account with the same address. Only link it when Google
+        // has actually verified that address, otherwise this is an account
+        // takeover primitive.
+        if (!profile.emailVerified) {
+          throw {
+            code: 'EMAIL_NOT_VERIFIED',
+            message:
+              'Your Google account has not verified this email address.',
+            status: 403,
+          };
+        }
+
+        user = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: {
+            googleId: profile.googleId,
+            avatarUrl: byEmail.avatarUrl ?? profile.picture,
+          },
+        });
+
+        logger.info('Linked Google identity to an existing account', {
+          userId: user.id,
+        });
+      }
+    }
+
+    let isNewAccount = false;
+
+    if (!user) {
+      user = await this.createGoogleUser(profile);
+      isNewAccount = true;
+    }
+
+    if (user.accountStatus !== 'ACTIVE') {
+      throw {
+        code: 'ACCOUNT_INACTIVE',
+        message: 'Your account is not active.',
+        status: 403,
+      };
+    }
+
+    await this.clearStaleSession(user.id);
+
+    const tokens = this.generateTokens({
+      userId: user.id,
+      username: user.username,
+      role: UserRole.PLAYER,
+    });
+
+    try {
+      await redisClient.set(
+        `refresh_token:${user.id}`,
+        tokens.refreshToken,
+        { EX: 30 * 24 * 60 * 60 }
+      );
+    } catch (e) {
+      // Redis is optional here.
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
+
+    logger.info('Google sign-in succeeded', {
+      userId: user.id,
+      uid: user.uid,
+      isNewAccount,
+    });
+
+    return {
+      ...tokens,
+      isNewAccount,
+      needsUsername: !user.usernameSet,
+    };
+  }
+
+  /**
+   * Creates the account behind a first-time Google sign-in.
+   *
+   * Both `uid` and `username` are unique, and two people can sign up at the
+   * same instant, so a unique-violation is retried with fresh values rather
+   * than surfaced as a failed sign-in.
+   */
+  private async createGoogleUser(profile: {
+    googleId: string;
+    email: string;
+    name: string | null;
+    picture: string | null;
+  }) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await prisma.user.create({
+          data: {
+            uid: await allocateUid(),
+            // A placeholder the player replaces on the next screen. It is
+            // still unique and still valid, so the account works even if they
+            // background the app before choosing one.
+            username: await this.provisionalUsername(profile.name),
+            email: profile.email,
+            googleId: profile.googleId,
+            passwordHash: null,
+            usernameSet: false,
+            avatarUrl: profile.picture,
+            emailVerified: true,
+            statistics: { create: {} },
+            settings: { create: {} },
+            leaderboard: { create: {} },
+          },
+        });
+      } catch (error: any) {
+        // P2002 is Prisma's unique constraint violation.
+        if (error?.code === 'P2002' && attempt < 4) continue;
+        throw error;
+      }
+    }
+
+    throw {
+      code: 'ACCOUNT_CREATE_FAILED',
+      message: 'Could not create your account. Please try again.',
+      status: 500,
+    };
+  }
+
+  /** A unique, valid, throwaway username for a brand-new Google account. */
+  private async provisionalUsername(name: string | null): Promise<string> {
+    // Seed from the Google display name so the suggestion feels personal,
+    // falling back to a generic stem when it has nothing usable in it.
+    const stem =
+      (name ?? '')
+        .replace(/[^a-zA-Z0-9_]/g, '')
+        .slice(0, 12) || 'Player';
+
+    for (let i = 0; i < 10; i++) {
+      const candidate = `${stem}${Math.floor(1000 + Math.random() * 9000)}`;
+      const taken = await prisma.user.findUnique({
+        where: { username: candidate },
+        select: { id: true },
+      });
+      if (!taken) return candidate;
+    }
+
+    // Vanishingly unlikely; keep it unique rather than give up.
+    return `Player${Date.now().toString().slice(-9)}`;
+  }
+
+  // ─────────────────────────────────────────
+  // SET USERNAME
+  // ─────────────────────────────────────────
+
+  /**
+   * Sets the player's chosen username after a Google sign-in.
+   *
+   * Deliberately one-shot: it only applies while `usernameSet` is false, so
+   * this cannot be used as a free rename endpoint. Renaming is a separate
+   * concern with its own rules.
+   */
+  async setUsername(userId: string, username: string): Promise<{
+    username: string;
+    uid: string;
+  }> {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw { code: 'USER_NOT_FOUND', message: 'User not found.', status: 404 };
+    }
+
+    if (user.usernameSet) {
+      throw {
+        code: 'USERNAME_ALREADY_SET',
+        message: 'Your username has already been chosen.',
+        status: 409,
+      };
+    }
+
+    // Case-insensitive: 'Rahul' and 'rahul' must not be different players.
+    const taken = await prisma.user.findFirst({
+      where: {
+        username: { equals: username, mode: 'insensitive' },
+        id: { not: userId },
+      },
+      select: { id: true },
+    });
+
+    if (taken) {
+      throw {
+        code: 'USERNAME_TAKEN',
+        message: 'That username is already taken.',
+        status: 409,
+      };
+    }
+
+    try {
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: { username, usernameSet: true },
+      });
+
+      logger.info('Username chosen', { userId, username });
+      return { username: updated.username, uid: updated.uid };
+    } catch (error: any) {
+      // Somebody took it between the check and the write.
+      if (error?.code === 'P2002') {
+        throw {
+          code: 'USERNAME_TAKEN',
+          message: 'That username is already taken.',
+          status: 409,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /** True when [username] is free. Powers the live tick on the setup screen. */
+  async isUsernameAvailable(username: string): Promise<boolean> {
+    const taken = await prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return !taken;
+  }
+
+  /** Drops room/match/queue keys left over from a previous session. */
+  private async clearStaleSession(userId: string): Promise<void> {
+    try {
+      await redisClient.del(`player:room:${userId}`);
+      await redisClient.del(`match:player:${userId}`);
+      await redisClient.del(`queue:player:${userId}`);
+    } catch (e) {
+      // Best effort.
+    }
   }
 
   // ─────────────────────────────────────────

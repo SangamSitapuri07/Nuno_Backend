@@ -38,6 +38,13 @@ dependencies:
   flutter_webrtc: ^1.6.0
   permission_handler: ^11.3.1
 
+  # Google sign-in.
+  #
+  # The app performs the interactive sign-in and sends the resulting ID token
+  # to POST /auth/google, which verifies it against Google's public keys. The
+  # token is never trusted client-side.
+  google_sign_in: ^6.2.1
+
   # Storage
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.2.3

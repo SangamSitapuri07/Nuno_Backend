@@ -95,12 +95,18 @@ class FriendRequest extends Equatable {
 /// GET /api/v1/players/search
 class PlayerSearchResult extends Equatable {
   final String id;
+
+  /// The public player number, shown under the name so it is obvious you
+  /// found the right account.
+  final String uid;
+
   final String username;
   final String? avatarUrl;
   final int rankPoints;
 
   const PlayerSearchResult({
     required this.id,
+    this.uid = '',
     required this.username,
     this.avatarUrl,
     this.rankPoints = 0,
@@ -109,6 +115,7 @@ class PlayerSearchResult extends Equatable {
   factory PlayerSearchResult.fromJson(Map<String, dynamic> json) =>
       PlayerSearchResult(
         id: J.str(json['id']),
+        uid: J.str(json['uid']),
         username: J.str(json['username']),
         avatarUrl: J.strOrNull(json['avatarUrl']),
         rankPoints: J.int_(json['rankPoints']),

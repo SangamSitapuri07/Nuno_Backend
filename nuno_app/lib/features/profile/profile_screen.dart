@@ -1,4 +1,7 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -191,6 +194,7 @@ class _IdentitySection extends ConsumerWidget {
                         ),
                       ),
                     Text('Lv. ${p.effectiveLevel}', style: AppTextStyles.caption),
+                    if (p.uid.isNotEmpty) _UidChip(uid: p.uid),
                     const SizedBox(height: 5),
                     ClipRRect(
                       borderRadius: AppDimens.brPill,
@@ -491,6 +495,51 @@ class _HistorySection extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// The player's public ID with a copy button.
+///
+/// Tapping copies it, because the entire purpose of the number is to be given
+/// to somebody else, and retyping ten digits from memory is how people end up
+/// adding the wrong account.
+class _UidChip extends StatelessWidget {
+  final String uid;
+
+  const _UidChip({required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: InkWell(
+        borderRadius: AppDimens.brSm,
+        onTap: () async {
+          await Clipboard.setData(ClipboardData(text: uid));
+          if (!context.mounted) return;
+          AppSnack.show(context, 'Player ID copied',
+              icon: Icons.copy_rounded);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'ID $uid',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.gold,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.copy_rounded, size: 11, color: AppColors.gold),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
