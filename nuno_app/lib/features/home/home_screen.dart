@@ -85,8 +85,16 @@ class HomeScreen extends ConsumerWidget {
                       .fold<int>(0, (sum, n) => sum + n) ??
                   0;
 
-              final openWidth = (w * 0.29).clamp(200.0, 320.0);
-              final panelWidth = friendsOpen ? openWidth : 132.0;
+              // The right column's width NEVER changes.
+              //
+              // Collapsing used to shrink it from ~29% of the screen to
+              // 132px, and because the stage is an Expanded sibling it
+              // absorbed the difference - so the podium, the chest and the
+              // header all jumped sideways every time the list was toggled.
+              // The column now keeps its width and only the LIST inside it
+              // slides away, which is what "hide the friends list" should
+              // mean: nothing else on the screen moves at all.
+              final columnWidth = (w * 0.29).clamp(200.0, 320.0);
               // Header shrinks on short canvases so the stage keeps room.
               // The badge carries an avatar plus three stacked lines (name,
               // title, level bar); 46 was too short for that and overflowed
@@ -101,7 +109,7 @@ class HomeScreen extends ConsumerWidget {
               // it is given, so an over-tall slot is what made the button
               // read as a square block.
               final playHeight =
-                  (openWidth / Art.buttonAspect).clamp(52.0, 96.0);
+                  (columnWidth / Art.buttonAspect).clamp(52.0, 96.0);
 
               return Padding(
                 // Tight to the left edge; the right keeps a normal gutter.
@@ -223,7 +231,7 @@ class HomeScreen extends ConsumerWidget {
                     // The tab stays in the column rather than floating over
                     // the stage, so nothing underneath it is ever covered.
                     SizedBox(
-                      width: panelWidth,
+                      width: columnWidth,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -234,6 +242,11 @@ class HomeScreen extends ConsumerWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                // The tab is pinned to the LEFT edge of the
+                                // column and never moves. Previously it was
+                                // laid out beside a shrinking panel, so it
+                                // drifted into the middle of the screen as
+                                // the list closed.
                                 _FriendsTab(
                                   isOpen: friendsOpen,
                                   unread: totalUnread,
@@ -242,13 +255,33 @@ class HomeScreen extends ConsumerWidget {
                                           .notifier)
                                       .state = !friendsOpen,
                                 ),
+                                // The list slides out to the right rather
+                                // than being swapped for an empty box. The
+                                // slot keeps its size either way, so nothing
+                                // around it reflows - it is clipped, which is
+                                // what makes it read as sliding off-screen.
                                 Expanded(
-                                  child: AnimatedSwitcher(
-                                    duration:
-                                        const Duration(milliseconds: 180),
-                                    child: friendsOpen
-                                        ? const FriendsPanel()
-                                        : const SizedBox.shrink(),
+                                  child: ClipRect(
+                                    child: AnimatedSlide(
+                                      offset: friendsOpen
+                                          ? Offset.zero
+                                          : const Offset(1, 0),
+                                      duration:
+                                          const Duration(milliseconds: 220),
+                                      curve: Curves.easeOutCubic,
+                                      child: AnimatedOpacity(
+                                        opacity: friendsOpen ? 1 : 0,
+                                        duration:
+                                            const Duration(milliseconds: 160),
+                                        // Hidden means untappable, or the
+                                        // invisible list would keep eating
+                                        // taps meant for the stage behind it.
+                                        child: IgnorePointer(
+                                          ignoring: !friendsOpen,
+                                          child: const FriendsPanel(),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -527,74 +560,95 @@ class _FriendsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      // Opaque so the whole strip is tappable, not just the glyphs.
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 26,
-        margin: const EdgeInsets.only(right: 4, bottom: 4),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xE62A1A5E), Color(0xF21A0F3D)],
-          ),
-          borderRadius: AppDimens.brMd,
-          border: Border.all(
-            color: AppColors.violet.withValues(alpha: 0.45),
-            width: 1.2,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Points the way the panel will move.
-            Icon(
-              isOpen
-                  ? Icons.keyboard_arrow_right_rounded
-                  : Icons.keyboard_arrow_left_rounded,
-              size: 18,
-              color: Colors.white70,
+    // A compact handle, not a full-height bar.
+    //
+    // The parent Row stretches its children, so this used to run the whole
+    // height of the column and read as a wall down the middle of the screen.
+    // Centring it keeps it to the size of its contents, like the pull-tabs
+    // these are modelled on.
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        // Opaque so the whole strip is tappable, not just the glyphs.
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 24,
+          margin: const EdgeInsets.only(right: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppDimens.md),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xE62A1A5E), Color(0xF21A0F3D)],
             ),
-            const SizedBox(height: AppDimens.sm),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.people_alt_rounded,
-                    size: 16, color: AppColors.cyan),
-                // Unread only matters while the list is hidden; with the
-                // panel open the badge is already on the row itself.
-                if (!isOpen && unread > 0)
-                  Positioned(
-                    right: -5,
-                    top: -4,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.danger,
-                        shape: BoxShape.circle,
+            // Rounded on the left only, so it reads as a tab attached to the
+            // panel rather than a free-floating box.
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(AppDimens.radiusMd),
+            ),
+            border: Border.all(
+              color: AppColors.violet.withValues(alpha: 0.45),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 8,
+                offset: const Offset(-2, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Points the way the panel will move.
+              Icon(
+                isOpen
+                    ? Icons.keyboard_arrow_right_rounded
+                    : Icons.keyboard_arrow_left_rounded,
+                size: 18,
+                color: Colors.white70,
+              ),
+              const SizedBox(height: AppDimens.sm),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.people_alt_rounded,
+                      size: 16, color: AppColors.cyan),
+                  // Unread only matters while the list is hidden; with the
+                  // panel open the badge is already on the row itself.
+                  if (!isOpen && unread > 0)
+                    Positioned(
+                      right: -5,
+                      top: -4,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.sm),
+              // Rotated so the label reads bottom-to-top down the tab.
+              RotatedBox(
+                quarterTurns: 3,
+                child: Text(
+                  'FRIENDS',
+                  style: AppTextStyles.caption.copyWith(
+                    fontSize: 9,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white70,
                   ),
-              ],
-            ),
-            const SizedBox(height: AppDimens.sm),
-            // Rotated so the label reads bottom-to-top down the tab.
-            RotatedBox(
-              quarterTurns: 3,
-              child: Text(
-                'FRIENDS',
-                style: AppTextStyles.caption.copyWith(
-                  fontSize: 9,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white70,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
