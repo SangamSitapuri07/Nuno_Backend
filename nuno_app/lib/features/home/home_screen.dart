@@ -34,6 +34,13 @@ import 'widgets/player_badge.dart';
 ///   ├───────────────────────────────┴──────────────┤
 ///   │ (space reserved for the floating nav bar)    │
 ///   └──────────────────────────────────────────────┘
+/// Width of the friends pull-tab.
+///
+/// The collapsed offset is derived from this, so the tab lands exactly flush
+/// with the right edge. Hard-coding the two separately is how a handle ends
+/// up half off-screen, or with a sliver of the list still showing.
+const double kFriendsTabWidth = 26;
+
 class HomeScreen extends ConsumerWidget {
   final ValueChanged<int>? onNavigate;
   final int navIndex;
@@ -238,37 +245,46 @@ class HomeScreen extends ConsumerWidget {
                           // Only the friends list collapses. PLAY keeps its
                           // slot whatever happens - hiding the friends list
                           // must not take the main action with it.
+                          // The tab and the list travel together.
+                          //
+                          // They used to be separate: the tab sat at the
+                          // left of the column while only the list slid
+                          // away, which left the handle stranded in the
+                          // middle of the screen with empty space to the
+                          // right of it. Sliding the pair as one group means
+                          // the tab rides out with the list and comes to
+                          // rest against the right edge, where it is still
+                          // the thing you press to bring everything back.
+                          //
+                          // The shift is exactly the list's width, so the
+                          // tab ends up flush with the edge: the group is
+                          // columnWidth wide and the tab occupies the first
+                          // kFriendsTabWidth of it.
                           Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // The tab is pinned to the LEFT edge of the
-                                // column and never moves. Previously it was
-                                // laid out beside a shrinking panel, so it
-                                // drifted into the middle of the screen as
-                                // the list closed.
-                                _FriendsTab(
-                                  isOpen: friendsOpen,
-                                  unread: totalUnread,
-                                  onTap: () => ref
-                                      .read(friendsPanelVisibleProvider
-                                          .notifier)
-                                      .state = !friendsOpen,
-                                ),
-                                // The list slides out to the right rather
-                                // than being swapped for an empty box. The
-                                // slot keeps its size either way, so nothing
-                                // around it reflows - it is clipped, which is
-                                // what makes it read as sliding off-screen.
-                                Expanded(
-                                  child: ClipRect(
-                                    child: AnimatedSlide(
-                                      offset: friendsOpen
-                                          ? Offset.zero
-                                          : const Offset(1, 0),
-                                      duration:
-                                          const Duration(milliseconds: 220),
-                                      curve: Curves.easeOutCubic,
+                            child: ClipRect(
+                              child: AnimatedSlide(
+                                offset: friendsOpen
+                                    ? Offset.zero
+                                    : Offset(
+                                        (columnWidth - kFriendsTabWidth) /
+                                            columnWidth,
+                                        0,
+                                      ),
+                                duration: const Duration(milliseconds: 240),
+                                curve: Curves.easeOutCubic,
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _FriendsTab(
+                                      isOpen: friendsOpen,
+                                      unread: totalUnread,
+                                      onTap: () => ref
+                                          .read(friendsPanelVisibleProvider
+                                              .notifier)
+                                          .state = !friendsOpen,
+                                    ),
+                                    Expanded(
                                       child: AnimatedOpacity(
                                         opacity: friendsOpen ? 1 : 0,
                                         duration:
@@ -282,9 +298,9 @@ class HomeScreen extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                           SizedBox(
@@ -572,8 +588,7 @@ class _FriendsTab extends StatelessWidget {
         // Opaque so the whole strip is tappable, not just the glyphs.
         behavior: HitTestBehavior.opaque,
         child: Container(
-          width: 24,
-          margin: const EdgeInsets.only(right: 4),
+          width: kFriendsTabWidth,
           padding: const EdgeInsets.symmetric(vertical: AppDimens.md),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
