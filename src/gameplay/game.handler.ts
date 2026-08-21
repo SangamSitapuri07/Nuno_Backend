@@ -16,6 +16,42 @@ import logger from '../utils/logger';
 
 const activeMatchTimers = new Set<string>();
 
+/**
+ * Puts a room back into a playable state once its match has ended.
+ *
+ * Without this the room stays IN_GAME and every player keeps a
+ * `match:player:` key, so joinRoom refuses new arrivals and a rematch can
+ * never be started in the same room.
+ */
+const releaseRoomAfterMatch = async (
+  io: Server,
+  roomId: string,
+  playerIds: string[]
+): Promise<void> => {
+  try {
+    const redis = (await import('../config/redis')).default;
+    for (const playerId of playerIds) {
+      await redis.del(`match:player:${playerId}`);
+    }
+
+    const roomService = (await import('../rooms/room.service')).default;
+    const room = await roomService.getRoom(roomId);
+    if (!room) return;
+
+    room.status = 'WAITING' as any;
+    // Readiness is per-match. Leaving it set meant a rematch could start the
+    // moment the room reopened, before anybody had agreed to one.
+    for (const player of room.players) {
+      player.isReady = false;
+    }
+    await (roomService as any).saveRoom(room);
+
+    io.to(roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+  } catch (error) {
+    logger.error('Failed to release the room after a match', { error, roomId });
+  }
+};
+
 export const startMatchTimer = (io: Server, matchId: string): void => {
   if (activeMatchTimers.has(matchId)) return;
   activeMatchTimers.add(matchId);
@@ -152,6 +188,12 @@ export const initializeGameHandlers = (
           totalTurns: state.totalTurns,
           matchId: state.matchId,
         });
+
+        // Hand the room back so it can be played in again.
+        //
+        // It was left IN_GAME forever, which made a rematch impossible: the
+        // room stayed locked and nobody could rejoin it either.
+        await releaseRoomAfterMatch(io, roomId, state.players);
 
         for (const playerId of state.players) {
           await friendsService.broadcastUserStatus(io, playerId);
@@ -311,7 +353,12 @@ export const initializeGameHandlers = (
       const playerIds = room.players.map(p => p.userId);
       const allAccepted = await rematchService.allPlayersAccepted(socket.matchId, playerIds);
 
-      if (allAccepted) {
+      // Two players minimum.
+      //
+      // Everyone else leaving shrinks room.players, and "all of them have
+      // accepted" is trivially true of a single remaining player - which
+      // would have dealt them a game against nobody.
+      if (allAccepted && playerIds.length >= 2) {
         const newMatchId = generateId();
         await rematchService.clearRematch(socket.matchId);
 

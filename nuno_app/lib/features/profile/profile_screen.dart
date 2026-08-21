@@ -162,9 +162,16 @@ class _IdentitySection extends ConsumerWidget {
                       level: p.level,
                       ringColor: tierColor,
                     ),
+                    // Both axes constrained.
+                    //
+                    // The frame art is not perfectly square (frame_gold is
+                    // 210x220), so giving only a width let contain derive a
+                    // taller height and the ring spilled outside the 72x72
+                    // slot, sitting off-centre against the avatar.
                     ArtImage(
                       cosmetics.avatarFrame ?? Art.frameForLevel(p.level),
                       width: 72,
+                      height: 72,
                     ),
                   ],
                 ),

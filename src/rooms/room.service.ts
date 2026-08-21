@@ -297,7 +297,12 @@ export class RoomService {
    * until its TTL lapses. Verifying the target still exists (and still lists
    * the player) makes the lock self-healing.
    */
-  private async resolveActiveRoom(userId: string): Promise<string | null> {
+  /// The room this player is genuinely in, healing a stale key.
+  ///
+  /// Public because callers outside the service - accepting an invite, for
+  /// one - need to know whether a player must be moved out of somewhere else
+  /// first.
+  async resolveActiveRoom(userId: string): Promise<string | null> {
     const roomId = await redisClient.get(`player:room:${userId}`);
     if (!roomId) return null;
 

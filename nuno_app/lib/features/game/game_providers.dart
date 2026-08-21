@@ -49,6 +49,17 @@ class GameUiState {
   /// Number of cards the local player was just forced to draw (screen 11).
   final int? penaltyDraw;
 
+  /// Who has agreed to play again since the match ended.
+  ///
+  /// The server already tracked this and started a new match once everyone
+  /// had accepted, but the app never listened, so pressing PLAY AGAIN fired
+  /// one event into the void and closed the dialog. Holding the votes here
+  /// lets the result screen show who is waiting on whom.
+  final Set<String> rematchAcceptedBy;
+
+  /// Players who have said no, or left. A rematch can no longer happen.
+  final Set<String> rematchDeclinedBy;
+
   const GameUiState({
     this.game,
     this.turnSecondsLeft = AppConfig.turnTimerSeconds,
@@ -60,6 +71,8 @@ class GameUiState {
     this.unoCalledBy = const {},
     this.pendingCardId,
     this.penaltyDraw,
+    this.rematchAcceptedBy = const {},
+    this.rematchDeclinedBy = const {},
   });
 
   GameUiState copyWith({
@@ -73,6 +86,8 @@ class GameUiState {
     Set<String>? unoCalledBy,
     String? pendingCardId,
     int? penaltyDraw,
+    Set<String>? rematchAcceptedBy,
+    Set<String>? rematchDeclinedBy,
     bool clearError = false,
     bool clearPending = false,
     bool clearResult = false,
@@ -89,6 +104,8 @@ class GameUiState {
         unoCalledBy: unoCalledBy ?? this.unoCalledBy,
         pendingCardId: clearPending ? null : (pendingCardId ?? this.pendingCardId),
         penaltyDraw: clearPenalty ? null : (penaltyDraw ?? this.penaltyDraw),
+        rematchAcceptedBy: rematchAcceptedBy ?? this.rematchAcceptedBy,
+        rematchDeclinedBy: rematchDeclinedBy ?? this.rematchDeclinedBy,
       );
 
   bool get isFinished => result != null || (game?.isFinished ?? false);
@@ -152,6 +169,32 @@ class GameController extends StateNotifier<GameUiState> {
     sub(SocketEvents.rematchStarted, (_) {
       state = const GameUiState(isSyncing: true);
       requestSync();
+    });
+
+    // Somebody pressed PLAY AGAIN. The server records the requester as having
+    // accepted, so both events mean the same thing to the tally.
+    sub(SocketEvents.rematchRequest, (p) {
+      final userId = J.strOrNull(p['userId']);
+      if (userId == null) return;
+      state = state.copyWith(
+        rematchAcceptedBy: {...state.rematchAcceptedBy, userId},
+      );
+    });
+
+    sub(SocketEvents.rematchAccept, (p) {
+      final userId = J.strOrNull(p['userId']);
+      if (userId == null) return;
+      state = state.copyWith(
+        rematchAcceptedBy: {...state.rematchAcceptedBy, userId},
+      );
+    });
+
+    sub(SocketEvents.rematchDecline, (p) {
+      final userId = J.strOrNull(p['userId']);
+      if (userId == null) return;
+      state = state.copyWith(
+        rematchDeclinedBy: {...state.rematchDeclinedBy, userId},
+      );
     });
 
     sub(SocketEvents.playerDrewCard, (p) {
@@ -308,7 +351,13 @@ class GameController extends StateNotifier<GameUiState> {
   void sendEmote(String key) =>
       _socket.emit(SocketEvents.emoteSend, {'emote': key});
 
-  void requestRematch() => _socket.emit(SocketEvents.rematchRequest);
+  /// Votes to play again.
+  ///
+  /// Sends `rematch.accept`, not `rematch.request`: on the server both record
+  /// the vote, but only accept runs the "has everyone agreed" check that
+  /// starts the next match. Emitting request alone meant the last player to
+  /// press the button never triggered anything.
+  void requestRematch() => _socket.emit(SocketEvents.rematchAccept);
 
   void acceptRematch() => _socket.emit(SocketEvents.rematchAccept);
 

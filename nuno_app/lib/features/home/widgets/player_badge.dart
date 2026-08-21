@@ -83,7 +83,10 @@ class PlayerBadge extends ConsumerWidget {
                     avatarUrl: cosmetics.avatar ?? avatarUrl,
                     size: 32,
                   ),
-                  ArtImage(frame, width: 42),
+                  // Height pinned as well as width: the frame art is very
+                  // close to square but not exactly, and without this the
+                  // ring grows past the 42x42 slot.
+                  ArtImage(frame, width: 42, height: 42),
                 ],
               ),
             ),

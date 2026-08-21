@@ -89,6 +89,52 @@ export const initializeSocketHandlers = (io: Server): void => {
               if (!socket.userId || !acceptData?.roomCode) return;
 
               const roomService = (await import('../rooms/room.service')).default;
+
+              // Accepting an invite means leaving whatever lobby you are in.
+              //
+              // joinRoom refuses with PLAYER_ALREADY_IN_ROOM when the player
+              // is somewhere else, so a player sitting in a group could accept
+              // an invite, see it apparently succeed, and never actually move
+              // - they had to find and press Leave first, which nobody does.
+              // Switching rooms IS the intent of accepting, so the old one is
+              // released here and the players left behind are told about it.
+              const targetRoomId = await redisClient.get(
+                `room:code:${acceptData.roomCode}`
+              );
+
+              if (!targetRoomId) {
+                socket.emit('error', {
+                  code: 'ROOM_NOT_FOUND',
+                  message: 'That room no longer exists.',
+                });
+                return;
+              }
+
+              const currentRoomId = await roomService.resolveActiveRoom(
+                socket.userId
+              );
+
+              if (currentRoomId && currentRoomId !== targetRoomId) {
+                const previous = await roomService.leaveRoom(socket.userId);
+                socket.leave(currentRoomId);
+
+                // Only emit when the room survived; leaveRoom destroys it and
+                // returns null once the last player has gone.
+                if (previous) {
+                  io.to(currentRoomId).emit('room.updated', { room: previous });
+                  io.to(currentRoomId).emit('room.playerLeft', {
+                    userId: socket.userId,
+                    username: socket.username,
+                  });
+                }
+
+                logger.info('Left previous room to accept an invite', {
+                  userId: socket.userId,
+                  from: currentRoomId,
+                  to: targetRoomId,
+                });
+              }
+
               const room = await roomService.joinRoom(
                 socket.userId,
                 socket.username,

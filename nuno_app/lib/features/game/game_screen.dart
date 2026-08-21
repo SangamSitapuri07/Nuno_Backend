@@ -176,11 +176,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       result: result,
       game: ref.read(gameControllerProvider).game,
       myId: myId,
-      onPlayAgain: () {
-        _resultShown = false;
-        ref.read(gameControllerProvider.notifier).requestRematch();
-      },
+      // A vote, not a navigation. The dialog stays up and shows the tally;
+      // it is dismissed from the listener below when the server actually
+      // starts the next match, or when this player bails to the lobby.
+      onPlayAgain: () =>
+          ref.read(gameControllerProvider.notifier).requestRematch(),
       onLobby: () {
+        // Tell the table before leaving. Without this the others sit on
+        // "waiting for the others" forever, because the server needs every
+        // player to accept and this one never will.
+        ref.read(gameControllerProvider.notifier).declineRematch();
         ref.read(gameControllerProvider.notifier).reset();
         ref.read(authControllerProvider.notifier).refreshProfile();
         context.go(AppRoutes.home);
@@ -202,6 +207,19 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
       if (next.result != null && next.result != prev?.result) {
         _showResult(next.result!, myId);
+      }
+
+      // The rematch started.
+      //
+      // rematch.started resets the controller to a syncing state, so the
+      // result disappears AND isSyncing goes true with the screen still
+      // mounted. Leaving for the lobby clears the result too, which is why
+      // the sync flag is part of the test rather than the result alone.
+      if (prev?.result != null && next.result == null && next.isSyncing) {
+        if (_resultShown) {
+          _resultShown = false;
+          Navigator.of(context, rootNavigator: true).maybePop();
+        }
       }
       if (next.error != null && next.error != prev?.error) {
         AppSnack.error(context, next.error!);
