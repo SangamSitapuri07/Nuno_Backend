@@ -62,6 +62,12 @@ class FriendsNotifier extends AsyncNotifier<List<Friend>> {
   }
 }
 
+/// Whether the home friends panel is showing.
+///
+/// Held outside the widget so toggling it does not rebuild the whole home
+/// screen, and so the choice survives switching tabs and coming back.
+final friendsPanelVisibleProvider = StateProvider<bool>((ref) => true);
+
 /// GET /api/v1/messages/unread — unread DM totals keyed by friend id.
 ///
 /// Refreshed whenever a message arrives, so the badge on the friends list

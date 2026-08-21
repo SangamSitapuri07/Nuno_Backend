@@ -14,6 +14,7 @@ import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/user_models.dart';
 import '../auth/auth_controller.dart';
+import 'home_providers.dart';
 import 'widgets/friends_panel.dart';
 import 'widgets/player_badge.dart';
 
@@ -73,7 +74,19 @@ class HomeScreen extends ConsumerWidget {
               final h = box.maxHeight;
 
               // Right column: friends panel above, PLAY below.
-              final panelWidth = (w * 0.29).clamp(200.0, 320.0);
+              //
+              // Collapsed, the column keeps only what PLAY needs plus the
+              // toggle tab, and the stage grows into the rest.
+              final friendsOpen = ref.watch(friendsPanelVisibleProvider);
+              final totalUnread = ref
+                      .watch(unreadCountsProvider)
+                      .valueOrNull
+                      ?.values
+                      .fold<int>(0, (sum, n) => sum + n) ??
+                  0;
+
+              final openWidth = (w * 0.29).clamp(200.0, 320.0);
+              final panelWidth = friendsOpen ? openWidth : 132.0;
               // Header shrinks on short canvases so the stage keeps room.
               // The badge carries an avatar plus three stacked lines (name,
               // title, level bar); 46 was too short for that and overflowed
@@ -88,7 +101,7 @@ class HomeScreen extends ConsumerWidget {
               // it is given, so an over-tall slot is what made the button
               // read as a square block.
               final playHeight =
-                  (panelWidth / Art.buttonAspect).clamp(52.0, 96.0);
+                  (openWidth / Art.buttonAspect).clamp(52.0, 96.0);
 
               return Padding(
                 // Tight to the left edge; the right keeps a normal gutter.
@@ -201,13 +214,45 @@ class HomeScreen extends ConsumerWidget {
 
                     // ── Right column: friends from the very top,
                     //    PLAY pinned at the bottom ──
+                    //
+                    // The friends panel slides away, leaving a slim tab to
+                    // bring it back. On a landscape phone it takes almost a
+                    // third of the width, which is a lot to give up when you
+                    // just want to look at the table.
+                    //
+                    // The tab stays in the column rather than floating over
+                    // the stage, so nothing underneath it is ever covered.
                     SizedBox(
                       width: panelWidth,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Only the friends list collapses. PLAY keeps its
+                          // slot whatever happens - hiding the friends list
+                          // must not take the main action with it.
                           Expanded(
-                            child: const FriendsPanel(),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _FriendsTab(
+                                  isOpen: friendsOpen,
+                                  unread: totalUnread,
+                                  onTap: () => ref
+                                      .read(friendsPanelVisibleProvider
+                                          .notifier)
+                                      .state = !friendsOpen,
+                                ),
+                                Expanded(
+                                  child: AnimatedSwitcher(
+                                    duration:
+                                        const Duration(milliseconds: 180),
+                                    child: friendsOpen
+                                        ? const FriendsPanel()
+                                        : const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           SizedBox(
                             height: playHeight,
@@ -215,7 +260,6 @@ class HomeScreen extends ConsumerWidget {
                               onTap: () => context.push(AppRoutes.playMenu),
                             ),
                           ),
-
                         ],
                       ),
                     ),
@@ -459,6 +503,100 @@ class _FloatingAssetState extends State<_FloatingAsset>
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
       child: art,
+    );
+  }
+}
+
+// ── Friends panel toggle ──────────────────────────────────────
+
+/// The slim vertical tab that shows and hides the friends list.
+///
+/// Deliberately part of the layout rather than floating over it: a tab that
+/// overlaps the stage would sit on top of the podium art, and the whole point
+/// of collapsing the panel is to give that space back.
+class _FriendsTab extends StatelessWidget {
+  final bool isOpen;
+  final int unread;
+  final VoidCallback onTap;
+
+  const _FriendsTab({
+    required this.isOpen,
+    required this.unread,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      // Opaque so the whole strip is tappable, not just the glyphs.
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 26,
+        margin: const EdgeInsets.only(right: 4, bottom: 4),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xE62A1A5E), Color(0xF21A0F3D)],
+          ),
+          borderRadius: AppDimens.brMd,
+          border: Border.all(
+            color: AppColors.violet.withValues(alpha: 0.45),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Points the way the panel will move.
+            Icon(
+              isOpen
+                  ? Icons.keyboard_arrow_right_rounded
+                  : Icons.keyboard_arrow_left_rounded,
+              size: 18,
+              color: Colors.white70,
+            ),
+            const SizedBox(height: AppDimens.sm),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.people_alt_rounded,
+                    size: 16, color: AppColors.cyan),
+                // Unread only matters while the list is hidden; with the
+                // panel open the badge is already on the row itself.
+                if (!isOpen && unread > 0)
+                  Positioned(
+                    right: -5,
+                    top: -4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.danger,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.sm),
+            // Rotated so the label reads bottom-to-top down the tab.
+            RotatedBox(
+              quarterTurns: 3,
+              child: Text(
+                'FRIENDS',
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 9,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

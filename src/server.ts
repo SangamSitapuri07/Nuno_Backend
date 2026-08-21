@@ -146,6 +146,10 @@ const startServer = async () => {
       );
     }
 
+    // Direct messages are kept for a day and then dropped.
+    const messagesService = (await import('./friends/messages.service')).default;
+    messagesService.startExpiryTimer();
+
     httpServer.listen(config.server.port, () => {
       logger.info(`${config.server.appName} server started`, {
         port: config.server.port,
