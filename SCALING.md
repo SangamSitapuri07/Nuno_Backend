@@ -86,58 +86,35 @@ memory, but the command allowance.
 
 #### Which provider
 
-| | Free tier | Runs out at | Notes |
+Checked against the providers' own docs, because the answer is not the
+obvious one.
+
+| | Free tier | Runs out at | Catch |
 |---|---|---|---|
-| **Upstash** | 500K cmds/mo, 256 MB | ~50 games/day | Then $0.20 per 100K commands — ~$2/mo at 1.5M |
-| **Render Key Value** | 25 MB, no command cap | memory, ~1,800 tables | Same-region, no egress cost |
+| **Upstash** | 500K cmds/mo, 256 MB | ~50 games/day | Command quota — this is what killed the last one |
+| **Render Key Value** | one instance, no command cap | memory | **Data lost on every restart**, and Render restarts it whenever it likes |
+| **Aiven (Valkey)** | 1 GB, no command cap | memory | Needs a separate account; not in Render's private network |
+| **Redis Cloud** | 30 MB, **100 ops/sec** | throughput | 100 ops/sec is roughly 25 games/day here |
 
-**Render's own Key Value is the better fit here**, because the constraint
-this app hits is commands, and Render does not meter them. 25 MB holds far
-more tables than the traffic that would exhaust Upstash's command budget.
+**Render's free Key Value is in-memory only.** Its docs are explicit: it does
+not persist to disk, Render may restart it at any time, and a restart deletes
+everything. For this app that means every open room and every live match
+disappears mid-hand — worse than the Postgres store we have now, which
+survives restarts.
 
-#### Setting it up
+So the honest ranking for *this* workload:
 
-1. Render dashboard → **New +** → **Key Value**
-2. **Name:** `nuno-redis`
-3. **Region:** the *same region as the web service* — a different region adds
-   a network hop to every call and undoes the point of the change
-4. **Maxmemory policy:** `noeviction`. This matters: the default
-   `allkeys-lru` silently discards keys under pressure, and these keys are
-   live match state, so a game would vanish mid-hand
-5. Create it, open it, copy the **Internal Key Value URL**:
+1. **Stay on Postgres.** It is already shared, already survives restarts, has
+   no command quota, and the timer fix removed 90% of the reads.
+2. **Render Key Value at $10/mo (Starter)** when Redis is actually needed —
+   paid instances get disk-backed persistence, and there is no command cap.
+3. **Aiven free (1 GB)** if the cost matters more than the extra latency of
+   leaving Render's network.
+4. **Upstash free** only for a low-traffic launch, knowing it dies around
+   50 games a day.
 
-```
-redis://red-xxxxxxxxxxxxxxxxxxxx:6379
-```
-
-Use the *internal* URL — it stays inside Render's network and is not billed
-as bandwidth.
-
-6. Web service → **Environment** → add:
-
-| Key | Value |
-|---|---|
-| `REDIS_URL` | the internal URL |
-
-7. Save. Render restarts.
-
-#### Confirm it actually took
-
-```
-Redis connected
-Socket.IO Redis adapter attached
-```
-
-If instead you see either of these, Redis is **not** in use:
-
-```
-Shared state store: Postgres (no Redis configured)
-Redis connection failed; trying Postgres instead
-```
-
-The fallback is deliberate — a bad `REDIS_URL` degrades the server rather
-than taking it down — which is exactly why the log has to be read rather than
-assumed.
+Redis Cloud's 30 MB free tier is fine on memory but capped at 100 ops/sec,
+which this app would hit at about 25 games a day — not worth it.
 
 #### Is it needed yet?
 
@@ -221,11 +198,16 @@ before the pooler.
 
 ### Order
 
-The pooler is done. Redis is optional today and mandatory before a second
-instance. If adding it now, prefer **Render Key Value** over a free Upstash
-database: the constraint this app hits is commands, not memory, and Upstash's
-free 500K/month is exhausted at roughly 50 games a day while Render's plan
-does not meter commands at all.
+The pooler is done. **Redis is not the next thing to do** — Postgres already
+gives shared, restart-surviving state with no command quota, and the timer
+fix removed 90% of the load.
+
+Redis becomes mandatory only when a second instance is added, because the
+Socket.IO adapter attaches only when `REDIS_URL` is set. At that point pay
+the $10/mo for a Render Key Value Starter instance rather than using a free
+one: every free option here fails on something this app cares about —
+Upstash on commands, Render's free tier on losing all data at restart, Redis
+Cloud on a 100 ops/sec cap.
 
 ## Realistic capacity
 
