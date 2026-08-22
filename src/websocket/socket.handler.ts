@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { AuthenticatedSocket } from './socket.types';
 import { authenticateSocket, removeSocketSession } from './socket.auth';
 import { initializeMatchmakingHandlers } from '../matchmaking/matchmaking.handler';
+import matchmakingService from '../matchmaking/matchmaking.service';
 import { initializeRoomHandlers } from '../rooms/room.handler';
 import { initializeGameHandlers } from '../gameplay/game.handler';
 import { initializeVoiceHandlers } from '../voice/voice.handler';
@@ -290,6 +291,24 @@ export const initializeSocketHandlers = (io: Server): void => {
           //
           // A match in progress is deliberately left alone: game.handler owns
           // that lifecycle and supports reconnecting into a running game.
+          // Drop them from the matchmaking queue too.
+          //
+          // Nothing did this, so a player who closed the app while searching
+          // stayed queued. The queue is only processed when somebody else
+          // joins it, and the next arrival was then paired with a socket that
+          // no longer exists: both were removed from the queue, a room and a
+          // match were created, and the live player got a "match found" for a
+          // game whose opponent could never appear. Reproduced in a test
+          // before this fix.
+          try {
+            await matchmakingService.leaveQueue(socket.userId);
+          } catch (error) {
+            logger.error('Failed to leave the queue on disconnect', {
+              userId: socket.userId,
+              error,
+            });
+          }
+
           try {
             const inMatch = await redisClient.get(`match:player:${socket.userId}`);
             if (!inMatch) {
