@@ -360,6 +360,12 @@ export class AuthService {
         data: { username, usernameSet: true },
       });
 
+      // The match-state layer caches names for five minutes; drop this one so
+      // the new name shows up at the table immediately rather than after the
+      // TTL expires.
+      const { invalidateNameCache } = await import('../gameplay/game.state');
+      invalidateNameCache(userId);
+
       logger.info('Username chosen', { userId, username });
       return { username: updated.username, uid: updated.uid };
     } catch (error: any) {

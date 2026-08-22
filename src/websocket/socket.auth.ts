@@ -101,11 +101,14 @@ export const removeSocketSession = async (
 
   await redisClient.del(`session:${socket.id}`);
 
+  // Counted from the user's own room, which Socket.IO already indexes,
+  // rather than walking every socket on the server on each disconnect.
   let remainingSockets = 0;
-  if (io && io.sockets && io.sockets.sockets) {
-    for (const [, s] of io.sockets.sockets) {
-      if ((s as any).userId === socket.userId && s.id !== socket.id) {
-        remainingSockets++;
+  if (io?.sockets?.adapter) {
+    const room = io.sockets.adapter.rooms.get(`user:${socket.userId}`);
+    if (room) {
+      for (const id of room) {
+        if (id !== socket.id) remainingSockets++;
       }
     }
   }

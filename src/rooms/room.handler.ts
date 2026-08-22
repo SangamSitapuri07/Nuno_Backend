@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../websocket/socket.types';
 import roomService from './room.service';
 import friendsService from '../friends/friends.service';
+import { getLocalSocket } from '../websocket/socket.session';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { CreateRoomInput, JoinRoomInput, RoomStatus } from './room.types';
 import logger from '../utils/logger';
@@ -286,15 +287,14 @@ const startCountdown = (io: Server, roomId: string): void => {
       }
 
       for (const playerId of playerIds) {
-        for (const [socketId, sock] of io.sockets.sockets) {
-          const s = sock as any;
-          if (s.userId === playerId) {
-            s.matchId = matchId;
-            const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
-            io.to(socketId).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
-            break;
-          }
-        }
+        // O(1) via the personal room rather than walking every socket on the
+        // server once per player.
+        const sock = getLocalSocket(io, playerId);
+        if (sock) sock.matchId = matchId;
+
+        const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
+        io.to(`user:${playerId}`).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
+
         await friendsService.broadcastUserStatus(io, playerId);
       }
       return;
@@ -308,10 +308,5 @@ const startCountdown = (io: Server, roomId: string): void => {
 
 /// Local lookup only. Prefer `io.to(`user:${id}`).emit(...)` for anything
 /// that must reach a player regardless of which instance serves them.
-const findSocketByUserId = (io: Server, userId: string): any => {
-  for (const [, socket] of io.sockets.sockets) {
-    const s = socket as AuthenticatedSocket;
-    if (s.userId === userId) return s;
-  }
-  return null;
-};
+const findSocketByUserId = (io: Server, userId: string): any =>
+  getLocalSocket(io, userId);

@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../websocket/socket.types';
 import matchmakingService from './matchmaking.service';
 import friendsService from '../friends/friends.service';
+import { getLocalSocket } from '../websocket/socket.session';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { GameMode, QueueJoinInput } from './matchmaking.types';
 import logger from '../utils/logger';
@@ -199,16 +200,15 @@ const processAndNotify = async (io: Server): Promise<void> => {
 
           // Send initial state to each player with matchId set
           for (const playerId of playerIds) {
-            for (const [socketId, sock] of io.sockets.sockets) {
-              const s = sock as any;
-              if (s.userId === playerId) {
-                s.matchId = matchId;
-                const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
-                io.to(socketId).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
-                logger.info('Sent initial state', { userId: playerId, matchId });
-                break;
-              }
-            }
+            // O(1) via the personal room rather than walking every socket on
+            // the server once per player.
+            const sock = getLocalSocket(io, playerId);
+            if (sock) sock.matchId = matchId;
+
+            const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
+            io.to(`user:${playerId}`).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
+            logger.info('Sent initial state', { userId: playerId, matchId });
+
             await friendsService.broadcastUserStatus(io, playerId);
           }
         } catch (err) {

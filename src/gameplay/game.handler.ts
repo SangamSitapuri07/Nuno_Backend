@@ -6,6 +6,7 @@ import rematchService from './rematch.service';
 import roomService from '../rooms/room.service';
 import friendsService from '../friends/friends.service';
 import redisClient from '../config/redis';
+import { getLocalSocket } from '../websocket/socket.session';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { PlayCardInput, MatchStatus } from './game.types';
 import { generateId } from '../utils/generateId';
@@ -59,8 +60,23 @@ export const startMatchTimer = (io: Server, matchId: string): void => {
 
   logger.info('Started match timer', { matchId });
 
+  // When this match may next need attention, as a millisecond timestamp.
+  //
+  // The tick used to read the whole match state from the store every second
+  // purely to look at a clock, which is one network round trip per match per
+  // second - the single largest source of load in the server, and it scales
+  // with the number of tables rather than with anything players are doing.
+  //
+  // A turn is only actionable at two moments: 3s in (auto-draw when the hand
+  // has nothing playable) and 20s in (the turn expires). Between those there
+  // is nothing to decide, so the state is not fetched at all. Skipped ticks
+  // cost a comparison against a number held in this process.
+  let nextCheckAt = 0;
+
   const interval = setInterval(async () => {
     try {
+      if (Date.now() < nextCheckAt) return;
+
       const state = await gameEngine.getMatchState(matchId);
 
       if (!state || state.status !== MatchStatus.RUNNING) {
@@ -79,7 +95,20 @@ export const startMatchTimer = (io: Server, matchId: string): void => {
       // Auto-draw if timer expired OR if player has no playable cards (after brief pause)
       const shouldAutoDraw = elapsed >= 20 || (!hasPlayable && elapsed >= 3);
 
-      if (shouldAutoDraw) {
+      if (!shouldAutoDraw) {
+        // Nothing to do until the next threshold this turn can cross.
+        // Re-read a little early so a turn that started mid-tick is not
+        // acted on late.
+        const nextThreshold = elapsed < 3 ? 3 : 20;
+        const waitMs = Math.max(250, (nextThreshold - elapsed) * 1000 - 250);
+        nextCheckAt = Date.now() + waitMs;
+        return;
+      }
+
+      // Acting now, so the next turn is examined from scratch.
+      nextCheckAt = 0;
+
+      {
         const newState = await gameEngine.handleTimeout(matchId);
 
         if (newState) {
@@ -88,15 +117,13 @@ export const startMatchTimer = (io: Server, matchId: string): void => {
             remainingTime: 20,
           });
 
+          // Addressed by the player's own room rather than by scanning every
+          // socket on the server. The scan was O(all connected players) for
+          // each player at the table - quadratic in the worst case, and it
+          // only ever found sockets belonging to this instance.
           for (const playerId of newState.players) {
-            for (const [socketId, sock] of io.sockets.sockets) {
-              const s = sock as any;
-              if (s.userId === playerId) {
-                const playerState = await gameStateManager.getPlayerStateWithNames(playerId, newState);
-                io.to(socketId).emit(SOCKET_EVENTS.GAME_SYNC_STATE, playerState);
-                break;
-              }
-            }
+            const playerState = await gameStateManager.getPlayerStateWithNames(playerId, newState);
+            io.to(`user:${playerId}`).emit(SOCKET_EVENTS.GAME_SYNC_STATE, playerState);
           }
 
           logger.info('Auto-draw triggered', {
@@ -544,9 +571,6 @@ const getPlayerSocketId = async (
   io: Server,
   userId: string
 ): Promise<string | null> => {
-  for (const [socketId, socket] of io.sockets.sockets) {
-    const s = socket as AuthenticatedSocket;
-    if (s.userId === userId) return socketId;
-  }
-  return null;
+  const socket = getLocalSocket(io, userId);
+  return socket ? socket.id : null;
 };
