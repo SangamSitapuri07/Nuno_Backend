@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -8,15 +9,16 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/game_assets.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../data/models/game_state.dart';
-import '../game_providers.dart';
 
 /// Screen 12 — Game Over. Crowned winner on top, final standings below,
-/// PLAY AGAIN (gold) and LOBBY (blue) actions.
-class GameOverScreen extends ConsumerWidget {
+/// The winner, the final standings, and a countdown back to the lobby.
+/// How long the results stay up before the player is returned automatically.
+const int autoReturnSeconds = 10;
+
+class GameOverScreen extends StatelessWidget {
   final GameResultPayload result;
   final GameState? game;
   final String? myId;
-  final VoidCallback onPlayAgain;
   final VoidCallback onLobby;
 
   const GameOverScreen({
@@ -24,7 +26,6 @@ class GameOverScreen extends ConsumerWidget {
     required this.result,
     required this.game,
     required this.myId,
-    required this.onPlayAgain,
     required this.onLobby,
   });
 
@@ -33,7 +34,6 @@ class GameOverScreen extends ConsumerWidget {
     required GameResultPayload result,
     required GameState? game,
     required String? myId,
-    required VoidCallback onPlayAgain,
     required VoidCallback onLobby,
   }) =>
       showDialog(
@@ -43,13 +43,12 @@ class GameOverScreen extends ConsumerWidget {
           result: result,
           game: game,
           myId: myId,
-          onPlayAgain: onPlayAgain,
           onLobby: onLobby,
         ),
       );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final winnerId = result.winner;
     final winnerName =
         winnerId == null ? 'Nobody' : (game?.playerInfo(winnerId).username ?? 'Player');
@@ -129,89 +128,15 @@ class GameOverScreen extends ConsumerWidget {
 
                       const SizedBox(height: AppDimens.md),
 
-                      // ── Play again vote ──────────────────
+                      // ── Return to the lobby ──────────────
                       //
-                      // The dialog stays open after voting. It used to pop
-                      // immediately, which left the player staring at an
-                      // empty table with no idea whether anyone else had
-                      // agreed - and the server needs every player to accept
-                      // before it can start the next match.
-                      Builder(
-                        builder: (context) {
-                          final ui = ref.watch(gameControllerProvider);
-                          final everyone = game?.players ?? const <String>[];
-                          final accepted = ui.rematchAcceptedBy;
-                          final declined = ui.rematchDeclinedBy;
-
-                          final iVoted =
-                              myId != null && accepted.contains(myId);
-                          final someoneLeft = declined.isNotEmpty;
-
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (someoneLeft)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: AppDimens.sm,
-                                  ),
-                                  child: Text(
-                                    'Someone left - a rematch is off.',
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.danger,
-                                    ),
-                                  ),
-                                )
-                              else if (iVoted && everyone.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: AppDimens.sm,
-                                  ),
-                                  child: Text(
-                                    'Waiting for the others... '
-                                    '${accepted.length}/${everyone.length} '
-                                    'ready',
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.gold,
-                                    ),
-                                  ),
-                                ),
-
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: AppButton(
-                                      label: iVoted
-                                          ? 'WAITING...'
-                                          : 'PLAY AGAIN',
-                                      size: AppButtonSize.small,
-                                      variant: AppButtonVariant.gold,
-                                      // Disabled once voted, so the same
-                                      // player cannot be counted twice, and
-                                      // once a rematch is impossible.
-                                      onPressed: (iVoted || someoneLeft)
-                                          ? null
-                                          : onPlayAgain,
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppDimens.sm),
-                                  Expanded(
-                                    child: AppButton(
-                                      label: 'LOBBY',
-                                      size: AppButtonSize.small,
-                                      variant: AppButtonVariant.blue,
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        onLobby();
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                      // PLAY AGAIN is gone. It needed every player at the
+                      // table to vote before anything happened, so one
+                      // person closing their app left the rest staring at
+                      // "waiting for the others" until they gave up - and
+                      // the countdown below now moves everyone on anyway,
+                      // which the vote would only have fought with.
+                      _AutoReturn(seconds: autoReturnSeconds, onLeave: onLobby),
                     ],
                   ),
                 ),
@@ -310,6 +235,75 @@ class _StandingRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Counts down and then leaves, with a button to go immediately.
+///
+/// Sitting on a finished table is the state players get stuck in, so leaving
+/// is the default rather than something they have to choose. The countdown is
+/// visible so it does not feel like the app moved on its own.
+class _AutoReturn extends StatefulWidget {
+  final int seconds;
+  final VoidCallback onLeave;
+
+  const _AutoReturn({required this.seconds, required this.onLeave});
+
+  @override
+  State<_AutoReturn> createState() => _AutoReturnState();
+}
+
+class _AutoReturnState extends State<_AutoReturn> {
+  late int _left = widget.seconds;
+  Timer? _timer;
+  bool _leaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _left--);
+      if (_left <= 0) _leave();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  /// Guarded: the timer and the button must not both fire the exit.
+  void _leave() {
+    if (_leaving) return;
+    _leaving = true;
+    _timer?.cancel();
+    Navigator.of(context).pop();
+    widget.onLeave();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Returning to the lobby in $_left...',
+          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
+        ),
+        const SizedBox(height: AppDimens.sm),
+        SizedBox(
+          width: 200,
+          child: AppButton(
+            label: 'BACK TO LOBBY',
+            size: AppButtonSize.small,
+            variant: AppButtonVariant.blue,
+            onPressed: _leave,
+          ),
+        ),
+      ],
     );
   }
 }

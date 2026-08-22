@@ -177,24 +177,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       result: result,
       game: ref.read(gameControllerProvider).game,
       myId: myId,
-      // A vote, not a navigation. The dialog stays up and shows the tally;
-      // it is dismissed from the listener below when the server actually
-      // starts the next match, or when this player bails to the lobby.
-      onPlayAgain: () =>
-          ref.read(gameControllerProvider.notifier).requestRematch(),
+      // Called by the countdown and by the button; the dialog is already
+      // popped by the time this runs.
       onLobby: () {
-        // Tell the table before leaving. Without this the others sit on
-        // "waiting for the others" forever, because the server needs every
-        // player to accept and this one never will.
-        ref.read(gameControllerProvider.notifier).declineRematch();
-        // And actually leave the room. The server used to evict everyone the
-        // moment a match ended, which is what broke the rematch; now that it
-        // keeps the room, going back to the menu has to say so or this player
-        // stays listed and keeps blocking the others' vote.
+        // The server drops everyone from the room when a match ends, but say
+        // so anyway: this also covers leaving before that has been processed,
+        // and it is harmless when the room is already gone.
         ref.read(socketServiceProvider).emit(SocketEvents.roomLeave);
         ref.read(gameControllerProvider.notifier).reset();
         ref.read(authControllerProvider.notifier).refreshProfile();
-        context.go(AppRoutes.home);
+        if (context.mounted) context.go(AppRoutes.home);
       },
     );
   }
@@ -215,19 +207,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         _showResult(next.result!, myId);
       }
 
-      // The rematch started - stated outright, not inferred.
-      //
-      // This used to test "the result went away and we are syncing", which
-      // is also true when the player leaves for the lobby and on some
-      // reconnects, so the dialog was dismissed on the wrong events and
-      // occasionally left up on the right one. The controller now bumps a
-      // counter when the server actually starts a rematch.
-      if (next.rematchEpoch != (prev?.rematchEpoch ?? 0)) {
-        if (_resultShown) {
-          _resultShown = false;
-          Navigator.of(context, rootNavigator: true).maybePop();
-        }
-      }
       if (next.error != null && next.error != prev?.error) {
         AppSnack.error(context, next.error!);
         controller.clearError();

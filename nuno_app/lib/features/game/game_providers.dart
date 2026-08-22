@@ -60,14 +60,6 @@ class GameUiState {
   /// Players who have said no, or left. A rematch can no longer happen.
   final Set<String> rematchDeclinedBy;
 
-  /// Bumped each time the server actually starts a rematch.
-  ///
-  /// The screen used to infer this from "the result vanished and we are
-  /// syncing", which is also true when the player walks out to the lobby and
-  /// on some reconnects - so the dialog was dismissed on the wrong events and
-  /// left up on the right one. A counter says exactly what happened.
-  final int rematchEpoch;
-
   const GameUiState({
     this.game,
     this.turnSecondsLeft = AppConfig.turnTimerSeconds,
@@ -81,7 +73,6 @@ class GameUiState {
     this.penaltyDraw,
     this.rematchAcceptedBy = const {},
     this.rematchDeclinedBy = const {},
-    this.rematchEpoch = 0,
   });
 
   GameUiState copyWith({
@@ -97,7 +88,6 @@ class GameUiState {
     int? penaltyDraw,
     Set<String>? rematchAcceptedBy,
     Set<String>? rematchDeclinedBy,
-    int? rematchEpoch,
     bool clearError = false,
     bool clearPending = false,
     bool clearResult = false,
@@ -116,7 +106,6 @@ class GameUiState {
         penaltyDraw: clearPenalty ? null : (penaltyDraw ?? this.penaltyDraw),
         rematchAcceptedBy: rematchAcceptedBy ?? this.rematchAcceptedBy,
         rematchDeclinedBy: rematchDeclinedBy ?? this.rematchDeclinedBy,
-        rematchEpoch: rematchEpoch ?? this.rematchEpoch,
       );
 
   bool get isFinished => result != null || (game?.isFinished ?? false);
@@ -193,7 +182,6 @@ class GameController extends StateNotifier<GameUiState> {
         clearResult: true,
         rematchAcceptedBy: const {},
         rematchDeclinedBy: const {},
-        rematchEpoch: state.rematchEpoch + 1,
       );
       requestSync();
     });
@@ -378,13 +366,6 @@ class GameController extends StateNotifier<GameUiState> {
   void sendEmote(String key) =>
       _socket.emit(SocketEvents.emoteSend, {'emote': key});
 
-  /// Votes to play again.
-  ///
-  /// Sends `rematch.accept`, not `rematch.request`: on the server both record
-  /// the vote, but only accept runs the "has everyone agreed" check that
-  /// starts the next match. Emitting request alone meant the last player to
-  /// press the button never triggered anything.
-  void requestRematch() => _socket.emit(SocketEvents.rematchAccept);
 
   void acceptRematch() => _socket.emit(SocketEvents.rematchAccept);
 

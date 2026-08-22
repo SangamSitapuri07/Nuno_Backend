@@ -32,23 +32,47 @@ const releaseRoomAfterMatch = async (
 ): Promise<void> => {
   try {
     const redis = (await import('../config/redis')).default;
+    const roomService = (await import('../rooms/room.service')).default;
+
+    // Everyone leaves the room when the match ends.
+    //
+    // Only `match:player:` used to be cleared, so `player:room:` outlived the
+    // game and friends saw "In Lobby" for someone sitting idle on the results
+    // screen. Worse, the stale key made the next Create Room or Join Room
+    // fail with ALREADY_IN_ROOM until its hour-long TTL expired.
+    //
+    // Emptying the room destroys it, which is correct: the table is finished
+    // and a rematch now re-forms one rather than reusing this.
     for (const playerId of playerIds) {
       await redis.del(`match:player:${playerId}`);
     }
 
-    const roomService = (await import('../rooms/room.service')).default;
     const room = await roomService.getRoom(roomId);
-    if (!room) return;
 
-    room.status = 'WAITING' as any;
-    // Readiness is per-match. Leaving it set meant a rematch could start the
-    // moment the room reopened, before anybody had agreed to one.
-    for (const player of room.players) {
-      player.isReady = false;
+    for (const playerId of playerIds) {
+      try {
+        await roomService.leaveRoom(playerId);
+      } catch (error) {
+        logger.error('Failed to remove a player from the finished room', {
+          userId: playerId,
+          roomId,
+          error,
+        });
+      }
     }
-    await (roomService as any).saveRoom(room);
 
-    io.to(roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+    // Tell anyone still listening that the table has broken up, using the
+    // pre-departure snapshot so the payload is not empty.
+    if (room) {
+      room.status = 'WAITING' as any;
+      for (const player of room.players) player.isReady = false;
+      io.to(roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, { room });
+    }
+
+    // Friends should see them as available again, not stuck in a lobby.
+    for (const playerId of playerIds) {
+      await friendsService.broadcastUserStatus(io, playerId);
+    }
   } catch (error) {
     logger.error('Failed to release the room after a match', { error, roomId });
   }
