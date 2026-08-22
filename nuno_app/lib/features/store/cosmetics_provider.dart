@@ -12,10 +12,11 @@ import '../auth/auth_controller.dart';
 ///
 /// Keyed on the signed-in user: without that, signing out and back in as
 /// somebody else would leave the previous player's cosmetics on the table.
-final inventoryProvider = syncedWithAccount(FutureProvider<Inventory>((ref) {
+final inventoryProvider = FutureProvider<Inventory>((ref) {
+  watchAccount(ref);
   ref.watch(currentUserIdProvider);
   return ref.watch(storeRepositoryProvider).getInventory();
-}));
+});
 
 /// Which cosmetics are actually in use, resolved to concrete asset paths.
 ///

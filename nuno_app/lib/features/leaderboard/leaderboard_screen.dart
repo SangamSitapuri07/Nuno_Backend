@@ -20,12 +20,16 @@ import '../auth/auth_controller.dart';
 import '../home/home_providers.dart';
 
 final globalLeaderboardProvider =
-    syncedWithAccount(FutureProvider<List<LeaderboardEntry>>(
-        (ref) => ref.watch(leaderboardRepositoryProvider).getGlobal()));
+    FutureProvider<List<LeaderboardEntry>>((ref) {
+  watchAccount(ref);
+  return ref.watch(leaderboardRepositoryProvider).getGlobal();
+});
 
 final friendsLeaderboardProvider =
-    syncedWithAccount(FutureProvider<List<LeaderboardEntry>>(
-        (ref) => ref.watch(leaderboardRepositoryProvider).getFriends()));
+    FutureProvider<List<LeaderboardEntry>>((ref) {
+  watchAccount(ref);
+  return ref.watch(leaderboardRepositoryProvider).getFriends();
+});
 
 /// Global / friends rankings with a podium for the top three.
 class LeaderboardScreen extends ConsumerStatefulWidget {

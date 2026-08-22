@@ -21,11 +21,11 @@ import '../auth/auth_controller.dart';
 /// success whatever the server did with it. `GET /rewards/daily` now returns
 /// the real track, the real streak, and whether today has already been
 /// claimed, so what is drawn is what will actually be paid.
-final dailyStatusProvider =
-    syncedWithAccount(FutureProvider<DailyStatus>((ref) {
+final dailyStatusProvider = FutureProvider<DailyStatus>((ref) {
+  watchAccount(ref);
   ref.watch(currentUserIdProvider);
   return ref.watch(storeRepositoryProvider).getDailyStatus();
-}));
+});
 
 class DailyRewardsScreen extends ConsumerStatefulWidget {
   const DailyRewardsScreen({super.key});

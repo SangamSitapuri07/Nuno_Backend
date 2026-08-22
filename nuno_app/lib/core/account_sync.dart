@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Coins, rating, tier and level are read by five different screens through
 /// four different providers:
 ///
-///   * the home header      -> authControllerProvider.profile.coins
-///   * the store header     -> inventoryProvider.coins
-///   * the profile card     -> authControllerProvider.profile
+///   * the home header      -> the cached profile
+///   * the store header     -> inventoryProvider
+///   * the profile card     -> the cached profile
 ///   * the rank header      -> myRankProvider
 ///   * the rank rows        -> global/friendsLeaderboardProvider
 ///
@@ -19,46 +19,60 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 750 while the store said 540, and why the rank header disagreed with the
 /// row for the same player.
 ///
-/// Bumping this counter invalidates the lot together. Anything that changes
-/// money or rating - a purchase, a daily claim, the end of a match - calls
-/// [AccountSync.refresh] and every screen re-reads from the server.
+/// ## Why a counter, and not `ref.invalidate`
+///
+/// The first version of this held a list of providers and had the auth
+/// controller invalidate them all. That deadlocks Riverpod with a circular
+/// dependency, and it is worth spelling out why, because the shape is easy
+/// to recreate:
+///
+///   * `inventoryProvider` reads `currentUserIdProvider`, which reads
+///     `authControllerProvider` - so inventory DEPENDS ON auth.
+///   * the auth controller then called `ref.invalidate(inventoryProvider)`,
+///     which makes Riverpod record auth as DEPENDING ON inventory.
+///
+/// Both directions at once is a cycle, and Riverpod throws
+/// "Instance of CircularDependencyError" the moment anything touches it -
+/// which is every button in the app, because buying, claiming and finishing
+/// a match all refresh the profile.
+///
+/// Depending on a counter inverts the arrows. Nothing account-scoped is
+/// named here; each cache reads [accountRevisionProvider] itself, so every
+/// edge points from the cache TO the counter and the graph stays acyclic.
+/// Bumping it re-runs them all.
 final accountRevisionProvider = StateProvider<int>((ref) => 0);
 
-/// Providers that must be re-fetched when the account changes.
+/// Marks the surrounding provider as account-scoped: it re-runs whenever
+/// [AccountSync.refresh] is called.
 ///
-/// Registered rather than imported so this file stays free of feature
-/// imports and cannot create an import cycle: each feature adds its own
-/// provider at declaration time.
-final _dependents = <ProviderOrFamily>[];
-
-/// Registers [provider] to be invalidated on the next [AccountSync.refresh].
+/// Call this first inside the provider body:
 ///
-/// Call once, at declaration. Returns [provider] so it can be used inline.
-T syncedWithAccount<T extends ProviderOrFamily>(T provider) {
-  if (!_dependents.contains(provider)) _dependents.add(provider);
-  return provider;
+/// ```dart
+/// final inventoryProvider = FutureProvider<Inventory>((ref) {
+///   watchAccount(ref);
+///   return ref.watch(storeRepositoryProvider).getInventory();
+/// });
+/// ```
+///
+/// Deliberately a `watch` on a counter rather than a registration list. A
+/// provider that forgets to call this simply keeps its old value, which is
+/// visible in the UI; a provider that registers itself with a central
+/// invalidator creates the cycle described above, which is not.
+void watchAccount(Ref ref) {
+  ref.watch(accountRevisionProvider);
 }
 
 abstract final class AccountSync {
-  /// Invalidates every account-scoped cache.
+  /// Re-reads every account-scoped cache from the server.
   ///
-  /// Callers do not await this: the providers refetch themselves and the
-  /// widgets rebuild when they land.
+  /// Safe to call from a provider, a notifier or a widget: it only ever
+  /// touches the counter, which depends on nothing.
   static void refresh(Ref ref) {
-    for (final p in _dependents) {
-      ref.invalidate(p);
-    }
     ref.read(accountRevisionProvider.notifier).state++;
   }
 
   /// Same, from a widget.
   static void refreshFrom(WidgetRef ref) {
-    for (final p in _dependents) {
-      ref.invalidate(p);
-    }
     ref.read(accountRevisionProvider.notifier).state++;
   }
-
-  /// Visible for testing: how many providers are wired up.
-  static int get registeredCount => _dependents.length;
 }

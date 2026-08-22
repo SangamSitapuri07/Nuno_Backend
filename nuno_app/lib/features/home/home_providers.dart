@@ -178,17 +178,22 @@ final onlineFriendsProvider = Provider<List<Friend>>((ref) {
 });
 
 /// GET /api/v1/statistics
-final statisticsProvider = syncedWithAccount(FutureProvider<PlayerStats>(
-    (ref) => ref.watch(userRepositoryProvider).getStatistics()));
+final statisticsProvider = FutureProvider<PlayerStats>((ref) {
+  watchAccount(ref);
+  return ref.watch(userRepositoryProvider).getStatistics();
+});
 
 /// GET /api/v1/history
-final matchHistoryProvider =
-    syncedWithAccount(FutureProvider<List<MatchHistoryEntry>>(
-        (ref) => ref.watch(userRepositoryProvider).getMatchHistory()));
+final matchHistoryProvider = FutureProvider<List<MatchHistoryEntry>>((ref) {
+  watchAccount(ref);
+  return ref.watch(userRepositoryProvider).getMatchHistory();
+});
 
 /// GET /api/v1/leaderboard/rank
-final myRankProvider = syncedWithAccount(FutureProvider<PlayerRank?>(
-    (ref) => ref.watch(leaderboardRepositoryProvider).getMyRank()));
+final myRankProvider = FutureProvider<PlayerRank?>((ref) {
+  watchAccount(ref);
+  return ref.watch(leaderboardRepositoryProvider).getMyRank();
+});
 
 /// Keeps the socket connected for as long as the user is authenticated.
 ///
