@@ -60,6 +60,14 @@ class GameUiState {
   /// Players who have said no, or left. A rematch can no longer happen.
   final Set<String> rematchDeclinedBy;
 
+  /// Bumped each time the server actually starts a rematch.
+  ///
+  /// The screen used to infer this from "the result vanished and we are
+  /// syncing", which is also true when the player walks out to the lobby and
+  /// on some reconnects - so the dialog was dismissed on the wrong events and
+  /// left up on the right one. A counter says exactly what happened.
+  final int rematchEpoch;
+
   const GameUiState({
     this.game,
     this.turnSecondsLeft = AppConfig.turnTimerSeconds,
@@ -73,6 +81,7 @@ class GameUiState {
     this.penaltyDraw,
     this.rematchAcceptedBy = const {},
     this.rematchDeclinedBy = const {},
+    this.rematchEpoch = 0,
   });
 
   GameUiState copyWith({
@@ -88,6 +97,7 @@ class GameUiState {
     int? penaltyDraw,
     Set<String>? rematchAcceptedBy,
     Set<String>? rematchDeclinedBy,
+    int? rematchEpoch,
     bool clearError = false,
     bool clearPending = false,
     bool clearResult = false,
@@ -106,6 +116,7 @@ class GameUiState {
         penaltyDraw: clearPenalty ? null : (penaltyDraw ?? this.penaltyDraw),
         rematchAcceptedBy: rematchAcceptedBy ?? this.rematchAcceptedBy,
         rematchDeclinedBy: rematchDeclinedBy ?? this.rematchDeclinedBy,
+        rematchEpoch: rematchEpoch ?? this.rematchEpoch,
       );
 
   bool get isFinished => result != null || (game?.isFinished ?? false);
@@ -167,7 +178,23 @@ class GameController extends StateNotifier<GameUiState> {
     });
 
     sub(SocketEvents.rematchStarted, (_) {
-      state = const GameUiState(isSyncing: true);
+      // Keep the old board until the new one arrives.
+      //
+      // This used to assign a blank GameUiState, which wiped `game` as well
+      // as the result. The results dialog reads the player list off `game`
+      // to size its tally, so for the frames between this event and the new
+      // hand landing it had nobody to count - and if the fresh state was
+      // slow, the screen sat empty. Clearing the result and the votes is
+      // enough; the board is replaced wholesale when game.initialState
+      // arrives a moment later.
+      _turnTimer?.cancel();
+      state = state.copyWith(
+        isSyncing: true,
+        clearResult: true,
+        rematchAcceptedBy: const {},
+        rematchDeclinedBy: const {},
+        rematchEpoch: state.rematchEpoch + 1,
+      );
       requestSync();
     });
 

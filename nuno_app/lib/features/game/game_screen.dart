@@ -215,13 +215,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         _showResult(next.result!, myId);
       }
 
-      // The rematch started.
+      // The rematch started - stated outright, not inferred.
       //
-      // rematch.started resets the controller to a syncing state, so the
-      // result disappears AND isSyncing goes true with the screen still
-      // mounted. Leaving for the lobby clears the result too, which is why
-      // the sync flag is part of the test rather than the result alone.
-      if (prev?.result != null && next.result == null && next.isSyncing) {
+      // This used to test "the result went away and we are syncing", which
+      // is also true when the player leaves for the lobby and on some
+      // reconnects, so the dialog was dismissed on the wrong events and
+      // occasionally left up on the right one. The controller now bumps a
+      // counter when the server actually starts a rematch.
+      if (next.rematchEpoch != (prev?.rematchEpoch ?? 0)) {
         if (_resultShown) {
           _resultShown = false;
           Navigator.of(context, rootNavigator: true).maybePop();

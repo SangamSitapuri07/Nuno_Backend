@@ -5,6 +5,7 @@ import gameStateManager from './game.state';
 import rematchService from './rematch.service';
 import roomService from '../rooms/room.service';
 import friendsService from '../friends/friends.service';
+import redisClient from '../config/redis';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { PlayCardInput, MatchStatus } from './game.types';
 import { generateId } from '../utils/generateId';
@@ -420,21 +421,42 @@ export const initializeGameHandlers = (
 
       startMatchTimer(io, newMatchId);
 
+      // Re-point every socket at the new match BEFORE telling anyone it
+      // started.
+      //
+      // The client reacts to rematch.started by clearing its state and
+      // asking for a sync. That request used to arrive while this loop was
+      // still awaiting getPlayerSocketId, so socket.matchId was unset and
+      // match:player had been deleted when the previous match ended - the
+      // sync handler found nothing, returned silently, and the player sat on
+      // a syncing screen that never resolved. Doing the bookkeeping first
+      // means a sync arriving at any point after the announcement is
+      // answerable.
+      const sockets = new Map<string, string>();
+      for (const playerId of playerIds) {
+        const playerSocketId = await getPlayerSocketId(io, playerId);
+        if (!playerSocketId) continue;
+
+        sockets.set(playerId, playerSocketId);
+
+        const playerSocket = io.sockets.sockets.get(playerSocketId);
+        if (playerSocket) {
+          (playerSocket as any).matchId = newMatchId;
+          (playerSocket as any).roomId = roomId;
+        }
+
+        // Also the shared key, so a sync from a socket this instance does
+        // not own can still resolve the match.
+        await redisClient.set(`match:player:${playerId}`, newMatchId);
+      }
+
       io.to(roomId).emit(SOCKET_EVENTS.REMATCH_STARTED, {
         matchId: newMatchId,
       });
 
-      for (const playerId of playerIds) {
-        const playerSocketId = await getPlayerSocketId(io, playerId);
-        if (playerSocketId) {
-          const playerSocket = io.sockets.sockets.get(playerSocketId);
-          if (playerSocket) {
-            (playerSocket as any).matchId = newMatchId;
-            (playerSocket as any).roomId = roomId;
-          }
-          const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
-          io.to(playerSocketId).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
-        }
+      for (const [playerId, playerSocketId] of sockets) {
+        const playerState = await gameStateManager.getPlayerStateWithNames(playerId, gameState);
+        io.to(playerSocketId).emit(SOCKET_EVENTS.GAME_INITIAL_STATE, playerState);
       }
     } catch (error) {
       logger.error('Rematch accept error', { error });
