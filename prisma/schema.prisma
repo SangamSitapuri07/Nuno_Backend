@@ -10,11 +10,15 @@ datasource db {
   //
   // Once DATABASE_URL points at Neon's -pooler endpoint, `prisma migrate
   // deploy` can fail against it: the pooler multiplexes sessions, and
-  // migrations want a session they own. Declaring directUrl lets the app use
-  // the pooler while migrations use the direct host.
+  // migrations want a session they own. directUrl lets the app use the
+  // pooler while migrations use the direct host.
   //
-  // Optional. Prisma falls back to `url` when DIRECT_URL is unset, so
-  // nothing changes until the variable is actually provided.
+  // DIRECT_URL MUST BE SET. Prisma resolves env() at schema-validation time
+  // and reports P1012 "Environment variable not found" for a missing one -
+  // it does not quietly fall back to `url`. Since the Render start command
+  // is `prisma migrate deploy && npm start`, an unset DIRECT_URL would fail
+  // the deploy, not just the migration. Set it to the un-pooled string; when
+  // not using the pooler at all, set it to the same value as DATABASE_URL.
   directUrl = env("DIRECT_URL")
 }
 

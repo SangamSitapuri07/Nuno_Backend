@@ -108,58 +108,80 @@ rather than taking it down, which is why the log has to be read.
 
 ### 2. Neon connection pooling
 
-The direct endpoint gives each instance a small connection ceiling. Prisma
-opens a pool per instance, so the ceiling is reached sooner than expected.
-The pooler multiplexes and is what Neon recommends for hosts like Render.
+The direct endpoint gives each instance a small connection ceiling, and
+Prisma opens a pool per instance, so it is reached sooner than expected. The
+pooler multiplexes and is what Neon recommends for hosts like Render.
 
-**Step 1 - get the pooled string.**
-
-Neon console -> your project -> **Connection Details** -> enable **Connection
-pooling** (or pick the "Pooled connection" tab).
-
-The only difference is `-pooler` inserted into the host:
+**Set BOTH variables at once.** Your Render start command is
 
 ```
-# direct  (current)
-postgresql://user:pass@ep-rapid-union-azjk1rqk.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-
-# pooled  (want)
-postgresql://user:pass@ep-rapid-union-azjk1rqk-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+npx prisma migrate deploy && npm start
 ```
 
-You can also just add `-pooler` to the existing host yourself - the rest of
-the string, including the password, stays identical.
+so a migration runs on every deploy. `migrate deploy` needs a session it
+owns and can fail against the pooler, which would break the deploy rather
+than just the migration. Setting `DIRECT_URL` in the same pass avoids that
+entirely — the app uses the pooler, migrations use the direct host. The
+schema already declares `directUrl = env("DIRECT_URL")`.
 
-**Step 2 - update the variable.**
+**`DIRECT_URL` is required, not optional.** Prisma resolves `env()` during
+schema validation, so a missing variable is a hard error — P1012,
+"Environment variable not found" — and not a silent fall back to `url`.
+Setting only `DATABASE_URL` would fail the deploy at the migrate step. Both
+go in together.
 
-Web service -> **Environment** -> edit `DATABASE_URL` -> paste the pooled
-string -> Save.
+**Step 1 — copy your current value.**
 
-**Step 3 - confirm.**
+Render → web service → **Environment** → copy the existing `DATABASE_URL`
+somewhere. That is the direct string; you need it for `DIRECT_URL`.
+
+It looks like:
+
+```
+postgresql://neondb_owner:PASSWORD@ep-rapid-union-azjk1rqk.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+```
+
+**Step 2 — make the pooled version.**
+
+Insert `-pooler` immediately after the endpoint id, before the first dot.
+Nothing else changes — same user, same password, same database.
+
+```
+                    ...azjk1rqk-pooler.c-3.ap-southeast-1...
+                              ^^^^^^^
+```
+
+(You can also get it from the Neon console → your project → **Connection
+Details** → tick **Connection pooling**. Same string either way.)
+
+**Step 3 — set the two variables.**
+
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | the **pooled** string (host has `-pooler`) |
+| `DIRECT_URL` | the **direct** string (host has no `-pooler`) |
+
+Save. Render restarts the service.
+
+**Step 4 — confirm.**
+
+The deploy log should show the migration step succeed and then:
 
 ```
 Database connected successfully
 ```
 
-and the app behaves normally.
+If the migration step fails, `DIRECT_URL` is wrong or missing — check that
+its host does **not** contain `-pooler`.
 
-**If a deploy's migration step fails against the pooler**, that is the one
-known caveat: `prisma migrate deploy` wants a session it owns and the pooler
-multiplexes. The schema already declares `directUrl = env("DIRECT_URL")`, so
-the fix is one more variable - keep `DATABASE_URL` pooled for the app and add:
-
-| Key | Value |
-|---|---|
-| `DIRECT_URL` | the **un**pooled string (host without `-pooler`) |
-
-Leaving `DIRECT_URL` unset is safe: Prisma falls back to `url`, which is the
-behaviour before this change.
-
----
+**Rollback,** if anything looks off: set **both** variables to the original
+direct string. Do not delete `DIRECT_URL` - the schema references it, so
+removing it fails validation. Same value in both is exactly the behaviour
+before the pooler.
 
 ### Order
 
-Do the **pooler** — it is a one-variable change with no cost attached. Leave
+Do the **pooler** — a two-variable change with no cost attached. Leave
 Redis alone until a second instance is genuinely needed, or Neon starts to
 strain. The measurements above are why: memory was never the constraint, and
 a free Redis will hit a command quota long before it hits a memory limit.
