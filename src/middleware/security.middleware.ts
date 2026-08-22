@@ -37,9 +37,29 @@ const sanitizeObject = (obj: any): any => {
       .trim();
   }
 
+  // Arrays must stay arrays.
+  //
+  // The object branch below rebuilds its input as a plain {} literal, so an
+  // array arrived at the route as {"0": ..., "1": ...} and every
+  // Array.isArray check downstream failed. That silently turned a valid
+  // request body into a 400.
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+
+  // Only plain objects are rebuilt. Dates, Buffers and anything else with a
+  // prototype would otherwise be flattened into a bare object and lose both
+  // their type and their methods.
   if (typeof obj === 'object' && obj !== null) {
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== Object.prototype && proto !== null) return obj;
+
     const sanitized: any = {};
     for (const key of Object.keys(obj)) {
+      // Skip prototype-polluting keys rather than copying them across.
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
       sanitized[key] = sanitizeObject(obj[key]);
     }
     return sanitized;
