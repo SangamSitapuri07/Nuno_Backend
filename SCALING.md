@@ -36,75 +36,115 @@ saving an environment variable restarts the service on its own.
 
 ---
 
-### 1. Redis — optional, and probably not yet
+### 1. Redis — measured first, because a free tier died last time
 
-A free Redis was tried before and filled up during testing, so this section
-starts with the measurement rather than the recommendation.
+A free Redis was tried before and was exhausted during testing. Rather than
+recommend one again, here is what this app actually consumes.
 
-**How much memory this app actually needs.** Every key written during one
-live 4-player match, measured by instrumenting the store:
+**Memory.** Every key written by one live 4-player match:
 
 | Bytes | Key |
 |---|---|
 | 11,153 | `game:<matchId>` — the whole match state |
 | 1,119 | `room:<roomId>` |
-| 4 x 96 | `match:player:<userId>` |
-| 4 x 89 | `player:room:<userId>` |
-| 51 | `room:code:<code>` |
-| **13,063** | **total per table** |
+| ~740 | nine smaller keys |
+| **13,063** | **per table** |
 
-With Redis' per-key overhead that is about **13.7 KB per live table**:
+With per-key overhead that is ~13.7 KB per live table:
 
 | Tables | Players | Memory |
 |---|---|---|
-| 100 | 400 | 1.3 MB |
 | 500 | 2,000 | 6.7 MB |
 | 1,000 | 4,000 | 13.4 MB |
 
-A 25 MB free tier fits roughly 1,800 simultaneous tables. So **memory is not
-the thing that runs out** — if a free instance filled during testing, the
-cause was almost certainly one of:
+Against a 256 MB free tier that is nothing. **Memory was never the problem.**
 
-- **Keys with no expiry accumulating.** Exactly one existed: the rematch path
-  wrote `match:player:` without a TTL while the other three writers all used
-  an hour. Fixed, and `ttl.py` now fails the build if any `set` omits `EX`.
-- **A command or connection quota**, not a memory quota. Free Redis plans
-  often cap monthly commands. This app issues **2 commands per card played**;
-  a completed 4-player game is ~240 including timer reads. At 1,000 games a
-  day that is ~7.2M commands a month, which will exhaust a small free
-  allowance regardless of how little memory is used.
+**Commands.** This is what runs out. Measured per operation:
 
-**Recommendation: stay on Postgres for now.** The timer fix cut steady-state
-reads by 90%, which was the actual problem. Postgres has no command quota,
-it is already provisioned, and at a few hundred concurrent players it is
-comfortable. Add Redis when either of these is true:
+| Operation | Commands |
+|---|---|
+| Create a room | 4 |
+| Three players join | 15 |
+| Deal the match | 9 |
+| **One card play** | **2** |
+| Timer, per turn | ~2 |
 
-- more than one instance is needed (Redis is mandatory then — the Socket.IO
-  adapter attaches only when `REDIS_URL` is set, and without it players on
-  different instances cannot see each other), or
-- the Neon dashboard shows the database straining.
+A complete 4-player game — 60 plays — is **~268 commands**.
 
-**If and when Redis is added**, use a paid instance rather than a free one,
-put it in the **same region** as the web service, and set the maxmemory
-policy to **`noeviction`** — the default `allkeys-lru` silently discards keys
-under pressure, and these keys are live match state, so a game would vanish
-mid-hand. Then set:
+Against Upstash's free 500K commands/month:
+
+| Games/day | Commands/month | % of free tier |
+|---|---|---|
+| 10 | 80,400 | 16% — fits |
+| 25 | 201,000 | 40% — fits |
+| 50 | 402,000 | 80% — tight |
+| 100 | 804,000 | **161% — exceeds** |
+
+So a free tier is fine for testing and a small launch, and dies at roughly
+**50 games a day**. That is almost certainly what happened before: not
+memory, but the command allowance.
+
+#### Which provider
+
+| | Free tier | Runs out at | Notes |
+|---|---|---|---|
+| **Upstash** | 500K cmds/mo, 256 MB | ~50 games/day | Then $0.20 per 100K commands — ~$2/mo at 1.5M |
+| **Render Key Value** | 25 MB, no command cap | memory, ~1,800 tables | Same-region, no egress cost |
+
+**Render's own Key Value is the better fit here**, because the constraint
+this app hits is commands, and Render does not meter them. 25 MB holds far
+more tables than the traffic that would exhaust Upstash's command budget.
+
+#### Setting it up
+
+1. Render dashboard → **New +** → **Key Value**
+2. **Name:** `nuno-redis`
+3. **Region:** the *same region as the web service* — a different region adds
+   a network hop to every call and undoes the point of the change
+4. **Maxmemory policy:** `noeviction`. This matters: the default
+   `allkeys-lru` silently discards keys under pressure, and these keys are
+   live match state, so a game would vanish mid-hand
+5. Create it, open it, copy the **Internal Key Value URL**:
+
+```
+redis://red-xxxxxxxxxxxxxxxxxxxx:6379
+```
+
+Use the *internal* URL — it stays inside Render's network and is not billed
+as bandwidth.
+
+6. Web service → **Environment** → add:
 
 | Key | Value |
 |---|---|
-| `REDIS_URL` | the internal connection URL |
+| `REDIS_URL` | the internal URL |
 
-and confirm in the logs:
+7. Save. Render restarts.
+
+#### Confirm it actually took
 
 ```
 Redis connected
 Socket.IO Redis adapter attached
 ```
 
-If instead the logs say `Shared state store: Postgres (no Redis configured)`
-or `Redis connection failed; trying Postgres instead`, Redis is not being
-used — the fallback is deliberate, so a bad URL degrades the server quietly
-rather than taking it down, which is why the log has to be read.
+If instead you see either of these, Redis is **not** in use:
+
+```
+Shared state store: Postgres (no Redis configured)
+Redis connection failed; trying Postgres instead
+```
+
+The fallback is deliberate — a bad `REDIS_URL` degrades the server rather
+than taking it down — which is exactly why the log has to be read rather than
+assumed.
+
+#### Is it needed yet?
+
+No, not for correctness on one instance. Postgres already works and the timer
+fix removed 90% of the load. Redis becomes **mandatory** the moment a second
+instance is added: the Socket.IO adapter only attaches when `REDIS_URL` is
+set, and without it players on different instances cannot see each other.
 
 ### 2. Neon connection pooling
 
@@ -181,10 +221,11 @@ before the pooler.
 
 ### Order
 
-Do the **pooler** — a two-variable change with no cost attached. Leave
-Redis alone until a second instance is genuinely needed, or Neon starts to
-strain. The measurements above are why: memory was never the constraint, and
-a free Redis will hit a command quota long before it hits a memory limit.
+The pooler is done. Redis is optional today and mandatory before a second
+instance. If adding it now, prefer **Render Key Value** over a free Upstash
+database: the constraint this app hits is commands, not memory, and Upstash's
+free 500K/month is exhausted at roughly 50 games a day while Render's plan
+does not meter commands at all.
 
 ## Realistic capacity
 
