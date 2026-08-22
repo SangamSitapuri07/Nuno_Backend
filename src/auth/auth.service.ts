@@ -9,6 +9,24 @@ import { RegisterInput, LoginInput } from './auth.validation';
 import { verifyGoogleIdToken } from './google';
 import { allocateUid } from './uid';
 
+/** How long a player must wait between username changes. */
+export const USERNAME_CHANGE_COOLDOWN_DAYS = 30;
+
+/**
+ * When the next username change becomes available, or null if it already is.
+ *
+ * Exported so the profile editor and the setup screen cannot drift apart -
+ * there was already a second rename path with no limit at all on it.
+ */
+export const usernameChangeAvailableAt = (
+  lastChangedAt: Date | null | undefined
+): Date | null => {
+  if (!lastChangedAt) return null;
+  const next = new Date(lastChangedAt);
+  next.setDate(next.getDate() + USERNAME_CHANGE_COOLDOWN_DAYS);
+  return next;
+};
+
 export class AuthService {
 
   // ─────────────────────────────────────────
@@ -329,12 +347,25 @@ export class AuthService {
       throw { code: 'USER_NOT_FOUND', message: 'User not found.', status: 404 };
     }
 
+    // Renaming is allowed once every 30 days.
+    //
+    // The first choice is not a rename - it is the account picking a name it
+    // never had - so it is free. After that this is the single gate both the
+    // setup screen and the profile editor go through, which is why the check
+    // lives here rather than in either handler.
     if (user.usernameSet) {
-      throw {
-        code: 'USERNAME_ALREADY_SET',
-        message: 'Your username has already been chosen.',
-        status: 409,
-      };
+      const nextAllowed = usernameChangeAvailableAt(user.usernameChangedAt);
+
+      if (nextAllowed !== null && nextAllowed > new Date()) {
+        throw {
+          code: 'USERNAME_CHANGE_TOO_SOON',
+          message: `You can change your username again on ${nextAllowed
+            .toISOString()
+            .slice(0, 10)}.`,
+          status: 429,
+          availableAt: nextAllowed.toISOString(),
+        };
+      }
     }
 
     // Case-insensitive: 'Rahul' and 'rahul' must not be different players.
@@ -357,7 +388,13 @@ export class AuthService {
     try {
       const updated = await prisma.user.update({
         where: { id: userId },
-        data: { username, usernameSet: true },
+        data: {
+          username,
+          usernameSet: true,
+          // Only stamped when this REPLACES a chosen name. The first pick
+          // stays unstamped so a new player still has a change in hand.
+          ...(user.usernameSet ? { usernameChangedAt: new Date() } : {}),
+        },
       });
 
       // The match-state layer caches names for five minutes; drop this one so

@@ -52,6 +52,12 @@ model User {
   /// sends the player to the pick-a-username screen while this is false.
   usernameSet     Boolean       @default(false)
 
+  /// When the username was last changed, for the once-a-month rename limit.
+  ///
+  /// Null means never renamed since the account picked its first name, which
+  /// does not count as a rename - that is what `usernameSet` records.
+  usernameChangedAt DateTime?
+
   avatarUrl       String?
   level           Int           @default(1)
   xp              Int           @default(0)
