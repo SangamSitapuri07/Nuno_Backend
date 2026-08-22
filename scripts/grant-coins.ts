@@ -8,18 +8,61 @@
  * number printed on the profile screen, it is unique, and it does not change
  * when somebody renames themselves.
  *
- * Usage (from the backend directory, with DATABASE_URL set):
+ * Usage - run this from INSIDE the backend folder, the one that holds
+ * package.json. From the repository root it fails with
+ * "Cannot find module ./grant-coins.ts", because scripts/ lives under
+ * backend/, not at the top.
+ *
+ *   cd backend
+ *   npm run grant -- 1234567890 9876543210
+ *   npm run grant -- --amount 50000 1234567890
+ *   npm run grant -- --set 0 1234567890
+ *
+ * Or, without the npm script:
  *
  *   npx ts-node scripts/grant-coins.ts 1234567890 9876543210
- *   npx ts-node scripts/grant-coins.ts --amount 50000 1234567890
- *   npx ts-node scripts/grant-coins.ts --set 0 1234567890
  *
  * --amount ADDS to the current balance (the default).
  * --set    REPLACES it, which is the one to use when re-testing from zero.
  */
 
-import prisma from '../src/config/database';
-import { isValidUid, normaliseUid } from '../src/auth/uid';
+import path from 'path';
+import fs from 'fs';
+import dotenv from 'dotenv';
+
+// The script is usually run by hand from a shell that has never seen the
+// Render environment, so load backend/.env before anything touches Prisma.
+dotenv.config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
+
+if (!process.env.DATABASE_URL) {
+  console.error(
+    'DATABASE_URL is not set.\n' +
+      'Run this from the backend folder with a .env beside package.json, ' +
+      'or set it for this one command:\n' +
+      '  $env:DATABASE_URL="postgresql://..."   (PowerShell)\n'
+  );
+  process.exit(1);
+}
+
+// Fail loudly on the mistake that actually happens: running from the repo
+// root, where scripts/ does not exist and ts-node reports a confusing
+// "Cannot find module" for a file that is plainly there.
+if (!fs.existsSync(path.resolve(__dirname, '..', 'package.json'))) {
+  console.error(
+    'Run this from the backend folder (the one containing package.json).\n' +
+      '  cd backend\n' +
+      '  npm run grant -- 1234567890\n'
+  );
+  process.exit(1);
+}
+
+// Required lazily: `import` statements are hoisted above the guards above,
+// and constructing PrismaClient without DATABASE_URL throws a far less
+// helpful error than the one printed there.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const prisma = require('../src/config/database').default as typeof import('../src/config/database').default;
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { isValidUid, normaliseUid } = require('../src/auth/uid') as typeof import('../src/auth/uid');
 
 const DEFAULT_AMOUNT = 100_000;
 

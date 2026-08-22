@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "grant": "ts-node scripts/grant-coins.ts"
   },
   "keywords": [],
   "author": "",
