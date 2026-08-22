@@ -150,6 +150,45 @@ export class EconomyService {
     userId: string,
     input: PurchaseInput
   ): Promise<void> {
+    // Price and type come from the CATALOGUE, never from the request.
+    //
+    // This used to charge whatever the client said the item cost. Sending
+    // price: 0 bought anything for free, and a negative price ran a
+    // `decrement` of a negative number - which adds - so the shop minted
+    // coins on demand. Both were reproduced against this method before the
+    // fix. The request now supplies only an item id; everything that affects
+    // the balance is looked up server-side.
+    const catalogue = await this.getStoreItems();
+    const item = catalogue.find((i) => i.itemId === input.itemId);
+
+    if (!item) {
+      throw {
+        code: 'ITEM_NOT_FOUND',
+        message: 'No such item.',
+        status: 404,
+      };
+    }
+
+    if (!item.isAvailable) {
+      throw {
+        code: 'ITEM_UNAVAILABLE',
+        message: 'That item is not for sale.',
+        status: 400,
+      };
+    }
+
+    const price = item.price;
+    const currency = item.currency;
+    const cosmeticType = item.type;
+
+    if (!Number.isFinite(price) || price < 0) {
+      throw {
+        code: 'ITEM_UNAVAILABLE',
+        message: 'That item is not for sale.',
+        status: 400,
+      };
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { coins: true },
@@ -171,16 +210,16 @@ export class EconomyService {
       throw { code: 'ALREADY_OWNED', message: 'Item already owned.', status: 409 };
     }
 
-    // Validate currency
-    if (input.currency === CurrencyType.COINS) {
-      if (user.coins < input.price) {
+    // Validate currency, using the catalogue's price.
+    if (currency === CurrencyType.COINS && price > 0) {
+      if (user.coins < price) {
         throw { code: 'INSUFFICIENT_FUNDS', message: 'Not enough coins.', status: 400 };
       }
 
       // Deduct coins
       await prisma.user.update({
         where: { id: userId },
-        data: { coins: { decrement: input.price } },
+        data: { coins: { decrement: price } },
       });
     }
 
@@ -191,7 +230,7 @@ export class EconomyService {
       prisma.playerCosmetic.updateMany({
         where: {
           playerId: userId,
-          cosmeticType: input.cosmeticType as any,
+          cosmeticType: cosmeticType as any,
           isEquipped: true,
         },
         data: { isEquipped: false },
@@ -199,8 +238,8 @@ export class EconomyService {
       prisma.playerCosmetic.create({
         data: {
           playerId: userId,
-          cosmeticType: input.cosmeticType as any,
-          cosmeticId: input.itemId,
+          cosmeticType: cosmeticType as any,
+          cosmeticId: item.itemId,
           isEquipped: true,
         },
       }),
@@ -208,9 +247,9 @@ export class EconomyService {
 
     logger.info('Item purchased', {
       userId,
-      itemId: input.itemId,
-      price: input.price,
-      currency: input.currency,
+      itemId: item.itemId,
+      price,
+      currency,
     });
   }
 

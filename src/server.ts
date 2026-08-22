@@ -164,6 +164,40 @@ const startServer = async () => {
 };
 
 // ─────────────────────────────────────────
+// LAST-RESORT ERROR HANDLING
+// ─────────────────────────────────────────
+
+/**
+ * Keep one player's failure from becoming everyone's.
+ *
+ * Node terminates the process on an unhandled promise rejection. In a plain
+ * request/response service that costs one request; here every player holds a
+ * live socket, so a single un-caught rejection anywhere - one floating
+ * promise, one store blip during one login - disconnects the entire server
+ * mid-game.
+ *
+ * Individual call sites still attach their own catch. This exists because
+ * "we caught them all" is not a property anyone can guarantee by reading.
+ */
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection - kept alive deliberately', {
+    reason: reason instanceof Error ? reason.stack : reason,
+  });
+});
+
+/**
+ * An uncaught exception leaves the process in an unknown state, so unlike a
+ * rejection it is NOT survivable: the handler logs and exits so the platform
+ * restarts cleanly, rather than serving from a half-broken process.
+ */
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception - shutting down', { error: error.stack });
+  httpServer.close(() => process.exit(1));
+  // Do not wait forever for connections to drain.
+  setTimeout(() => process.exit(1), 5000).unref();
+});
+
+// ─────────────────────────────────────────
 // GRACEFUL SHUTDOWN
 // ─────────────────────────────────────────
 

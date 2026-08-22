@@ -260,10 +260,25 @@ export const initializeSocketHandlers = (io: Server): void => {
           }
         };
 
-        restoreMatchState();
+        // Fire-and-forget, but never unhandled.
+        //
+        // Both of these are deliberately not awaited - authentication should
+        // not block on them - but an un-caught rejection from a floating
+        // promise is fatal: Node terminates the process on unhandledRejection
+        // by default, so one store blip during one player's login would
+        // disconnect every player on the server. Attaching a catch keeps the
+        // failure local to the player it happened to.
+        restoreMatchState().catch((error) => {
+          logger.error('Restore state failed', { userId: socket.userId, error });
+        });
 
         // ═══ BROADCAST USER STATUS TO FRIENDS ═══
-        friendsService.broadcastUserStatus(io, socket.userId);
+        friendsService.broadcastUserStatus(io, socket.userId).catch((error) => {
+          logger.error('Status broadcast failed', {
+            userId: socket.userId,
+            error,
+          });
+        });
 
         logger.info('Socket authentication successful', {
           userId: socket.userId,
