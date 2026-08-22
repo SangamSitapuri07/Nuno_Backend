@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/account_sync.dart';
 import '../../core/providers.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/social_models.dart';
@@ -177,16 +178,17 @@ final onlineFriendsProvider = Provider<List<Friend>>((ref) {
 });
 
 /// GET /api/v1/statistics
-final statisticsProvider = FutureProvider<PlayerStats>(
-    (ref) => ref.watch(userRepositoryProvider).getStatistics());
+final statisticsProvider = syncedWithAccount(FutureProvider<PlayerStats>(
+    (ref) => ref.watch(userRepositoryProvider).getStatistics()));
 
 /// GET /api/v1/history
-final matchHistoryProvider = FutureProvider<List<MatchHistoryEntry>>(
-    (ref) => ref.watch(userRepositoryProvider).getMatchHistory());
+final matchHistoryProvider =
+    syncedWithAccount(FutureProvider<List<MatchHistoryEntry>>(
+        (ref) => ref.watch(userRepositoryProvider).getMatchHistory()));
 
 /// GET /api/v1/leaderboard/rank
-final myRankProvider = FutureProvider<PlayerRank?>(
-    (ref) => ref.watch(leaderboardRepositoryProvider).getMyRank());
+final myRankProvider = syncedWithAccount(FutureProvider<PlayerRank?>(
+    (ref) => ref.watch(leaderboardRepositoryProvider).getMyRank()));
 
 /// Keeps the socket connected for as long as the user is authenticated.
 ///

@@ -10,6 +10,33 @@ import {
 export class LeaderboardService {
 
   // ─────────────────────────────────────────
+  // ROW -> ENTRY
+  // ─────────────────────────────────────────
+
+  /// Tier and division are derived from the rating on the way out rather
+  /// than trusted from the row.
+  ///
+  /// They are stored too, and finishing a match keeps them current, but rows
+  /// written before that fix still hold the BRONZE III default. Deriving
+  /// here means every screen agrees the moment the code ships, without
+  /// waiting for a backfill, and there is exactly one definition of what a
+  /// rating is worth.
+  private toEntry = (entry: any, index: number) => {
+    const { tier, division } = this.getTierFromRating(entry.rating);
+    return {
+      rank: index + 1,
+      userId: entry.user.id,
+      username: entry.user.username,
+      avatarUrl: entry.user.avatarUrl,
+      rating: entry.rating,
+      tier,
+      division,
+      wins: entry.user.statistics?.gamesWon || 0,
+    };
+  };
+
+
+  // ─────────────────────────────────────────
   // GET GLOBAL LEADERBOARD
   // ─────────────────────────────────────────
 
@@ -33,16 +60,7 @@ export class LeaderboardService {
       },
     });
 
-    return entries.map((entry, index) => ({
-      rank: index + 1,
-      userId: entry.user.id,
-      username: entry.user.username,
-      avatarUrl: entry.user.avatarUrl,
-      rating: entry.rating,
-      tier: entry.tier,
-      division: entry.division,
-      wins: entry.user.statistics?.gamesWon || 0,
-    }));
+    return entries.map(this.toEntry);
   }
 
   // ─────────────────────────────────────────
@@ -84,16 +102,7 @@ export class LeaderboardService {
       },
     });
 
-    return entries.map((entry, index) => ({
-      rank: index + 1,
-      userId: entry.user.id,
-      username: entry.user.username,
-      avatarUrl: entry.user.avatarUrl,
-      rating: entry.rating,
-      tier: entry.tier,
-      division: entry.division,
-      wins: entry.user.statistics?.gamesWon || 0,
-    }));
+    return entries.map(this.toEntry);
   }
 
   // ─────────────────────────────────────────
@@ -243,11 +252,13 @@ export class LeaderboardService {
       where: { rating: { gt: leaderboard.rating } },
     });
 
+    const { tier, division } = this.getTierFromRating(leaderboard.rating);
+
     return {
       globalRank: rank + 1,
       rating: leaderboard.rating,
-      tier: leaderboard.tier,
-      division: leaderboard.division,
+      tier,
+      division,
       season: leaderboard.season,
     };
   }

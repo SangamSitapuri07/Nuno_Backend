@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/account_sync.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/game_assets.dart';
 import '../../data/models/enums.dart';
@@ -11,10 +12,10 @@ import '../auth/auth_controller.dart';
 ///
 /// Keyed on the signed-in user: without that, signing out and back in as
 /// somebody else would leave the previous player's cosmetics on the table.
-final inventoryProvider = FutureProvider<Inventory>((ref) {
+final inventoryProvider = syncedWithAccount(FutureProvider<Inventory>((ref) {
   ref.watch(currentUserIdProvider);
   return ref.watch(storeRepositoryProvider).getInventory();
-});
+}));
 
 /// Which cosmetics are actually in use, resolved to concrete asset paths.
 ///
@@ -166,3 +167,20 @@ class TableBackdrop {
       : assert(asset != null || colors != null,
             'a backdrop needs either an asset or colours');
 }
+
+/// The one number every screen shows as "your coins".
+///
+/// The home header used to read `profile.coins` and the store header read
+/// `inventory.coins`. Those are two independent caches with no expiry, so
+/// whichever loaded first kept its value - which is how the home screen said
+/// 750 while the store said 540 at the same moment.
+///
+/// Everything now reads this. The inventory is preferred because it is
+/// refetched immediately after a purchase; the cached profile is the
+/// fallback for screens opened before the store has ever loaded. Both are
+/// invalidated together by AccountSync, so they cannot drift apart.
+final coinBalanceProvider = Provider<int>((ref) {
+  final inventory = ref.watch(inventoryProvider).valueOrNull;
+  if (inventory != null) return inventory.coins;
+  return ref.watch(currentProfileProvider)?.coins ?? 0;
+});

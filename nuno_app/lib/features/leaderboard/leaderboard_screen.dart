@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/account_sync.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -18,11 +19,13 @@ import '../../data/models/user_models.dart';
 import '../auth/auth_controller.dart';
 import '../home/home_providers.dart';
 
-final globalLeaderboardProvider = FutureProvider<List<LeaderboardEntry>>(
-    (ref) => ref.watch(leaderboardRepositoryProvider).getGlobal());
+final globalLeaderboardProvider =
+    syncedWithAccount(FutureProvider<List<LeaderboardEntry>>(
+        (ref) => ref.watch(leaderboardRepositoryProvider).getGlobal()));
 
-final friendsLeaderboardProvider = FutureProvider<List<LeaderboardEntry>>(
-    (ref) => ref.watch(leaderboardRepositoryProvider).getFriends());
+final friendsLeaderboardProvider =
+    syncedWithAccount(FutureProvider<List<LeaderboardEntry>>(
+        (ref) => ref.watch(leaderboardRepositoryProvider).getFriends()));
 
 /// Global / friends rankings with a podium for the top three.
 class LeaderboardScreen extends ConsumerStatefulWidget {

@@ -5,6 +5,7 @@ import gameStateManager from './game.state';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { levelForXp, rewardBetween } from '../users/leveling';
+import leaderboardService from '../leaderboard/leaderboard.service';
 import {
   MatchState,
   MatchStatus,
@@ -459,9 +460,25 @@ export class GameEngine {
           });
         }
 
+        // Rewrite tier and division alongside the rating.
+        //
+        // Only `rating` used to be written, so the tier stayed at whatever
+        // the row was created with - BRONZE III, the schema default - no
+        // matter how high the rating climbed. That is why a 1020-rated
+        // player was labelled "Bronze III" while GOLD starts at 1000.
+        // Reading the row first also stops the rating going negative, which
+        // `increment` on its own allowed.
+        const row = await prisma.leaderboard.findUnique({
+          where: { playerId },
+          select: { rating: true },
+        });
+
+        const newRating = Math.max(0, (row?.rating ?? 1000) + ratingChange);
+        const { tier, division } = leaderboardService.getTierFromRating(newRating);
+
         await prisma.leaderboard.update({
           where: { playerId },
-          data: { rating: { increment: ratingChange } },
+          data: { rating: newRating, tier, division },
         });
       }
 

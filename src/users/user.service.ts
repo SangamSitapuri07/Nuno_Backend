@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { usernameChangeAvailableAt } from '../auth/auth.service';
+import leaderboardService from '../leaderboard/leaderboard.service';
 import logger from '../utils/logger';
 import { UpdateProfileInput, UpdateSettingsInput } from './user.validation';
 
@@ -55,6 +56,16 @@ export class UserService {
 
     if (!user) {
       throw { code: 'USER_NOT_FOUND', message: 'User not found.', status: 404 };
+    }
+
+    // Same derivation as the leaderboard endpoints, so the tier on the home
+    // badge cannot disagree with the tier on the rank screen. Without this
+    // the profile returned the stored column, which is stale on every row
+    // written before finalizeMatch started maintaining it.
+    if (user.leaderboard) {
+      const { tier, division } =
+        leaderboardService.getTierFromRating(user.leaderboard.rating);
+      user.leaderboard = { ...user.leaderboard, tier, division };
     }
 
     return user;

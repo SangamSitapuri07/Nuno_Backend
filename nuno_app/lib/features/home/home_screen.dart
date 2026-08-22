@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router/app_router.dart';
+import '../store/cosmetics_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -164,7 +165,7 @@ class HomeScreen extends ConsumerWidget {
                                 _CurrencyCapsule(
                                   icon: Icons.monetization_on_rounded,
                                   iconColor: AppColors.gold,
-                                  value: profile?.coins ?? 0,
+                                  value: ref.watch(coinBalanceProvider),
                                   onAdd: () => onNavigate?.call(2),
                                 ),
                                 const SizedBox(width: 4),

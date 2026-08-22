@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_exception.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../services/google_auth_service.dart';
+import '../../core/account_sync.dart';
 import '../../core/network/server_wakeup.dart';
 import '../../core/providers.dart';
 import '../../data/models/user_models.dart';
@@ -162,15 +163,24 @@ class AuthController extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  /// Refreshes the cached profile (coins, xp, level...).
+  /// Refreshes the cached profile (coins, xp, level...) AND every other
+  /// account-scoped cache.
+  ///
+  /// Refreshing the profile alone was not enough: the store reads its coin
+  /// total from `inventoryProvider` and the rank screen reads its rating
+  /// from `myRankProvider`, both of which are independent caches that never
+  /// expire. Updating one and not the others is exactly how the home header
+  /// and the store header ended up showing different balances.
   Future<void> refreshProfile() async {
     if (!state.isLoggedIn) return;
     try {
       final profile = await _ref.read(userRepositoryProvider).getProfile();
       state = state.copyWith(profile: profile);
     } catch (_) {
-      // Keep the stale profile on failure.
+      // Keep the stale profile on failure - but still re-read the rest,
+      // since one failed request does not make the other caches correct.
     }
+    AccountSync.refresh(_ref);
   }
 
   void clearError() => state = state.copyWith(clearError: true);

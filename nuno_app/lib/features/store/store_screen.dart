@@ -37,7 +37,6 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
   Widget build(BuildContext context) {
     final items = ref.watch(storeItemsProvider);
     final inventory = ref.watch(inventoryProvider).valueOrNull;
-    final profile = ref.watch(currentProfileProvider);
 
     final content = SafeArea(
       // Left inset excluded: in landscape it is the display cutout, and
@@ -83,9 +82,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                           size: 16, color: AppColors.gold),
                       const SizedBox(width: 5),
                       Text(
-                        Formatters.compact(
-                          inventory?.coins ?? profile?.coins ?? 0,
-                        ),
+                        Formatters.compact(ref.watch(coinBalanceProvider)),
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.gold,
                           fontWeight: FontWeight.w800,
@@ -192,8 +189,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                         equipped:
                             inventory?.isEquipped(item.itemId) ?? false,
                         canAfford:
-                            (inventory?.coins ?? profile?.coins ?? 0) >=
-                                item.price,
+                            ref.watch(coinBalanceProvider) >= item.price,
                         onBuy: () => _purchase(item),
                         onEquip: () => _equip(item),
                       );

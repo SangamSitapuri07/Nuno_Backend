@@ -275,7 +275,7 @@ class _IdentitySection extends ConsumerWidget {
 
           Row(
             children: [
-              CurrencyPill(coins: p.coins),
+              CurrencyPill(coins: ref.watch(coinBalanceProvider)),
               const Spacer(),
               SizedBox(
                 width: 110,

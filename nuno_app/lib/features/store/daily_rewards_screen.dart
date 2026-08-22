@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/account_sync.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
@@ -20,10 +21,11 @@ import '../auth/auth_controller.dart';
 /// success whatever the server did with it. `GET /rewards/daily` now returns
 /// the real track, the real streak, and whether today has already been
 /// claimed, so what is drawn is what will actually be paid.
-final dailyStatusProvider = FutureProvider<DailyStatus>((ref) {
+final dailyStatusProvider =
+    syncedWithAccount(FutureProvider<DailyStatus>((ref) {
   ref.watch(currentUserIdProvider);
   return ref.watch(storeRepositoryProvider).getDailyStatus();
-});
+}));
 
 class DailyRewardsScreen extends ConsumerStatefulWidget {
   const DailyRewardsScreen({super.key});
