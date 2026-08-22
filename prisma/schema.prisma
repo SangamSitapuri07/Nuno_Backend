@@ -5,6 +5,17 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+
+  // Migrations prefer an unpooled connection.
+  //
+  // Once DATABASE_URL points at Neon's -pooler endpoint, `prisma migrate
+  // deploy` can fail against it: the pooler multiplexes sessions, and
+  // migrations want a session they own. Declaring directUrl lets the app use
+  // the pooler while migrations use the direct host.
+  //
+  // Optional. Prisma falls back to `url` when DIRECT_URL is unset, so
+  // nothing changes until the variable is actually provided.
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────

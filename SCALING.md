@@ -31,45 +31,130 @@ second.
 
 ## Still to configure (no code change needed)
 
+Both are Render dashboard changes. Neither needs a redeploy of the code -
+saving an environment variable restarts the service on its own.
+
+---
+
 ### 1. Redis
 
-Without `REDIS_URL` the shared store falls back to Postgres, so every KV
-operation is a network round trip to Neon. Redis turns those into sub-
-millisecond calls and, just as importantly, **switches on the Socket.IO Redis
-adapter automatically** (`src/server.ts` attaches it when a Redis client
-exists).
+Turns every shared-state operation from a network round trip to Neon into a
+sub-millisecond call, and **switches on the Socket.IO Redis adapter
+automatically** (`src/server.ts` attaches it whenever a Redis client exists).
 
-Set on Render:
+**Step 1 - create the instance.**
 
-```
-REDIS_URL = redis://<user>:<password>@<host>:<port>
-```
+Render dashboard -> **New +** -> **Key Value** (Render's name for its managed
+Redis; it was called "Redis" until recently).
 
-Until this is set the server logs:
+- **Name:** `nuno-redis`
+- **Region:** the *same region as the web service*. A different region adds
+  cross-region latency to every call and undoes the point of the change.
+- **Maxmemory policy:** `noeviction`. This matters. The default,
+  `allkeys-lru`, lets Redis silently throw away keys when memory fills - and
+  the keys here are live match state and room membership, so a game would
+  vanish mid-hand.
+- **Plan:** the free tier is fine to start.
 
-```
-Socket.IO is running without the Redis adapter. This is fine on a single
-instance, but rooms will not be shared if you scale out.
-```
-
-### 2. More than one instance
-
-Two instances **cannot** be run until `REDIS_URL` is set - players on
-different instances would not see each other. Even then, one detail is still
-single-instance: `activeMatchTimers` is an in-process `Set`, so each instance
-runs timers only for matches it started. That is correct as long as the
-socket that starts a match stays on that instance, which it does with sticky
-sessions. Enable sticky sessions before scaling out.
-
-### 3. Neon connection pooling
-
-Use the `-pooler` endpoint in `DATABASE_URL`. The direct endpoint gives each
-instance its own small connection ceiling; the pooler multiplexes and is what
-Neon recommends for serverless-style hosts.
+Create it, then open it and copy the **Internal Key Value URL**. It looks
+like:
 
 ```
-DATABASE_URL = postgresql://...@ep-xxx-pooler.<region>.aws.neon.tech/neondb?sslmode=require
+redis://red-xxxxxxxxxxxxxxxxxxxx:6379
 ```
+
+Use the *internal* URL, not the external one: internal traffic stays inside
+Render's network, is faster, and is not billed as bandwidth.
+
+**Step 2 - point the service at it.**
+
+Web service -> **Environment** -> **Add Environment Variable**:
+
+| Key | Value |
+|---|---|
+| `REDIS_URL` | the internal URL from step 1 |
+
+Save. Render restarts the service.
+
+**Step 3 - confirm it took.**
+
+In the service logs you want these two lines:
+
+```
+Redis connected {"url":"redis://red-xxxx:6379"}
+Socket.IO Redis adapter attached
+```
+
+If instead you see either of these, Redis is **not** in use and the server
+has quietly fallen back to Postgres:
+
+```
+Shared state store: Postgres (no Redis configured)
+Redis connection failed; trying Postgres instead
+```
+
+The fallback is deliberate - a bad `REDIS_URL` degrades the server rather
+than taking it down - which is exactly why the log line has to be checked
+rather than assumed.
+
+---
+
+### 2. Neon connection pooling
+
+The direct endpoint gives each instance a small connection ceiling. Prisma
+opens a pool per instance, so the ceiling is reached sooner than expected.
+The pooler multiplexes and is what Neon recommends for hosts like Render.
+
+**Step 1 - get the pooled string.**
+
+Neon console -> your project -> **Connection Details** -> enable **Connection
+pooling** (or pick the "Pooled connection" tab).
+
+The only difference is `-pooler` inserted into the host:
+
+```
+# direct  (current)
+postgresql://user:pass@ep-rapid-union-azjk1rqk.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+# pooled  (want)
+postgresql://user:pass@ep-rapid-union-azjk1rqk-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+```
+
+You can also just add `-pooler` to the existing host yourself - the rest of
+the string, including the password, stays identical.
+
+**Step 2 - update the variable.**
+
+Web service -> **Environment** -> edit `DATABASE_URL` -> paste the pooled
+string -> Save.
+
+**Step 3 - confirm.**
+
+```
+Database connected successfully
+```
+
+and the app behaves normally.
+
+**If a deploy's migration step fails against the pooler**, that is the one
+known caveat: `prisma migrate deploy` wants a session it owns and the pooler
+multiplexes. The schema already declares `directUrl = env("DIRECT_URL")`, so
+the fix is one more variable - keep `DATABASE_URL` pooled for the app and add:
+
+| Key | Value |
+|---|---|
+| `DIRECT_URL` | the **un**pooled string (host without `-pooler`) |
+
+Leaving `DIRECT_URL` unset is safe: Prisma falls back to `url`, which is the
+behaviour before this change.
+
+---
+
+### Order
+
+Redis first. It is the change that moves the numbers, and it is independently
+verifiable from the logs. Do the pooler after, once Redis is confirmed, so a
+problem is attributable to one change rather than two.
 
 ## Realistic capacity
 
