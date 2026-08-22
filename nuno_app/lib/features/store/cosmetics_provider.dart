@@ -128,6 +128,12 @@ class EquippedCosmetics {
   /// gradients. Both are real backdrops - a gradient is not a placeholder -
   /// which lets the catalogue grow without waiting on more artwork.
   static TableBackdrop _tableBackdrop(String? itemId) => switch (itemId) {
+        // The free default, granted to every account and equipped
+        // automatically. It had no case here, so it fell through to the
+        // wildcard - harmless by luck, since the wildcard is the same table,
+        // but it meant the one backdrop everybody starts with was the only
+        // one not actually listed.
+        'table_galaxy' => const TableBackdrop(asset: Art.tableGalaxy),
         'table_midnight' => const TableBackdrop(asset: Art.bgPanel),
         'table_aurora' => const TableBackdrop(asset: Art.bgStore),
         'table_emerald' => const TableBackdrop(
