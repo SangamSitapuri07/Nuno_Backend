@@ -474,7 +474,13 @@ export const initializeGameHandlers = (
 
         // Also the shared key, so a sync from a socket this instance does
         // not own can still resolve the match.
-        await redisClient.set(`match:player:${playerId}`, newMatchId);
+        //
+        // The TTL matters: this is the only match:player write that lacked
+        // one, so a rematch left a key with no expiry behind. Every other
+        // writer uses an hour, which is longer than any match runs.
+        await redisClient.set(`match:player:${playerId}`, newMatchId, {
+          EX: 3600,
+        });
       }
 
       io.to(roomId).emit(SOCKET_EVENTS.REMATCH_STARTED, {

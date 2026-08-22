@@ -36,68 +36,75 @@ saving an environment variable restarts the service on its own.
 
 ---
 
-### 1. Redis
+### 1. Redis — optional, and probably not yet
 
-Turns every shared-state operation from a network round trip to Neon into a
-sub-millisecond call, and **switches on the Socket.IO Redis adapter
-automatically** (`src/server.ts` attaches it whenever a Redis client exists).
+A free Redis was tried before and filled up during testing, so this section
+starts with the measurement rather than the recommendation.
 
-**Step 1 - create the instance.**
+**How much memory this app actually needs.** Every key written during one
+live 4-player match, measured by instrumenting the store:
 
-Render dashboard -> **New +** -> **Key Value** (Render's name for its managed
-Redis; it was called "Redis" until recently).
+| Bytes | Key |
+|---|---|
+| 11,153 | `game:<matchId>` — the whole match state |
+| 1,119 | `room:<roomId>` |
+| 4 x 96 | `match:player:<userId>` |
+| 4 x 89 | `player:room:<userId>` |
+| 51 | `room:code:<code>` |
+| **13,063** | **total per table** |
 
-- **Name:** `nuno-redis`
-- **Region:** the *same region as the web service*. A different region adds
-  cross-region latency to every call and undoes the point of the change.
-- **Maxmemory policy:** `noeviction`. This matters. The default,
-  `allkeys-lru`, lets Redis silently throw away keys when memory fills - and
-  the keys here are live match state and room membership, so a game would
-  vanish mid-hand.
-- **Plan:** the free tier is fine to start.
+With Redis' per-key overhead that is about **13.7 KB per live table**:
 
-Create it, then open it and copy the **Internal Key Value URL**. It looks
-like:
+| Tables | Players | Memory |
+|---|---|---|
+| 100 | 400 | 1.3 MB |
+| 500 | 2,000 | 6.7 MB |
+| 1,000 | 4,000 | 13.4 MB |
 
-```
-redis://red-xxxxxxxxxxxxxxxxxxxx:6379
-```
+A 25 MB free tier fits roughly 1,800 simultaneous tables. So **memory is not
+the thing that runs out** — if a free instance filled during testing, the
+cause was almost certainly one of:
 
-Use the *internal* URL, not the external one: internal traffic stays inside
-Render's network, is faster, and is not billed as bandwidth.
+- **Keys with no expiry accumulating.** Exactly one existed: the rematch path
+  wrote `match:player:` without a TTL while the other three writers all used
+  an hour. Fixed, and `ttl.py` now fails the build if any `set` omits `EX`.
+- **A command or connection quota**, not a memory quota. Free Redis plans
+  often cap monthly commands. This app issues **2 commands per card played**;
+  a completed 4-player game is ~240 including timer reads. At 1,000 games a
+  day that is ~7.2M commands a month, which will exhaust a small free
+  allowance regardless of how little memory is used.
 
-**Step 2 - point the service at it.**
+**Recommendation: stay on Postgres for now.** The timer fix cut steady-state
+reads by 90%, which was the actual problem. Postgres has no command quota,
+it is already provisioned, and at a few hundred concurrent players it is
+comfortable. Add Redis when either of these is true:
 
-Web service -> **Environment** -> **Add Environment Variable**:
+- more than one instance is needed (Redis is mandatory then — the Socket.IO
+  adapter attaches only when `REDIS_URL` is set, and without it players on
+  different instances cannot see each other), or
+- the Neon dashboard shows the database straining.
+
+**If and when Redis is added**, use a paid instance rather than a free one,
+put it in the **same region** as the web service, and set the maxmemory
+policy to **`noeviction`** — the default `allkeys-lru` silently discards keys
+under pressure, and these keys are live match state, so a game would vanish
+mid-hand. Then set:
 
 | Key | Value |
 |---|---|
-| `REDIS_URL` | the internal URL from step 1 |
+| `REDIS_URL` | the internal connection URL |
 
-Save. Render restarts the service.
-
-**Step 3 - confirm it took.**
-
-In the service logs you want these two lines:
+and confirm in the logs:
 
 ```
-Redis connected {"url":"redis://red-xxxx:6379"}
+Redis connected
 Socket.IO Redis adapter attached
 ```
 
-If instead you see either of these, Redis is **not** in use and the server
-has quietly fallen back to Postgres:
-
-```
-Shared state store: Postgres (no Redis configured)
-Redis connection failed; trying Postgres instead
-```
-
-The fallback is deliberate - a bad `REDIS_URL` degrades the server rather
-than taking it down - which is exactly why the log line has to be checked
-rather than assumed.
-
----
+If instead the logs say `Shared state store: Postgres (no Redis configured)`
+or `Redis connection failed; trying Postgres instead`, Redis is not being
+used — the fallback is deliberate, so a bad URL degrades the server quietly
+rather than taking it down, which is why the log has to be read.
 
 ### 2. Neon connection pooling
 
@@ -152,9 +159,10 @@ behaviour before this change.
 
 ### Order
 
-Redis first. It is the change that moves the numbers, and it is independently
-verifiable from the logs. Do the pooler after, once Redis is confirmed, so a
-problem is attributable to one change rather than two.
+Do the **pooler** — it is a one-variable change with no cost attached. Leave
+Redis alone until a second instance is genuinely needed, or Neon starts to
+strain. The measurements above are why: memory was never the constraint, and
+a free Redis will hit a command quota long before it hits a memory limit.
 
 ## Realistic capacity
 
