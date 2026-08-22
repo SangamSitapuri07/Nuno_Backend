@@ -21,6 +21,7 @@ import friendsRoutes from './friends/friends.routes';
 import leaderboardRoutes from './leaderboard/leaderboard.routes';
 import economyRoutes from './economy/economy.routes';
 import reportsRoutes from './reports/reports.routes';
+import adminRoutes from './admin/admin.routes';
 import {
   sanitizeInput,
   validateContentType,
@@ -91,6 +92,8 @@ app.use('/api/v1', friendsRoutes);
 app.use('/api/v1', leaderboardRoutes);
 app.use('/api/v1', economyRoutes);
 app.use('/api/v1', reportsRoutes);
+// Operator-only. Inert unless ADMIN_TOKEN is set - see admin.routes.ts.
+app.use('/api/v1', adminRoutes);
 
 // ─────────────────────────────────────────
 // 404 HANDLER
