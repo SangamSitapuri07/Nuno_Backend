@@ -35,6 +35,32 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   /// say in how many people they were about to play against.
   int _tableSize = 4;
 
+  @override
+  void initState() {
+    super.initState();
+
+    // Clear whatever the last match left behind.
+    //
+    // The controller is a provider, so it outlives this screen. Finishing a
+    // match leaves its status on `inGame` - nothing ever reset it - and the
+    // size picker is only drawn while the status is `idle`. So the second
+    // visit skipped the picker entirely and went straight to the searching
+    // layout, showing a table size the player never chose.
+    //
+    // Deferred to after the first frame: initState runs during a build, and
+    // changing provider state there throws.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final mm = ref.read(matchmakingControllerProvider);
+      // A live search is left alone - re-entering the screen while genuinely
+      // queued should show the search, not throw it away.
+      if (mm.status != QueueStatus.searching &&
+          mm.status != QueueStatus.matchFound) {
+        ref.read(matchmakingControllerProvider.notifier).reset();
+      }
+    });
+  }
+
   void _startSearch() {
     ref
         .read(matchmakingControllerProvider.notifier)

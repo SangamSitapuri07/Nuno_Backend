@@ -16,6 +16,7 @@ import '../../data/models/enums.dart';
 import '../../data/models/game_card.dart';
 import '../../data/models/game_state.dart';
 import '../auth/auth_controller.dart';
+import '../matchmaking/matchmaking_providers.dart';
 import '../store/cosmetics_provider.dart';
 import 'game_providers.dart';
 import 'widgets/card_action_popup.dart';
@@ -185,6 +186,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         // and it is harmless when the room is already gone.
         ref.read(socketServiceProvider).emit(SocketEvents.roomLeave);
         ref.read(gameControllerProvider.notifier).reset();
+        // The matchmaking controller is a provider too, and its status is
+        // still `inGame` from the match that just ended. Left set, the next
+        // visit to Quick Match skips the table-size picker, because that is
+        // only drawn while the status is `idle`.
+        ref.read(matchmakingControllerProvider.notifier).reset();
         ref.read(authControllerProvider.notifier).refreshProfile();
         if (context.mounted) context.go(AppRoutes.home);
       },
