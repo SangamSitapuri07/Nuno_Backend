@@ -6,6 +6,7 @@ import { getLocalSocket } from '../websocket/socket.session';
 import { SOCKET_EVENTS } from '../utils/constants';
 import { GameMode, QueueJoinInput } from './matchmaking.types';
 import logger from '../utils/logger';
+import { OFFICIAL_RULES } from '../gameplay/house.rules';
 
 export const initializeMatchmakingHandlers = (
   io: Server,
@@ -176,12 +177,18 @@ const processAndNotify = async (io: Server): Promise<void> => {
           currentRoom.matchId = matchId;
           await roomService.saveRoom(currentRoom);
 
-          // Initialize game
+          // Quick Match is always the official game.
+          //
+          // Stated explicitly rather than relying on the parameter default:
+          // strangers paired by rating have agreed to nothing, so a queue
+          // whose rules varied would be unplayable. House rules exist only
+          // in a private room, where everybody can see the choice first.
           const gameState = await gameEngine.initializeMatch(
             matchId,
             room.roomId,
             playerIds,
-            match.mode
+            match.mode,
+            OFFICIAL_RULES
           );
 
           // Track player match

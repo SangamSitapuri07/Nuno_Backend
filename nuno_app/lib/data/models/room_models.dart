@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import 'enums.dart';
+import 'house_rules.dart';
 import 'json.dart';
 
 /// Mirrors `RoomPlayer` in src/rooms/room.types.ts
@@ -54,6 +55,9 @@ class GameRoom extends Equatable {
   final RoomStatus status;
   final String? matchId;
 
+  /// Variants the host enabled. Official game when absent.
+  final HouseRules houseRules;
+
   const GameRoom({
     required this.roomId,
     required this.roomCode,
@@ -66,6 +70,7 @@ class GameRoom extends Equatable {
     this.gameMode = GameMode.private,
     this.status = RoomStatus.waiting,
     this.matchId,
+    this.houseRules = HouseRules.official,
   });
 
   factory GameRoom.fromJson(Map<String, dynamic> json) => GameRoom(
@@ -83,6 +88,9 @@ class GameRoom extends Equatable {
         gameMode: GameModeX.parse(J.strOrNull(json['gameMode'])),
         status: RoomStatusX.parse(J.strOrNull(json['status'])),
         matchId: J.strOrNull(json['matchId']),
+        houseRules: json['houseRules'] == null
+            ? HouseRules.official
+            : HouseRules.fromJson(J.map(json['houseRules'])),
       );
 
   bool isHost(String userId) => hostId == userId;
@@ -101,7 +109,7 @@ class GameRoom extends Equatable {
 
   @override
   List<Object?> get props =>
-      [roomId, roomCode, hostId, players, status, maxPlayers];
+      [roomId, roomCode, hostId, players, status, maxPlayers, houseRules];
 }
 
 /// Payload of the `match.found` socket event.

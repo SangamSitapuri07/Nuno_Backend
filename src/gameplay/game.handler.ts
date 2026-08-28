@@ -265,6 +265,96 @@ export const initializeGameHandlers = (
     }
   });
 
+  // ─────────────────────────────────────────
+  // JUMP IN  (house rule)
+  // ─────────────────────────────────────────
+
+  socket.on(SOCKET_EVENTS.CARD_JUMP_IN, async (data: PlayCardInput) => {
+    try {
+      if (!socket.userId || !socket.matchId) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'INVALID_MATCH',
+          message: 'Not in a match.',
+        });
+        return;
+      }
+
+      if (!data?.cardId) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'INVALID_PAYLOAD',
+          message: 'Card ID is required.',
+        });
+        return;
+      }
+
+      const { state, events } = await gameEngine.jumpIn(
+        socket.matchId,
+        socket.userId,
+        data
+      );
+
+      const roomId = socket.roomId;
+      if (!roomId) return;
+
+      io.to(roomId).emit(SOCKET_EVENTS.PLAYER_PLAYED_CARD, {
+        userId: socket.userId,
+        cardId: data.cardId,
+        currentColor: state.currentColor,
+        currentValue: state.currentValue,
+        direction: state.direction,
+        jumpedIn: true,
+      });
+
+      for (const playerId of state.players) {
+        const playerSocketId = await getPlayerSocketId(io, playerId);
+        if (playerSocketId) {
+          const playerState =
+            await gameStateManager.getPlayerStateWithNames(playerId, state);
+          io.to(playerSocketId).emit(SOCKET_EVENTS.GAME_SYNC_STATE, playerState);
+        }
+      }
+
+      if (state.status === MatchStatus.RUNNING) {
+        io.to(roomId).emit(SOCKET_EVENTS.TURN_CHANGED, {
+          currentPlayer: state.currentTurn,
+          remainingTime: 20,
+        });
+      }
+
+      if (events.includes('direction.changed')) {
+        io.to(roomId).emit(SOCKET_EVENTS.DIRECTION_CHANGED, {
+          direction: state.direction,
+        });
+      }
+
+      if (events.includes('game.finished')) {
+        stopMatchTimer(state.matchId);
+        io.to(roomId).emit(SOCKET_EVENTS.GAME_FINISHED, {
+          winner: state.winner,
+          duration: Math.floor((Date.now() - state.startedAt) / 1000),
+          totalTurns: state.totalTurns,
+          matchId: state.matchId,
+        });
+
+        await releaseRoomAfterMatch(io, roomId, state.players);
+
+        for (const playerId of state.players) {
+          await friendsService.broadcastUserStatus(io, playerId);
+        }
+      }
+
+      socket.emit(SOCKET_EVENTS.CARD_ACCEPTED, {
+        cardId: data.cardId,
+        success: true,
+      });
+    } catch (error: any) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        code: error.code || 'SERVER_ERROR',
+        message: error.message || 'Failed to jump in.',
+      });
+    }
+  });
+
   socket.on(SOCKET_EVENTS.CARD_DRAW, async () => {
     try {
       if (!socket.userId || !socket.matchId) return;

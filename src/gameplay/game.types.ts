@@ -1,3 +1,5 @@
+import { HouseRules } from './house.rules';
+
 export enum CardColor {
   RED = 'RED',
   BLUE = 'BLUE',
@@ -81,11 +83,27 @@ export interface MatchState {
   unoCalledBy: string[];
   lastWildDrawFourBy?: string;
   lastWildDrawFourChallengeable?: boolean;
+
+  /// Variants agreed in the lobby. Absent means the official game, which is
+  /// what every match played before this existed was.
+  houseRules?: HouseRules;
+
+  /// Cards owed by the player to move next, built up by a stack of Draw Twos
+  /// or Draw Fours. Zero when nothing is pending.
+  pendingDraw?: number;
+
+  /// Which card the pending stack is made of, so a Draw Two chain cannot be
+  /// answered with a Draw Four.
+  pendingDrawType?: CardValue.DRAW_TWO | CardValue.WILD_DRAW_FOUR;
 }
 
 export interface PlayCardInput {
   cardId: string;
   selectedColor?: CardColor;
+
+  /// Target for the seven-zero swap. Only read when the seven-zero house
+  /// rule is on and the card played is a 7.
+  swapWith?: string;
 }
 
 export interface GameResult {

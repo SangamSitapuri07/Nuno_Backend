@@ -28,6 +28,7 @@ class SocketEvents {
   static const roomCountdown = 'room.countdown';
   static const roomCountdownCancelled = 'room.countdownCancelled';
   static const roomStart = 'room.start';
+  static const roomSetRules = 'room.setRules';
   static const roomReady = 'room.ready';
   static const roomKick = 'room.kick';
   static const roomKicked = 'room.kicked';
@@ -41,6 +42,7 @@ class SocketEvents {
 
   // Gameplay
   static const cardPlay = 'card.play';
+  static const cardJumpIn = 'card.jumpIn';
   static const cardDraw = 'card.draw';
   static const cardAccepted = 'card.accepted';
   static const turnChanged = 'turn.changed';

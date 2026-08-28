@@ -328,8 +328,9 @@ class GameController extends StateNotifier<GameUiState> {
     _socket.emit(SocketEvents.gameSyncRequest);
   }
 
-  /// Plays a card. Wild cards require [selectedColor].
-  void playCard(GameCard card, {CardColor? selectedColor}) {
+  /// Plays a card. Wild cards require [selectedColor]; a 7 under the
+  /// seven-zero house rule requires [swapWith].
+  void playCard(GameCard card, {CardColor? selectedColor, String? swapWith}) {
     final game = state.game;
     if (game == null) return;
     if (!game.isMyTurn(_myId ?? '')) return;
@@ -341,7 +342,22 @@ class GameController extends StateNotifier<GameUiState> {
       'cardId': card.cardId,
       if (card.isWild && selectedColor != null)
         'selectedColor': selectedColor.wire,
+      if (swapWith != null) 'swapWith': swapWith,
     });
+  }
+
+  /// Plays an identical card out of turn, under the jump-in house rule.
+  ///
+  /// Deliberately not routed through [playCard]: that refuses anything when
+  /// it is not your turn, which is the entire point of a jump-in.
+  void jumpIn(GameCard card) {
+    final game = state.game;
+    if (game == null) return;
+    if (!game.houseRules.jumpIn) return;
+    if (state.pendingCardId != null) return;
+
+    state = state.copyWith(pendingCardId: card.cardId);
+    _socket.emit(SocketEvents.cardJumpIn, {'cardId': card.cardId});
   }
 
   void drawCard() {

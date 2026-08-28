@@ -7,6 +7,7 @@ import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/json.dart';
+import '../../data/models/house_rules.dart';
 import '../../data/models/room_models.dart';
 import '../../data/models/social_models.dart';
 import '../../services/socket_events.dart';
@@ -311,6 +312,15 @@ class LobbyController extends StateNotifier<LobbyState> {
 
   /// Host-only. The server re-checks ownership and readiness, so this is a
   /// request rather than an assertion.
+  /// Replaces the room's house rules. Host only; the server enforces that
+  /// and answers NOT_HOST otherwise.
+  ///
+  /// The whole set is sent rather than one flag, so the server and the six
+  /// checkboxes can never disagree about something that was not mentioned.
+  void setHouseRules(HouseRules rules) {
+    _socket.emit(SocketEvents.roomSetRules, {'houseRules': rules.toJson()});
+  }
+
   void startMatch() => _socket.emit(SocketEvents.roomStart);
 
   void kick(String targetUserId) {

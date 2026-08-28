@@ -21,6 +21,7 @@ export const SOCKET_EVENTS = {
   ROOM_COUNTDOWN: 'room.countdown',
   ROOM_COUNTDOWN_CANCELLED: 'room.countdownCancelled',
   ROOM_START: 'room.start',
+  ROOM_SET_RULES: 'room.setRules',
 
   // Game
   GAME_STARTED: 'game.started',
@@ -31,6 +32,7 @@ export const SOCKET_EVENTS = {
 
   // Gameplay
   CARD_PLAY: 'card.play',
+  CARD_JUMP_IN: 'card.jumpIn',
   CARD_DRAW: 'card.draw',
   CARD_ACCEPTED: 'card.accepted',
   TURN_CHANGED: 'turn.changed',

@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import 'enums.dart';
 import 'game_card.dart';
+import 'house_rules.dart';
 import 'json.dart';
 
 /// A player as described by `playerNames` in the game state payload.
@@ -44,6 +45,14 @@ class GameState extends Equatable {
   final String? winner;
   final int totalTurns;
 
+  /// Variants in force for this match. Official game unless the host chose
+  /// otherwise in the lobby.
+  final HouseRules houseRules;
+
+  /// Cards owed by whoever is to move, from a stack of draw cards. Zero when
+  /// nothing is pending.
+  final int pendingDraw;
+
   const GameState({
     required this.matchId,
     required this.roomId,
@@ -60,6 +69,8 @@ class GameState extends Equatable {
     this.playerNames = const {},
     this.winner,
     this.totalTurns = 0,
+    this.houseRules = HouseRules.official,
+    this.pendingDraw = 0,
   });
 
   factory GameState.fromJson(Map<String, dynamic> json) {
@@ -113,6 +124,10 @@ class GameState extends Equatable {
       playerNames: names,
       winner: J.strOrNull(json['winner']),
       totalTurns: J.int_(json['totalTurns']),
+      houseRules: json['houseRules'] == null
+          ? HouseRules.official
+          : HouseRules.fromJson(J.map(json['houseRules'])),
+      pendingDraw: J.int_(json['pendingDraw']),
     );
   }
 

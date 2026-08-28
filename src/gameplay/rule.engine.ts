@@ -14,6 +14,15 @@ export class RuleEngine {
   // ─────────────────────────────────────────
 
   isValidPlay(card: Card, state: MatchState): boolean {
+    // A stack is pending: the only legal answer is the same draw card.
+    //
+    // Same type only. A Draw Two chain cannot be answered with a Wild Draw
+    // Four and vice versa - that is how virtually every group that plays
+    // stacking plays it, and mixing them is rejected even in casual play.
+    if (state.pendingDraw && state.pendingDraw > 0) {
+      return card.value === state.pendingDrawType;
+    }
+
     // Wild cards are always valid
     if (card.type === CardType.WILD) return true;
 
@@ -24,6 +33,33 @@ export class RuleEngine {
     if (card.value === state.currentValue) return true;
 
     return false;
+  }
+
+  // ─────────────────────────────────────────
+  // JUMP-IN
+  // ─────────────────────────────────────────
+
+  /**
+   * Whether [card] may be played out of turn under the jump-in house rule.
+   *
+   * Requires an exact match on colour AND value against the top of the
+   * discard pile, and only for number cards: allowing it on action cards
+   * makes the turn order unresolvable, since the effect would fire from a
+   * seat the game is not currently on.
+   *
+   * Never legal while a draw stack is pending, and never for the player
+   * whose turn it already is - that is an ordinary play.
+   */
+  canJumpIn(card: Card, userId: string, state: MatchState): boolean {
+    if (!state.houseRules?.jumpIn) return false;
+    if (state.pendingDraw && state.pendingDraw > 0) return false;
+    if (state.currentTurn === userId) return false;
+    if (card.type !== CardType.NUMBER) return false;
+
+    const top = state.discardPile[state.discardPile.length - 1];
+    if (!top) return false;
+
+    return card.color === top.color && card.value === top.value;
   }
 
   // ─────────────────────────────────────────

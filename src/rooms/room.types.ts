@@ -1,3 +1,5 @@
+import { HouseRules } from '../gameplay/house.rules';
+
 export enum RoomStatus {
   CREATED = 'CREATED',
   WAITING = 'WAITING',
@@ -38,6 +40,10 @@ export interface Room {
   status: RoomStatus;
   createdAt: number;
   matchId?: string;
+
+  /// Variants the host has enabled. Absent means the official Mattel game,
+  /// which is what every room created before this existed used.
+  houseRules?: HouseRules;
 }
 
 export interface CreateRoomInput {

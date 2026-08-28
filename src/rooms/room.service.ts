@@ -1,4 +1,10 @@
 import redisClient from '../config/redis';
+import {
+  HouseRules,
+  OFFICIAL_RULES,
+  normaliseHouseRules,
+  describeHouseRules,
+} from '../gameplay/house.rules';
 import logger from '../utils/logger';
 import { generateId, generateRoomCode } from '../utils/generateId';
 import {
@@ -74,6 +80,8 @@ export class RoomService {
       gameMode: input.gameMode || 'CASUAL',
       status: RoomStatus.WAITING,
       createdAt: Date.now(),
+      // The official game unless the host says otherwise.
+      houseRules: { ...OFFICIAL_RULES },
     };
 
     await this.saveRoom(room);
@@ -227,6 +235,60 @@ export class RoomService {
   // ─────────────────────────────────────────
   // KICK PLAYER
   // ─────────────────────────────────────────
+
+  // ─────────────────────────────────────────
+  // SET HOUSE RULES
+  // ─────────────────────────────────────────
+
+  /**
+   * Replaces the room's rule set. Host only, and only before the game
+   * starts.
+   *
+   * Deliberately a whole-set replace rather than a per-flag toggle: the
+   * lobby shows six checkboxes and sends what they add up to, so there is
+   * never a question of the server and the screen disagreeing about a flag
+   * that was not mentioned.
+   */
+  async setHouseRules(
+    userId: string,
+    rules: unknown
+  ): Promise<Room> {
+    const roomId = await this.resolveActiveRoom(userId);
+    if (!roomId) {
+      throw { code: 'NOT_IN_ROOM', message: 'You are not in a room.', status: 400 };
+    }
+
+    const room = await this.getRoom(roomId);
+    if (!room) {
+      throw { code: 'ROOM_NOT_FOUND', message: 'Room not found.', status: 404 };
+    }
+
+    if (room.hostId !== userId) {
+      throw {
+        code: 'NOT_HOST',
+        message: 'Only the host can change the rules.',
+        status: 403,
+      };
+    }
+
+    if (room.status !== RoomStatus.WAITING) {
+      throw {
+        code: 'GAME_IN_PROGRESS',
+        message: 'The rules cannot change once the game has started.',
+        status: 400,
+      };
+    }
+
+    room.houseRules = normaliseHouseRules(rules);
+    await this.saveRoom(room);
+
+    logger.info('House rules changed', {
+      roomId,
+      rules: describeHouseRules(room.houseRules),
+    });
+
+    return room;
+  }
 
   async kickPlayer(
     hostId: string,

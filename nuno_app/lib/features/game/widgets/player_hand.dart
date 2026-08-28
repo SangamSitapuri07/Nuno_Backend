@@ -19,12 +19,17 @@ class PlayerHand extends StatefulWidget {
   final void Function(GameCard) onPlay;
   final String? pendingCardId;
 
+  /// Whether this card may be played out of turn, under the jump-in house
+  /// rule. Always false when the rule is off.
+  final bool Function(GameCard) canJumpIn;
+
   const PlayerHand({
     super.key,
     required this.cards,
     required this.isPlayable,
     required this.isMyTurn,
     required this.onPlay,
+    required this.canJumpIn,
     this.pendingCardId,
   });
 
@@ -43,11 +48,25 @@ class _PlayerHandState extends State<PlayerHand> {
         !widget.cards.any((c) => c.cardId == _selectedId)) {
       _selectedId = null;
     }
-    if (!widget.isMyTurn) _selectedId = null;
+    // Keep a selection alive when it is jump-in-able, otherwise the card the
+    // player is lining up vanishes from under them the moment the turn moves.
+    if (!widget.isMyTurn &&
+        _selectedId != null &&
+        !widget.cards.any(
+          (c) => c.cardId == _selectedId && widget.canJumpIn(c),
+        )) {
+      _selectedId = null;
+    }
   }
 
   void _onTap(GameCard card) {
-    if (!widget.isMyTurn || !widget.isPlayable(card)) {
+    // A jump-in is legal precisely when it is NOT your turn, so the turn
+    // check cannot be the only gate.
+    final allowed = widget.isMyTurn
+        ? widget.isPlayable(card)
+        : widget.canJumpIn(card);
+
+    if (!allowed) {
       HapticFeedback.heavyImpact();
       return;
     }
@@ -120,7 +139,9 @@ class _PlayerHandState extends State<PlayerHand> {
   ) {
     final card = widget.cards[i];
     final isSelected = _selectedId == card.cardId;
-    final playable = widget.isMyTurn && widget.isPlayable(card);
+    final playable = widget.isMyTurn
+        ? widget.isPlayable(card)
+        : widget.canJumpIn(card);
     final isPending = widget.pendingCardId == card.cardId;
 
     // Arc: middle cards sit slightly higher, edges tilt outward.

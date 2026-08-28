@@ -29,6 +29,7 @@ import 'widgets/opponent_seat.dart';
 import 'widgets/player_hand.dart';
 import 'widgets/quick_chat_sheet.dart';
 import 'widgets/shuffle_intro.dart';
+import 'widgets/swap_target_dialog.dart';
 import 'widgets/table_center.dart';
 import 'widgets/table_overlays.dart';
 import 'widgets/table_toasts.dart';
@@ -150,13 +151,56 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   Future<void> _playCard(GameCard card) async {
     final controller = ref.read(gameControllerProvider.notifier);
+    final game = ref.read(gameControllerProvider).game;
+    final myId = ref.read(currentUserIdProvider);
+
+    // Out of turn, but the card is an exact match and jump-in is on: this is
+    // a jump-in rather than an illegal play.
+    if (game != null &&
+        myId != null &&
+        game.houseRules.jumpIn &&
+        !game.isMyTurn(myId) &&
+        _canJumpIn(card, game)) {
+      controller.jumpIn(card);
+      return;
+    }
+
     if (card.isWild) {
       final color = await CardActionPopup.show(context, card: card);
       if (color == null || !mounted) return;
       controller.playCard(card, selectedColor: color);
-    } else {
-      controller.playCard(card);
+      return;
     }
+
+    // A 7 under seven-zero needs a target before it means anything.
+    if (game != null &&
+        myId != null &&
+        game.houseRules.sevenZero &&
+        card.value == CardValue.seven &&
+        game.players.length > 1) {
+      final target = await SwapTargetDialog.show(
+        context,
+        game: game,
+        myId: myId,
+      );
+      if (!mounted) return;
+      controller.playCard(card, swapWith: target);
+      return;
+    }
+
+    controller.playCard(card);
+  }
+
+  /// Mirrors RuleEngine.canJumpIn: exact colour and value, numbers only, and
+  /// never while a draw stack is pending.
+  bool _canJumpIn(GameCard card, GameState game) {
+    if (game.pendingDraw > 0) return false;
+    final top = game.topCard;
+    if (top == null) return false;
+    // Numbers only: an action card jumped in from another seat makes the
+    // turn order unresolvable, which is why the server refuses it too.
+    if (!card.value.isNumber) return false;
+    return card.color == top.color && card.value == top.value;
   }
 
   Future<void> _confirmExit() async {
@@ -565,6 +609,14 @@ class _Table extends ConsumerWidget {
               cards: game.myHand,
               isPlayable: game.isCardPlayable,
               isMyTurn: isMyTurn && state.pendingCardId == null,
+              canJumpIn: (card) =>
+                  state.pendingCardId == null &&
+                  game.houseRules.jumpIn &&
+                  game.pendingDraw == 0 &&
+                  card.value.isNumber &&
+                  game.topCard != null &&
+                  card.color == game.topCard!.color &&
+                  card.value == game.topCard!.value,
               pendingCardId: state.pendingCardId,
               onPlay: onPlayCard,
             ),

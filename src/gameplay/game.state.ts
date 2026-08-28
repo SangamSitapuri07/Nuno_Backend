@@ -1,4 +1,5 @@
 import redisClient from '../config/redis';
+import { OFFICIAL_RULES } from './house.rules';
 import logger from '../utils/logger';
 import { MatchState } from './game.types';
 
@@ -148,6 +149,11 @@ export class GameStateManager {
       players: state.players,
       winner: state.winner,
       totalTurns: state.totalTurns,
+
+      // The client needs these to know whether to offer a jump-in, ask who
+      // to swap with on a seven, or show a pending stack.
+      houseRules: state.houseRules ?? OFFICIAL_RULES,
+      pendingDraw: state.pendingDraw ?? 0,
     };
   }
 }

@@ -19,6 +19,8 @@ import '../../services/socket_service.dart';
 import '../auth/auth_controller.dart';
 import '../game/widgets/playing_card.dart';
 import 'lobby_providers.dart';
+import '../../data/models/house_rules.dart';
+import 'widgets/house_rules_sheet.dart';
 import 'widgets/invite_friends_sheet.dart';
 
 /// Screen 5 — Room Lobby. Landscape split: room code + card art on the left,
@@ -252,6 +254,24 @@ class _LobbyBody extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: AppDimens.sm),
+
+              // What everybody is about to play under. Tappable by all, but
+              // only the host can change it - a guest opening it sees the
+              // same list read-only, which is better than not being told.
+              _RulesBar(
+                rules: room.houseRules,
+                isHost: isHost,
+                onTap: () async {
+                  final next = await HouseRulesSheet.show(
+                    context,
+                    rules: room.houseRules,
+                    editable: isHost,
+                  );
+                  if (next != null) controller.setHouseRules(next);
+                },
+              ),
+
               const SizedBox(height: AppDimens.sm),
               // Side by side rather than stacked: two 190px buttons in a
               // column overflowed the panel on a phone in landscape.
@@ -560,6 +580,74 @@ class _LobbyAction extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One-line summary of the room's rules, and the way into the picker.
+class _RulesBar extends StatelessWidget {
+  final HouseRules rules;
+  final bool isHost;
+  final VoidCallback onTap;
+
+  const _RulesBar({
+    required this.rules,
+    required this.isHost,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final official = rules.isOfficial;
+    final colour = official ? AppColors.textMuted : AppColors.accent;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.sm,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppDimens.brSm,
+          border: Border.all(
+            color: official
+                ? AppColors.surfaceStroke
+                : AppColors.accent.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              official ? Icons.rule_rounded : Icons.tune_rounded,
+              size: 15,
+              color: colour,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                rules.summary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  color: colour,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              isHost ? 'CHANGE' : 'VIEW',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ),
       ),
     );

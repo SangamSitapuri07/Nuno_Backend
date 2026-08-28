@@ -5,6 +5,12 @@ import gameStateManager from './game.state';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { levelForXp, rewardBetween } from '../users/leveling';
+import {
+  HouseRules,
+  OFFICIAL_RULES,
+  MAX_STACK_DRAW,
+  describeHouseRules,
+} from './house.rules';
 import leaderboardService from '../leaderboard/leaderboard.service';
 import {
   MatchState,
@@ -24,7 +30,8 @@ export class GameEngine {
     matchId: string,
     roomId: string,
     playerIds: string[],
-    gameMode: string
+    gameMode: string,
+    houseRules: HouseRules = OFFICIAL_RULES
   ): Promise<MatchState> {
     const deck = deckEngine.generateDeck();
     const shuffledDeck = deckEngine.shuffleDeck(deck);
@@ -56,6 +63,8 @@ export class GameEngine {
       startedAt: Date.now(),
       unoCalledBy: [],
       lastWildDrawFourChallengeable: false,
+      houseRules,
+      pendingDraw: 0,
     };
 
     // Save player match mapping in Redis for reconnection
@@ -71,6 +80,7 @@ export class GameEngine {
       matchId,
       playerCount: playerIds.length,
       firstPlayer,
+      rules: describeHouseRules(houseRules),
     });
 
     return state;
@@ -123,11 +133,28 @@ export class GameEngine {
     state.cardsPlayedBy ??= {};
     state.cardsPlayedBy[userId] = (state.cardsPlayedBy[userId] ?? 0) + 1;
 
-    await this.processCardEffect(card, state, input.selectedColor, events);
+    await this.processCardEffect(
+      card, state, input.selectedColor, events, input.swapWith
+    );
 
     // Reset UNO call if player is no longer on 1 card
     if (state.hands[userId].length !== 1 && state.unoCalledBy) {
       state.unoCalledBy = state.unoCalledBy.filter(id => id !== userId);
+    }
+
+    // Caught not saying it. Officially another player has to notice and
+    // challenge; this house rule does the noticing automatically.
+    //
+    // Checked after the effect has resolved, and only when the player is
+    // actually left holding one card - going out entirely is a win, not an
+    // offence.
+    if (
+      state.houseRules?.forceUnoPenalty &&
+      state.hands[userId].length === 1 &&
+      !(state.unoCalledBy ?? []).includes(userId)
+    ) {
+      this.dealTo(userId, 2, state);
+      events.push('uno.penalty');
     }
 
     // Track Wild Draw Four for challenge
@@ -136,6 +163,84 @@ export class GameEngine {
       state.lastWildDrawFourChallengeable = true;
     } else {
       state.lastWildDrawFourChallengeable = false;
+    }
+
+    if (ruleEngine.checkWin(userId, state)) {
+      state.winner = userId;
+      state.status = MatchStatus.FINISHED;
+      events.push('game.finished');
+      await this.finalizeMatch(state);
+    }
+
+    await gameStateManager.saveState(state);
+
+    return { state, events };
+  }
+
+  /**
+   * Plays an identical card out of turn, under the jump-in house rule.
+   *
+   * The turn is handed to the jumping player before the effect resolves, so
+   * play continues from their seat - that is the whole point of the rule.
+   */
+  async jumpIn(
+    matchId: string,
+    userId: string,
+    input: PlayCardInput
+  ): Promise<{ state: MatchState; events: string[] }> {
+    const state = await gameStateManager.getState(matchId);
+    if (!state) {
+      throw { code: 'INVALID_MATCH', message: 'Match not found.', status: 404 };
+    }
+
+    if (!state.houseRules?.jumpIn) {
+      throw {
+        code: 'RULE_DISABLED',
+        message: 'Jump-in is not enabled for this game.',
+        status: 400,
+      };
+    }
+
+    if (state.status !== MatchStatus.RUNNING) {
+      throw { code: 'INVALID_MATCH', message: 'Match is not active.', status: 400 };
+    }
+
+    if (!state.players.includes(userId)) {
+      throw { code: 'INVALID_MATCH', message: 'Not in this match.', status: 400 };
+    }
+
+    const card = ruleEngine.getCardFromHand(userId, input.cardId, state);
+    if (!card) {
+      throw { code: 'INVALID_CARD', message: 'Card not found.', status: 400 };
+    }
+
+    if (!ruleEngine.canJumpIn(card, userId, state)) {
+      throw {
+        code: 'INVALID_CARD',
+        message: 'That card cannot be jumped in.',
+        status: 400,
+      };
+    }
+
+    // Seat the jumper first; processCardEffect advances from currentTurn.
+    state.currentTurn = userId;
+
+    const events: string[] = ['card.jumpedIn'];
+
+    ruleEngine.removeCardFromHand(userId, input.cardId, state);
+    state.discardPile.push(card);
+    state.currentValue = card.value;
+    state.totalTurns++;
+
+    state.cardsPlayedBy ??= {};
+    state.cardsPlayedBy[userId] = (state.cardsPlayedBy[userId] ?? 0) + 1;
+
+    await this.processCardEffect(
+      card, state, input.selectedColor, events, input.swapWith
+    );
+
+    if (state.hands[userId].length !== 1 && state.unoCalledBy) {
+      state.unoCalledBy = state.unoCalledBy.filter((id) => id !== userId);
     }
 
     if (ruleEngine.checkWin(userId, state)) {
@@ -166,27 +271,59 @@ export class GameEngine {
 
     const drawnCards = [];
 
-    for (let i = 0; i < count; i++) {
+    // Taking a stacked penalty. The player could not - or chose not to -
+    // answer it, so they take the lot and the turn moves on regardless of
+    // what they happened to draw.
+    const takingStack = (state.pendingDraw ?? 0) > 0;
+    if (takingStack) {
+      count = state.pendingDraw!;
+    }
+
+    const drawOne = (): boolean => {
       if (state.drawPile.length === 0) {
         const { newDrawPile, newDiscardPile } =
           deckEngine.rebuildDrawPile(state.discardPile);
         state.drawPile = newDrawPile;
         state.discardPile = newDiscardPile;
       }
+      if (state.drawPile.length === 0) return false;
 
-      if (state.drawPile.length > 0) {
-        const card = state.drawPile.shift()!;
-        state.hands[userId].push(card);
-        drawnCards.push(card);
+      const card = state.drawPile.shift()!;
+      state.hands[userId].push(card);
+      drawnCards.push(card);
 
-        state.cardsDrawnBy ??= {};
-        state.cardsDrawnBy[userId] = (state.cardsDrawnBy[userId] ?? 0) + 1;
+      state.cardsDrawnBy ??= {};
+      state.cardsDrawnBy[userId] = (state.cardsDrawnBy[userId] ?? 0) + 1;
+      return true;
+    };
+
+    if (!takingStack && state.houseRules?.drawToMatch) {
+      // Keep going until something playable turns up. Bounded by the size of
+      // a full deck so an unplayable state cannot loop for ever.
+      let guard = 108;
+      while (guard-- > 0) {
+        if (!drawOne()) break;
+        if (ruleEngine.isValidPlay(drawnCards[drawnCards.length - 1], state)) {
+          break;
+        }
       }
+    } else {
+      for (let i = 0; i < count; i++) {
+        if (!drawOne()) break;
+      }
+    }
+
+    if (takingStack) {
+      state.pendingDraw = 0;
+      state.pendingDrawType = undefined;
     }
 
     // Check if drawn card is playable
     const lastDrawnCard = drawnCards[drawnCards.length - 1];
-    const canPlayDrawn = lastDrawnCard && ruleEngine.isValidPlay(lastDrawnCard, state);
+    const canPlayDrawn =
+      !takingStack &&
+      lastDrawnCard &&
+      ruleEngine.isValidPlay(lastDrawnCard, state);
 
     if (!canPlayDrawn) {
       state.currentTurn = ruleEngine.getNextPlayer(
@@ -202,11 +339,83 @@ export class GameEngine {
     return { state, drawnCards };
   }
 
+  // ─────────────────────────────────────────
+  // HOUSE-RULE HELPERS
+  // ─────────────────────────────────────────
+
+  /** Moves [count] cards from the draw pile into a player's hand. */
+  private dealTo(playerId: string, count: number, state: MatchState): void {
+    for (let i = 0; i < count; i++) {
+      if (state.drawPile.length === 0) {
+        const { newDrawPile, newDiscardPile } =
+          deckEngine.rebuildDrawPile(state.discardPile);
+        state.drawPile = newDrawPile;
+        state.discardPile = newDiscardPile;
+      }
+      // The pile can still be empty if the discard had nothing to recycle.
+      if (state.drawPile.length === 0) return;
+      state.hands[playerId].push(state.drawPile.shift()!);
+    }
+  }
+
+  /**
+   * Seven: swap hands with a chosen player.
+   *
+   * An invalid or missing target is a no-op rather than an error - the seven
+   * is still a perfectly good number card, and rejecting the play outright
+   * would strand a client that did not send a target.
+   */
+  private swapHands(
+    playerId: string,
+    targetId: string | undefined,
+    state: MatchState,
+    events: string[]
+  ): void {
+    if (!targetId || targetId === playerId) return;
+    if (!state.players.includes(targetId)) return;
+
+    const mine = state.hands[playerId];
+    state.hands[playerId] = state.hands[targetId];
+    state.hands[targetId] = mine;
+
+    // Either player may now be on one card, or no longer on one, so the
+    // outstanding UNO calls no longer describe the table.
+    state.unoCalledBy = (state.unoCalledBy ?? []).filter(
+      (id) => id !== playerId && id !== targetId
+    );
+
+    events.push('hands.swapped');
+  }
+
+  /** Zero: every hand moves one seat in the current direction of play. */
+  private rotateHands(state: MatchState, events: string[]): void {
+    const order = state.players;
+    if (order.length < 2) return;
+
+    const hands = order.map((id) => state.hands[id]);
+
+    if (state.direction === GameDirection.CLOCKWISE) {
+      // Each player receives the hand of the player before them.
+      for (let i = 0; i < order.length; i++) {
+        state.hands[order[i]] = hands[(i - 1 + order.length) % order.length];
+      }
+    } else {
+      for (let i = 0; i < order.length; i++) {
+        state.hands[order[i]] = hands[(i + 1) % order.length];
+      }
+    }
+
+    // Nobody's call survives a rotation.
+    state.unoCalledBy = [];
+    events.push('hands.rotated');
+  }
+
   private async processCardEffect(
     card: any,
     state: MatchState,
     selectedColor: CardColor | undefined,
-    events: string[]
+    events: string[],
+    swapWith?: string
   ): Promise<void> {
     switch (card.value) {
       case CardValue.SKIP:
@@ -232,21 +441,31 @@ export class GameEngine {
         break;
 
       case CardValue.DRAW_TWO:
-        const nextPlayerDrawTwo = ruleEngine.getNextPlayer(
-          state.currentTurn, state.players, state.direction
-        );
+        state.currentColor = card.color;
 
-        for (let i = 0; i < 2; i++) {
-          if (state.drawPile.length === 0) {
-            const { newDrawPile, newDiscardPile } =
-              deckEngine.rebuildDrawPile(state.discardPile);
-            state.drawPile = newDrawPile;
-            state.discardPile = newDiscardPile;
-          }
-          if (state.drawPile.length > 0) {
-            state.hands[nextPlayerDrawTwo].push(state.drawPile.shift()!);
-          }
+        if (state.houseRules?.stackDrawTwo) {
+          // Hand the growing penalty to the next player and let them answer
+          // it. They draw only when they cannot, which is handled in
+          // resolvePendingDraw.
+          state.pendingDraw = Math.min(
+            (state.pendingDraw ?? 0) + 2,
+            MAX_STACK_DRAW
+          );
+          state.pendingDrawType = CardValue.DRAW_TWO;
+          state.currentTurn = ruleEngine.getNextPlayer(
+            state.currentTurn, state.players, state.direction
+          );
+          events.push('draw.stacked');
+          break;
         }
+
+        this.dealTo(
+          ruleEngine.getNextPlayer(
+            state.currentTurn, state.players, state.direction
+          ),
+          2,
+          state
+        );
 
         state.currentTurn = ruleEngine.getNextPlayer(
           state.currentTurn, state.players, state.direction, true
@@ -263,21 +482,26 @@ export class GameEngine {
       case CardValue.WILD_DRAW_FOUR:
         if (selectedColor) state.currentColor = selectedColor;
 
-        const nextPlayerWildFour = ruleEngine.getNextPlayer(
-          state.currentTurn, state.players, state.direction
-        );
-
-        for (let i = 0; i < 4; i++) {
-          if (state.drawPile.length === 0) {
-            const { newDrawPile, newDiscardPile } =
-              deckEngine.rebuildDrawPile(state.discardPile);
-            state.drawPile = newDrawPile;
-            state.discardPile = newDiscardPile;
-          }
-          if (state.drawPile.length > 0) {
-            state.hands[nextPlayerWildFour].push(state.drawPile.shift()!);
-          }
+        if (state.houseRules?.stackDrawFour) {
+          state.pendingDraw = Math.min(
+            (state.pendingDraw ?? 0) + 4,
+            MAX_STACK_DRAW
+          );
+          state.pendingDrawType = CardValue.WILD_DRAW_FOUR;
+          state.currentTurn = ruleEngine.getNextPlayer(
+            state.currentTurn, state.players, state.direction
+          );
+          events.push('draw.stacked');
+          break;
         }
+
+        this.dealTo(
+          ruleEngine.getNextPlayer(
+            state.currentTurn, state.players, state.direction
+          ),
+          4,
+          state
+        );
 
         state.currentTurn = ruleEngine.getNextPlayer(
           state.currentTurn, state.players, state.direction, true
@@ -286,6 +510,15 @@ export class GameEngine {
 
       default:
         state.currentColor = card.color;
+
+        if (state.houseRules?.sevenZero) {
+          if (card.value === CardValue.SEVEN) {
+            this.swapHands(state.currentTurn, swapWith, state, events);
+          } else if (card.value === CardValue.ZERO) {
+            this.rotateHands(state, events);
+          }
+        }
+
         state.currentTurn = ruleEngine.getNextPlayer(
           state.currentTurn, state.players, state.direction
         );

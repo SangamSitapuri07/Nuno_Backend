@@ -128,6 +128,36 @@ export const initializeRoomHandlers = (
   });
 
   // ═══ START MATCH (host only) ═══
+  // ─────────────────────────────────────────
+  // SET HOUSE RULES
+  // ─────────────────────────────────────────
+
+  socket.on(SOCKET_EVENTS.ROOM_SET_RULES, async (data: any) => {
+    try {
+      if (!socket.userId) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          code: 'AUTH_FAILED',
+          message: 'Not authenticated.',
+        });
+        return;
+      }
+
+      const room = await roomService.setHouseRules(
+        socket.userId,
+        data?.houseRules ?? data
+      );
+
+      // Everyone in the lobby, not just the host: the other players need to
+      // see what they are about to agree to.
+      io.to(room.roomId).emit(SOCKET_EVENTS.ROOM_UPDATED, room);
+    } catch (error: any) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        code: error.code || 'SET_RULES_FAILED',
+        message: error.message || 'Could not change the rules.',
+      });
+    }
+  });
+
   socket.on(SOCKET_EVENTS.ROOM_START, async () => {
     try {
       const room = await roomService.getPlayerRoom(socket.userId);
@@ -270,7 +300,8 @@ const startCountdown = (io: Server, roomId: string): void => {
         matchId,
         room.roomId,
         playerIds,
-        room.gameMode
+        room.gameMode,
+        room.houseRules
       );
 
       // Start auto-draw timer for this match
