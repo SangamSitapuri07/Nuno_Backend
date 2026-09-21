@@ -269,3 +269,23 @@ A monitor that hits `/health` every 5 minutes keeps Render's instance warm,
 which is useful — but if that endpoint touches Postgres it also holds the
 Neon compute open and puts this problem straight back. `/health` must stay
 a pure in-process response.
+
+### Checking whether the uptime monitor is safe
+
+`tools/health.test.js` rebuilds the real middleware chain, counts every
+Prisma call, and asserts that a day's worth of 5-minute pings runs **zero**
+database statements.
+
+```
+node tools/health.test.js
+```
+
+The test includes a control: a route that deliberately queries the database,
+asserted to be *detected*. Without it, a counter that silently stopped
+working would report a clean result forever.
+
+To check the deployed server rather than the code, watch Neon's Project
+Dashboard with the app closed and no players online. The compute should show
+as **Idle** within about five minutes and stay there. If it keeps waking on a
+regular cycle matching the monitor's interval, something on that path is
+reaching Postgres.
