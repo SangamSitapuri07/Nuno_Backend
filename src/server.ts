@@ -150,8 +150,14 @@ const startServer = async () => {
     }
 
     // Direct messages are kept for a day and then dropped.
+    //
+    // Cleared once at boot, then opportunistically whenever a conversation
+    // is read. A background timer was doing this hourly, which on a
+    // serverless Postgres keeps waking a database nobody is using.
     const messagesService = (await import('./friends/messages.service')).default;
-    messagesService.startExpiryTimer();
+    messagesService.purgeExpired().catch((error) =>
+      logger.error('Initial DM purge failed', { error })
+    );
 
     httpServer.listen(config.server.port, () => {
       logger.info(`${config.server.appName} server started`, {

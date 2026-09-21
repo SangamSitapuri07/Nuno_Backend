@@ -220,3 +220,52 @@ Cloud on a 100 ops/sec cap.
 
 The one thing that does not scale by adding instances is the match timer's
 in-process registry, noted above.
+
+---
+
+## Neon free tier: why the project got suspended
+
+The Free plan allows **100 CU-hours per project per month**, and compute
+scales to zero after **5 minutes of inactivity**. Compute is only billed
+while awake, so an idle database is close to free.
+
+Two background timers meant it was never idle:
+
+| Timer | Interval | Effect |
+|---|---|---|
+| `PgStore.sweep()` | 60 s | a query every minute, for ever |
+| DM `purgeExpired()` | 60 min | a wake-up every hour |
+
+A query every 60 seconds means the 5-minute idle window never elapses, so
+the compute stayed awake 24/7 with nobody playing:
+
+```
+730 hours/month x 0.25 CU = 182.5 CU-hours
+Free allowance            = 100   CU-hours
+```
+
+The quota was gone in roughly **17 days**, and Neon then suspends the
+compute — existing connections drop, new ones cannot open, and the game
+stops. No data is lost.
+
+### The fix
+
+* The KV sweep now runs every **5 minutes**, and **only if the store has
+  been used in the last 3 minutes**. Three minutes is deliberately shorter
+  than Neon's 5-minute window, so the sweep is already quiet before the
+  compute wants to suspend. Expired keys are removed lazily on read as well,
+  so a skipped sweep is never a correctness problem.
+* The hourly DM purge is gone. It now runs opportunistically when a
+  conversation is read, at most once an hour — the database is awake for
+  that query anyway. If nobody is using the app, nothing expires that anyone
+  can see.
+
+With both changed, an empty server issues **no** database statements, so the
+compute suspends and stops consuming the allowance.
+
+### Do not add an uptime pinger to the backend
+
+A monitor that hits `/health` every 5 minutes keeps Render's instance warm,
+which is useful — but if that endpoint touches Postgres it also holds the
+Neon compute open and puts this problem straight back. `/health` must stay
+a pure in-process response.

@@ -14,10 +14,35 @@ import logger from '../utils/logger';
  * periodic sweep, mirroring Redis' TTL semantics closely enough for rooms,
  * queues, sessions and match state.
  */
+/**
+ * How long the store must be completely unused before the sweep stops.
+ *
+ * Shorter than Neon's 5-minute scale-to-zero window, so the sweep is already
+ * quiet by the time the compute wants to suspend.
+ */
+const IDLE_BEFORE_SWEEP_STOPS_MS = 3 * 60 * 1000;
+
+/** Gap between sweeps while the store is in use. */
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
 export class PgStore {
   private sweepTimer: NodeJS.Timeout | null = null;
 
+  /** When the store was last touched by real application traffic. */
+  private lastUsedAt = Date.now();
+
   constructor(private prisma: PrismaClient) {}
+
+  /**
+   * Records real traffic.
+   *
+   * Every public method calls this. The sweep uses it to decide whether the
+   * server is doing anything at all, which is the difference between a
+   * database that can fall asleep and one that cannot.
+   */
+  private touch(): void {
+    this.lastUsedAt = Date.now();
+  }
 
   /// Prisma's generated client types the raw helpers loosely, so results are
   /// cast at the call site rather than via type arguments.
@@ -45,9 +70,26 @@ export class PgStore {
 
     // Drop anything that expired while the process was down.
     await this.sweep();
+
+    // Sweep only while the server is actually being used.
+    //
+    // This ran unconditionally every 60 seconds, which meant a query hit the
+    // database every minute for ever - so Neon's compute never reached the
+    // 5 minutes of inactivity it needs to scale to zero. Staying awake 24/7
+    // costs ~182 CU-hours a month against a 100 CU-hour free allowance, so
+    // the project was suspended roughly two thirds of the way through every
+    // month with nobody playing.
+    //
+    // Expired keys are also removed lazily on read, so skipping a sweep is
+    // never a correctness problem - it only delays reclaiming dead rows, and
+    // if nothing is reading them there is nothing to reclaim.
     this.sweepTimer = setInterval(() => {
+      if (Date.now() - this.lastUsedAt > IDLE_BEFORE_SWEEP_STOPS_MS) return;
       this.sweep().catch(() => {});
-    }, 60_000);
+    }, SWEEP_INTERVAL_MS);
+
+    // Never hold the process open for a cleanup task.
+    this.sweepTimer.unref?.();
 
     logger.info('Postgres KV store ready');
   }
@@ -66,6 +108,7 @@ export class PgStore {
   // ── strings ─────────────────────────────────────────────────
 
   async get(key: string): Promise<string | null> {
+    this.touch();
     const rows: any[] = await this.query<{ value: string | null }>(
       `SELECT value FROM kv_store
         WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
@@ -79,6 +122,7 @@ export class PgStore {
     value: string,
     options?: { EX?: number }
   ): Promise<void> {
+    this.touch();
     const expires = options?.EX
       ? new Date(Date.now() + options.EX * 1000)
       : null;
@@ -93,6 +137,7 @@ export class PgStore {
   }
 
   async del(key: string): Promise<void> {
+    this.touch();
     await this.prisma.$executeRawUnsafe(
       `DELETE FROM kv_store WHERE key = $1`,
       key
@@ -100,10 +145,12 @@ export class PgStore {
   }
 
   async exists(key: string): Promise<number> {
+    this.touch();
     return (await this.get(key)) === null ? 0 : 1;
   }
 
   async incr(key: string): Promise<number> {
+    this.touch();
     const rows: any[] = await this.query<{ value: string }>(
       `INSERT INTO kv_store (key, value) VALUES ($1, '1')
        ON CONFLICT (key) DO UPDATE
@@ -115,6 +162,7 @@ export class PgStore {
   }
 
   async expire(key: string, seconds: number): Promise<void> {
+    this.touch();
     await this.prisma.$executeRawUnsafe(
       `UPDATE kv_store SET expires_at = $2 WHERE key = $1`,
       key,
@@ -123,6 +171,7 @@ export class PgStore {
   }
 
   async keys(pattern: string): Promise<string[]> {
+    this.touch();
     const like = pattern.replace(/\*/g, '%');
     const rows: any[] = await this.query<{ key: string }>(
       `SELECT key FROM kv_store
@@ -135,6 +184,7 @@ export class PgStore {
   // ── sets (online_players, etc.) ─────────────────────────────
 
   async sAdd(key: string, member: string): Promise<void> {
+    this.touch();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO kv_store (key, members) VALUES ($1, ARRAY[$2])
        ON CONFLICT (key) DO UPDATE
@@ -147,6 +197,7 @@ export class PgStore {
   }
 
   async sRem(key: string, member: string): Promise<void> {
+    this.touch();
     await this.prisma.$executeRawUnsafe(
       `UPDATE kv_store SET members = array_remove(members, $2) WHERE key = $1`,
       key,
@@ -155,6 +206,7 @@ export class PgStore {
   }
 
   async sIsMember(key: string, member: string): Promise<boolean> {
+    this.touch();
     const rows: any[] = await this.query<{ found: boolean }>(
       `SELECT $2 = ANY(members) AS found FROM kv_store WHERE key = $1`,
       key,
@@ -164,6 +216,7 @@ export class PgStore {
   }
 
   async sMembers(key: string): Promise<string[]> {
+    this.touch();
     const rows: any[] = await this.query<{ members: string[] }>(
       `SELECT members FROM kv_store WHERE key = $1`,
       key
@@ -174,6 +227,7 @@ export class PgStore {
   // ── lists (matchmaking queues) ──────────────────────────────
 
   async lPush(key: string, value: string): Promise<void> {
+    this.touch();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO kv_store (key, list_items) VALUES ($1, ARRAY[$2])
        ON CONFLICT (key) DO UPDATE
@@ -184,6 +238,7 @@ export class PgStore {
   }
 
   async lRange(key: string, start: number, stop: number): Promise<string[]> {
+    this.touch();
     const rows: any[] = await this.query<{ list_items: string[] }>(
       `SELECT list_items FROM kv_store WHERE key = $1`,
       key
@@ -193,6 +248,7 @@ export class PgStore {
   }
 
   async lRem(key: string, _count: number, value: string): Promise<void> {
+    this.touch();
     await this.prisma.$executeRawUnsafe(
       `UPDATE kv_store SET list_items = array_remove(list_items, $2)
         WHERE key = $1`,
@@ -202,6 +258,7 @@ export class PgStore {
   }
 
   async lLen(key: string): Promise<number> {
+    this.touch();
     const rows: any[] = await this.query<{ n: bigint }>(
       `SELECT COALESCE(array_length(list_items, 1), 0) AS n
          FROM kv_store WHERE key = $1`,

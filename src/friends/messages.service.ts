@@ -111,6 +111,10 @@ export class MessagesService {
     friendId: string,
     limit = PAGE_SIZE
   ) {
+    // The database is awake for this query anyway, so take the chance to
+    // clear anything that has aged out. At most once an hour.
+    void this.purgeIfDue();
+
     const rows = await prisma.directMessage.findMany({
       where: {
         // Filtered on read as well as swept in the background: the sweep runs
@@ -181,12 +185,39 @@ export class MessagesService {
     return result.count;
   }
 
+  /** Last time a purge actually ran, so the check below is cheap. */
+  private lastPurgeAt = 0;
+
+  /**
+   * Purges at most once an hour, and only when something else has already
+   * woken the database.
+   *
+   * Called from the read paths rather than from a timer. A timer purges on a
+   * schedule the players are not on: on a serverless Postgres that bills by
+   * awake-time, a query every hour from an empty server is pure cost, and it
+   * resets the idle clock that lets the compute suspend.
+   *
+   * Piggy-backing on real traffic means the work happens when the database
+   * is awake anyway. If nobody is using the app, nothing expires that anyone
+   * can see, so there is nothing to clean up.
+   */
+  async purgeIfDue(): Promise<void> {
+    if (Date.now() - this.lastPurgeAt < 60 * 60 * 1000) return;
+    this.lastPurgeAt = Date.now();
+
+    try {
+      await this.purgeExpired();
+    } catch (error) {
+      logger.error('Opportunistic DM purge failed', { error });
+    }
+  }
+
   /**
    * Starts the hourly purge.
    *
-   * Hourly rather than at midnight: the cutoff is a rolling 24 hours from
-   * each message, so there is no single moment when everything expires, and
-   * an hourly pass keeps each sweep small.
+   * Kept for a deployment that wants a background timer - it is not used by
+   * default, because on a free serverless tier the timer is what stops the
+   * database ever going to sleep.
    */
   startExpiryTimer(): NodeJS.Timeout {
     // One pass at boot clears anything that expired while the process was
