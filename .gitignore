@@ -6,3 +6,4 @@ logs/
 coverage/
 .DS_Store
 nuno_app.zip
+__pycache__/
